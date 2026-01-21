@@ -313,10 +313,39 @@ img#baseShirtImg { padding: 20px; }
   .stampMeta { grid-template-columns: 1fr 1fr; }
 }
 
+/* UX - avisos e validação */
+.notice{
+  width: 90vw;
+  margin: 10px auto;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #e6e6e6;
+  background: #fffbe6;
+  color: #5c4b00;
+  font-size: 14px;
+}
+.notice.success{ background:#e7fff4; color:#0f5132; border-color:#b7f5d8; }
+.notice.error{ background:#ffecec; color:#7a1f1f; border-color:#f5b7b7; }
+
+.field-error{
+  outline: 2px solid #d9534f !important;
+  border-radius: 4px;
+}
+
+button:disabled{
+  opacity: .55;
+  cursor: not-allowed;
+  filter: grayscale(0.2);
+}
+
 
 </style>
 </head>
 <body>
+
+<!-- Barra de avisos (UX) -->
+<div id="uiNotice" class="notice" style="display:none;"></div>
+
 
 <div id="overallContainer">
   <div class="title"><p>Personalize sua camiseta</p></div>
@@ -448,7 +477,7 @@ img#baseShirtImg { padding: 20px; }
 
 <!-- Ações principais -->
 <div style="margin:20px; text-align:center;">
-  <button onclick="gerarPDF()" style="padding:10px; background:#000; color:#fff; border-radius:6px;">Gerar PDF</button>
+  <button id="btnGerarPdf" onclick="gerarPDF()" style="padding:10px; background:#000; color:#fff; border-radius:6px;">Gerar PDF</button>
 </div>
 
 <script>
@@ -765,6 +794,18 @@ function updateBasePreview() {
   });
 }
 
+function syncUiState() {
+  const btnPdf = document.getElementById('btnGerarPdf');
+  if (!btnPdf) return;
+
+  const hasStamp = stamps.some(s => !s.hidden);
+  const sizes = collectSizes();
+  const total = sizes.reduce((sum, s) => sum + (parseInt(s.qty || 0, 10) || 0), 0);
+
+  btnPdf.disabled = !(hasStamp && total > 0);
+}
+
+
 function stampLocationChanged() {
   populateSubLocations();
   updateBasePreview();
@@ -872,6 +913,8 @@ function removeStamp(id){
   if (activeStampId===id) activeStampId = stamps[0]?.id || null;
   setAlignHudVisible(!!activeStampId);
   renderStampsList();
+  syncUiState();
+
 }
 
 function refreshStampSideInPreview(s){
@@ -888,10 +931,50 @@ function promptAddStamp() {
   document.getElementById('stampFile').click();
 }
 
+function showNotice(type, msg) {
+  const el = document.getElementById('uiNotice');
+  if (!el) return;
+  el.className = 'notice ' + (type || '');
+  el.textContent = msg;
+  el.style.display = 'block';
+
+  // some sozinho depois de 4s (apenas info/success)
+  if (type !== 'error') {
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+  }
+}
+
+function clearNotice() {
+  const el = document.getElementById('uiNotice');
+  if (!el) return;
+  el.style.display = 'none';
+  el.textContent = '';
+}
+
+function markError(el, on=true) {
+  if (!el) return;
+  el.classList.toggle('field-error', !!on);
+}
+
+
 function updateStampPreview() {
   const input = document.getElementById("stampFile");
-  if (!input.files.length) { alert("Selecione um arquivo de estampa."); return; }
+  if (!input.files.length) {
+    showNotice('error', 'Selecione um arquivo de estampa para adicionar.');
+    markError(input, true);
+    return;
+  }
+  markError(input, false);
+  clearNotice();
+
   const file = input.files[0];
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const ok = ['png','jpg','jpeg','svg'].includes(ext);
+  if (!ok) {
+    showNotice('error', 'Formato não suportado no preview. Use PNG, JPG/JPEG ou SVG.');
+    return;
+  }
+
   const reader = new FileReader();
   reader.onload = function(e) {
     const side = document.getElementById('stampLocation').value || 'Frente';
@@ -927,6 +1010,8 @@ function addStampFromDataURL(dataURL, name='Estampa', side='Frente', cm=20) {
   activeStampId = sObj.id;
   setAlignHudVisible(true);
   renderStampsList();
+  syncUiState();
+
 }
 
 // ========================
@@ -1080,6 +1165,7 @@ function updateSizeTable() {
     const td2 = document.createElement("td");
     td2.classList.add("quantityControl");
     const input = document.createElement("input");
+    input.addEventListener('input', syncUiState);
     input.type = "number"; input.min = "0"; input.value = "0"; input.dataset.size = s;
     td2.appendChild(input);
     tr.appendChild(td1); tr.appendChild(td2);
@@ -1398,6 +1484,7 @@ async function buildPDF(orderData, opts = { returnBlob: false, filename: "pedido
 
 // Wrapper público
 async function gerarPDF() {
+  if (!validateBeforePdf()) return;
   // Caso use o toggle visual no HTML:
   const cb = document.getElementById('chkPdfShirtBox');
   if (cb) SHOW_PDF_SHIRT_BOX = cb.checked === true;
@@ -1412,6 +1499,29 @@ async function gerarPDF() {
   };
   await buildPDF(orderData, { returnBlob: false, filename: "pedido-camiseta.pdf" });
 }
+
+function validateBeforePdf() {
+  clearNotice();
+
+  // 1) Precisa ter ao menos 1 estampa visível
+  const hasStamp = stamps.some(s => !s.hidden);
+  if (!hasStamp) {
+    showNotice('error', 'Adicione pelo menos 1 estampa antes de gerar o PDF.');
+    return false;
+  }
+
+  // 2) Precisa ter ao menos 1 quantidade > 0
+  const sizes = collectSizes(); // já existe :contentReference[oaicite:4]{index=4}
+  const total = sizes.reduce((sum, s) => sum + (parseInt(s.qty || 0, 10) || 0), 0);
+
+  if (total <= 0) {
+    showNotice('error', 'Defina as quantidades (pelo menos 1 tamanho com quantidade maior que zero).');
+    return false;
+  }
+
+  return true;
+}
+
 
 async function sendWhatsApp() {
   const orderData = {
@@ -1502,6 +1612,7 @@ function initConfigurator() {
   toggleShirtBox(true);
   setAlignHudVisible(false);
   renderStampsList();
+  syncUiState();
 }
 
 // Expor globais (on* do HTML)
