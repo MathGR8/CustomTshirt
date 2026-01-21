@@ -1,0 +1,19 @@
+O que falta fazer no código:
+
+ - Ajustar tabela de tamanhos/quantidades no PDF. deixa-las ocupando menos espaço no PDF. talvez fazendo mais fileiras verticais com tamanhos/quantidades.
+
+ - Adaptar código e cadastrar outras opções de layout. ==> Feito
+
+ - Adicionar na seleção de tamanhos botões de "+" e "-" aos lados para controle de quantidades e sumir com as setinhas dentro do input.
+
+ - Se quantidade de alguma variação for igual a "0" não incluir o tamanho/quantidade no PDF.
+
+ - Remover ou corrigir função de tamanho Livre. Input do tipo range atualmente não serve para nada/ não funciona para aumentar ou diminuir o tamanho da estampa.
+
+ - Adicionar infomrtivos de como fazer o processo de criação da estampa/Layout. (fazer mais futuramente).
+
+ - Fazer colocar duas imagens da estampa no pdf, uma na camiseta onde já está posicionada (Frente e costas) e outra no quadrado correspondente para detalhes da estampa.
+
+ - Possibilitar adicionar mais de uma estampa na camiseta camiseta e permitir que sejam em locais e em tamanhos diferentes.
+
+ - Fazer menu de controle de Estampas, com um menu visual ao lado da imagem, com miniaturas das estampas dispostas uma acima da outra e com um "x" vermelho no topo direito para fazer a remoção das estampas correspondentes da pré-visualização.
