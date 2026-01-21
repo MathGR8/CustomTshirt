@@ -1,0 +1,1527 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Configurar Camiseta - ArtRock (Demo)</title>
+
+  <!-- jsPDF + AutoTable -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<style>
+
+/* Container geral */
+#overallContainer {
+  width: 90vw;
+  height: 95vh;
+  margin: auto;
+  padding: 10px;
+  box-sizing: border-box;
+  border: 1px solid #ccc;
+}
+
+/* Layout principal: duas colunas */
+.mainContainer {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  gap: 20px;
+}
+
+/* Painel esquerdo */
+#leftPanel {
+  width: 30%;
+  height: 93%;
+  border-right: 1px solid #ccc;
+  padding-right: 10px;
+  box-sizing: border-box;
+  overflow: auto;
+}
+
+/* Painel direito */
+#midlePanel {
+  width: 40%;
+  text-align: center;
+  position: relative;
+}
+
+/* Painel direito */
+#rightPanel {
+  width: 30%;
+  text-align: center;
+  position: relative;
+}
+
+.title {
+  background-color: #00000026;
+  height: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 3px;
+  margin-bottom: 20px;
+  font-weight: 900;
+}
+.title p { font-size: 20px; }
+.title2 { display: flex; justify-content: center; margin: 0; font-size: 18px; }
+
+/* Blocos de configuração */
+.seletor { display: flex; flex-direction: column; margin: 10px 0; }
+.seletor label{ margin-bottom: 10px; }
+.configRow { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+
+#seletorCtg, #seletorMalha { width: 50%; }
+div#setor1 {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  gap: 12px;
+}
+
+div#leftPanel label { font-size: 16px; }
+#stampSizeContainer label { width: 100%; }
+#stampSizeContainer { align-items: flex-start; }
+#stampSizeContainer input { width: 75%; }
+
+/* Inputs de arquivo / ações */
+.fileInputSection {
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+.actionsRow { display: flex; gap: 8px; }
+
+button {
+  padding: 10px;
+  background-color: #36C5C4;
+  color: white;
+  border: none;
+  cursor: pointer;
+  margin-top: 10px;
+  border-radius: 5px;
+}
+button:hover { filter: brightness(0.95); }
+button:active { transform: translateY(1px); }
+
+button#btnDefineQuantities {
+  width: 100%;
+  font-size: 16px;
+}
+
+/* Área de pré-visualização */
+.previewContainer {
+  width: auto; height: 500px; margin: auto; border: 1px solid #333;
+  position: relative; border-radius: 10px; overflow: hidden; background-color: #d8d8d8;
+}
+.shirtPreview {
+  width: 100%; height: 100%; position: relative; display: flex; justify-content: center;
+}
+
+/* Botão de alternar vista */
+#btnToggleView {
+  position: absolute;
+  right: 10px;
+  bottom: 60px;
+  border: 1px solid black;
+}
+
+/* Seletor de cores (bolinhas) */
+#colorOptionsContainer {
+  display: flex; padding: 10px; flex-wrap: wrap; border: 1px solid #00000038; border-radius: 5px;justify-content: space-evenly;
+}
+.colorOption {
+  display: flex; flex-direction: column; align-items: center; cursor: pointer;
+}
+.colorCircle { width: 18px; height: 18px; border-radius: 50%; border: 2px solid black; margin-bottom: 3px; }
+.colorOption.selected .colorCircle { border-color: green; }
+.colorLabel { font-size: 11px; text-align: center; }
+
+/* Tabela de tamanhos */
+.tableSizes { width: 95%; border-collapse: collapse; margin: 10px auto; text-align: center; }
+.tableSizes th, .tableSizes td { border: 1px solid #ddd; padding: 5px; }
+
+/* Controles de quantidade */
+.quantityControl { display: flex; align-items: center; justify-content: center; }
+.quantityControl button { padding: 2px 6px; font-size: 12px; margin: 0 5px; }
+.quantityControl input { width: 70px; text-align: center; }
+
+/* Containers internos */
+#configSection { display: flex; flex-direction: column; flex-wrap: nowrap; }
+#locationSection {
+  display: flex; flex-direction: row; flex-wrap: wrap; width: 100%;
+  align-items: center; justify-content: space-evenly; gap: 12px;
+}
+#subLocationContainer, #locationContainer { display: flex; flex-direction: column; }
+
+/* Overlay da shirt box no preview */
+#shirtBoxOverlay {
+  position: absolute;
+  border: 2px dashed #36C5C4;
+  border-radius: 4px;
+  pointer-events: none;
+  display: none;
+  z-index: 5;
+}
+
+label#MarkshirtBox {
+  position: absolute;
+  right: 15px;
+  top: -20px;
+}
+
+img#baseShirtImg { padding: 20px; }
+
+/* HUD de alinhamento */
+#alignHud {
+  position: absolute;
+  right: 5px;
+  bottom: 50px;
+  display: none;
+  gap: 10px;
+  align-items: center;
+  z-index: 20;
+  flex-direction: column;
+}
+
+#alignHud .centerCol { display: flex; flex-direction: column; gap: 6px; margin-left: 20px; }
+
+#alignHud .align-button {
+  padding: 5px 8px;
+  font-size: 12px;
+  border: 1px solid #000000;
+  background: #32d1cf;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 0;
+}
+
+/* D-pad em cruz */
+#alignHud .dpad {
+  display: grid;
+  grid-template-columns: 25px 25px 25px;
+  grid-template-rows: 25px 25px 25px;
+  padding: 5px;
+  border-radius: 10px;
+  background: rgba(50, 209, 207, .35);
+  border: 1px solid #000000;
+  backdrop-filter: blur(2px);
+  align-items: center;
+  justify-items: center;
+  gap: 0;
+}
+
+#alignHud .dpad .cell {
+  width: 22px;
+  height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  border: 2px solid #045;
+  background: #1b8fe0;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  margin: 0;
+}
+#btnNudgeUp    { grid-column: 2; grid-row: 1; }
+#btnNudgeLeft  { grid-column: 1; grid-row: 2; }
+#btnNudgeRight { grid-column: 3; grid-row: 2; }
+#btnNudgeDown  { grid-column: 2; grid-row: 3; }
+
+/* Lista de Estampas (mini-menu) */
+#stampsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  padding: 8px;
+  background: #fafafa;
+}
+
+.stampItem {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid #e1e1e1;
+  border-radius: 8px;
+  background: #fff;
+  align-items: center;
+  cursor: pointer;
+}
+.stampItem.active {
+  border-color: #36C5C4;
+  box-shadow: 0 0 0 2px rgba(54,197,196,0.15);
+}
+
+.stampThumb {
+  width: 100px; height: auto;
+  object-fit: contain;
+  border: 1px dashed #ccc;
+  border-radius: 6px;
+  background: #f5f5f5;
+}
+
+.stampMeta {
+  display: flex;
+  gap: 8px;
+}
+.labelWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+.labelWrap span { color: #444; }
+
+.stampRowBtns {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+}
+
+.stampRowBtns button {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: #2f9e99;
+}
+.stampRowBtns button:nth-child(2) { background: #d9534f; }
+.stampRowBtns button:nth-child(3) { background: #d9534f; }
+
+/* Toggle de debug do PDF */
+.pdfToggles {
+  margin-top: 12px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* Responsivo básico */
+@media (max-width: 1100px) {
+  #overallContainer { width: 95vw; }
+  .mainContainer { flex-direction: column; }
+  #leftPanel, #midlePanel { width: 100%; height: auto; }
+  #btnToggleView { position: static; margin-top: 10px; }
+  .previewContainer { height: 420px; }
+  .stampMeta { grid-template-columns: 1fr 1fr; }
+}
+
+
+</style>
+</head>
+<body>
+
+<div id="overallContainer">
+  <div class="title"><p>Personalize sua camiseta</p></div>
+
+  <div class="mainContainer">
+    <!-- Painel esquerdo -->
+    <div id="leftPanel">
+      <div id="configSection">
+        <div id="setor1">
+          <div class="seletor" id="seletorCtg">
+            <label for="category">Categoria:</label>
+            <select id="category" onchange="updateColorOptions(); updateSizeTable();">
+              <option value="Masculina" selected>Masculina</option>
+              <option value="Feminina">Feminina</option>
+              <option value="Infantil/Juvenil">Infantil/Juvenil</option>
+            </select>
+          </div>
+          <div class="seletor" id="seletorMalha">
+            <label for="fabricType">Tipo da Malha:</label>
+            <select id="fabricType" onchange="updateColorOptions()">
+              <option value="100% algodão" selected>100% algodão</option>
+              <option value="Premium mesclado">Premium mesclado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="seletor" id="seletorCor">
+          <label>Cor:</label>
+          <div id="colorOptionsContainer"></div>
+        </div>
+
+        <div class="seletor" id="enviaEstampa">
+          <label>Envie sua Estampa:</label>
+          <div class="fileInputSection">
+            <input type="file" id="stampFile" accept=".svg,.eps,.pdf,.png,.jpg" />
+            <div class="actionsRow">
+              <button type="button" onclick="updateStampPreview()">Adicionar Estampa</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="locationSection" class="seletor">
+          <div id="locationContainer">
+            <label for="stampLocation">Local da Estampa:</label>
+            <select id="stampLocation" onchange="stampLocationChanged()">
+              <option value="Frente" selected>Frente</option>
+              <option value="Costas">Costas</option>
+            </select>
+          </div>
+          <div id="subLocationContainer">
+            <label for="subLocation">Tamanho rápido:</label>
+            <select id="subLocation" onchange="updateStampSizeDefault()"></select>
+          </div>
+        </div>
+
+        <div id="stampSizeContainer" class="seletor" style="display:none;">
+          <label for="stampSize">Largura da Estampa ativa: <span id="stampSizeValue">0 cm</span></label>
+          <input type="range" id="stampSize" min="5" max="38" value="22" />
+        </div>
+
+        <button type="button" id="btnDefineQuantities" onclick="showSizeSection(); updateSizeTable()">Definir Quantidades</button>
+      </div>
+
+      <div id="sizeSection" style="display:none;">
+        <p class="title2">Tamanhos e Quantidades</p>
+        <table id="sizeTable" class="tableSizes"></table>
+        <button type="button" onclick="backToConfig()">Voltar</button>
+      </div>
+    </div>
+
+    <!-- Painel do meio -->
+    <div id="midlePanel">
+      <label id="MarkshirtBox">
+        <input type="checkbox" id="chkShowShirtBox" checked onchange="toggleShirtBox(this.checked)">
+        Mostrar TShirt Box (preview)
+      </label>
+
+      <div id="previewContainer" class="previewContainer">
+        <div class="shirtPreview" id="preview"></div>
+
+        <!-- HUD de alinhamento -->
+        <div id="alignHud">
+          <div class="centerCol">
+            <button type="button" class="align-button"
+                    onclick="alignStamp('centerX')" title="Centralizar horizontalmente">Centro ⟷</button>
+            <button type="button" class="align-button"
+                    onclick="alignStamp('top')" title="Alinhar ao topo">Topo ⤒</button>
+            <button type="button" class="align-button"
+                    onclick="alignStamp('bottom')" title="Alinhar à base">Baixo ⤓</button>
+          </div>
+          <div class="dpad">
+            <button id="btnNudgeUp"    class="cell"
+              onmousedown="startNudge('moveUp')"    onmouseup="stopNudge()" onmouseleave="stopNudge()"
+              ontouchstart="startNudge('moveUp');return false;" ontouchend="stopNudge()" ontouchcancel="stopNudge()">▲</button>
+            <button id="btnNudgeLeft"  class="cell"
+              onmousedown="startNudge('moveLeft')"  onmouseup="stopNudge()" onmouseleave="stopNudge()"
+              ontouchstart="startNudge('moveLeft');return false;" ontouchend="stopNudge()" ontouchcancel="stopNudge()">◀</button>
+            <button id="btnNudgeRight" class="cell"
+              onmousedown="startNudge('moveRight')" onmouseup="stopNudge()" onmouseleave="stopNudge()"
+              ontouchstart="startNudge('moveRight');return false;" ontouchend="stopNudge()" ontouchcancel="stopNudge()">▶</button>
+            <button id="btnNudgeDown"  class="cell"
+              onmousedown="startNudge('moveDown')"  onmouseup="stopNudge()" onmouseleave="stopNudge()"
+              ontouchstart="startNudge('moveDown');return false;" ontouchend="stopNudge()" ontouchcancel="stopNudge()">▼</button>
+          </div>
+        </div>
+      </div>
+
+      <button type="button" id="btnToggleView" onclick="toggleView()">Trocar Frente/Costas</button>
+
+      <div class="pdfToggles">
+        <label>
+          <input type="checkbox" id="chkPdfShirtBox" />
+          Mostrar Shirt Box no PDF (debug)
+        </label>
+      </div>
+    </div>
+    
+    <!-- Painel do meio -->
+    <div id="rightPanel">
+        <!-- Mini-menu de estampas -->
+        <div class="seletor">
+          <label>Controle de Estampas</label>
+          <div id="stampsList"></div>
+        </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Ações principais -->
+<div style="margin:20px; text-align:center;">
+  <button onclick="gerarPDF()" style="padding:10px; background:#000; color:#fff; border-radius:6px;">Gerar PDF</button>
+</div>
+
+<script>
+// ========================
+// ESTADO GLOBAL
+// ========================
+let currentView = "Frente";
+
+// === MULTI-ESTAMPAS ===
+let stamps = []; // [{id, node, dataURL, side:'Frente'|'Costas', name, cm:number, hidden:false}]
+let activeStampId = null;
+
+function getActiveStamp() {
+  return stamps.find(s => s.id === activeStampId) || null;
+}
+
+let isDragging = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+
+let selectedColor = "";
+let showShirtBox = true; // shirt box no PREVIEW
+
+// ========================
+// CONFIGS GERAIS
+// ========================
+const MAX_PRINT_WIDTH_CM = 38;
+
+// Mostrar/ocultar o retângulo no PDF (debug) — deixe false para ocultar
+let SHOW_PDF_SHIRT_BOX = false;
+
+// ========================
+// BASE IMAGES (preview por categoria/cor/lado)
+// ========================
+const baseImages = {
+  "Masculina": {
+    "Branco": {
+      "Frente":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/branca-frente.png' alt='Camiseta masculina branca frente'>",
+      "Costas":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/branca-costas.png' alt='Camiseta masculina branca costas'>"
+    },
+    "Preto": {
+      "Frente":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/preta-frente.png' alt='Camiseta masculina preta frente'>",
+      "Costas":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/preta-costas.png' alt='Camiseta masculina preta costas'>"
+    },
+    "Marinho": {
+      "Frente":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/marinho-frente.png' alt='Camiseta masculina marinho frente'>",
+      "Costas":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/marinho-costas.png' alt='Camiseta masculina marinho costas'>"
+    },
+    "Preta Jaguar": {
+      "Frente":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/jaguar-frente-2.png' alt='Camiseta masculina preta jaguar frente'>",
+      "Costas":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/jaguar-costas-2.png' alt='Camiseta masculina preta jaguar costas'>"
+    },
+    "Marinho Índigo": {
+      "Frente":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/indigo-frente-4.png' alt='Camiseta masculina marinho índigo frente'>",
+      "Costas":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/indigo-costas.png' alt='Camiseta masculina marinho índigo costas'>"
+    },
+    "Cinza Mescla": {
+      "Frente":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/mescla-frente.png' alt='Camiseta masculina cinza mescla frente'>",
+      "Costas":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/mescla-costas.png' alt='Camiseta masculina cinza mescla costas'>"
+    },
+    "Cinza Grafite": {
+      "Frente":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/grafite-frente.png' alt='Camiseta masculina cinza grafite frente'>",
+      "Costas":  "<img src='https://cdn.awsli.com.br/1274/1274265/arquivos/grafite-costas.png' alt='Camiseta masculina cinza grafite costas'>"
+    }
+  },
+  "Feminina": {
+    "Branco":        { "Frente": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/185294547/10000-camiseta-feminina-basica-branca-frente-2-8t3155sik5.png' alt='Camiseta feminina branca frente'>", "Costas": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/168684774/bb-375-camiseta-feminina-rolling-stones-branca-costas-517akz0r81.png' alt='Camiseta feminina branca costas'>" },
+    "Preto":         { "Frente": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/185294558/10000-camiseta-feminina-basica-preta-frente-2-3jtk8wnj11.png' alt='Camiseta feminina preta frente'>", "Costas": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/185294558/10000-camisa-p-gbdesjb1cj.jpg' alt='Camiseta feminina preta costas'>" },
+    "Marinho":       { "Frente": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/185294553/10000-camiseta-feminina-basica-marinho-frente-1-ysvn0w9crn.png' alt='Camiseta feminina marinho frente'>", "Costas": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/168684771/camiseta-feminin-dzme1j0q62.png' alt='Camiseta feminina marinho costas'>" },
+    "Preta Jaguar":  { "Frente": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/185305572/10000-camiseta-feminina-basica-preta-jaguar-frente-2-7g4lv1clxy.png' alt='Camiseta feminina preta jaguar frente'>", "Costas": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/185305572/10000-camisa-b-s-kq410gfe44.jpg' alt='Camiseta feminina preta jaguar costas'>" },
+    "Marinho Índigo":{ "Frente": "", "Costas": "" },
+    "Cinza Mescla":  { "Frente": "", "Costas": "" },
+    "Cinza Grafite": { "Frente": "", "Costas": "" }
+  },
+  "Infantil/Juvenil": {
+    "Branco":        { "Frente": "", "Costas": "" },
+    "Preto":         { "Frente": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/196997466/10000-camiseta-basica-juvenil-preta-ba67a0fbce.jpg' alt='Camiseta juvenil preta frente'>", "Costas": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/196997466/camiseta-juvenil-costas-preta-e105ab11bc.jpg' alt='Camiseta juvenil preta costas'>" },
+    "Marinho":       { "Frente": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/196995997/10000-camiseta-basica-juvenil-marinho-ba9c7ede9c.jpg' alt='Camiseta juvenil marinho frente'>", "Costas": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/167795404/camiseta-juvenil-gasoline-marinho-c27736e8.jpg' alt='Camiseta juvenil marinho costas'>" },
+    "Preta Jaguar":  { "Frente": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/197000745/10000-camiseta-basica-juvenil-preta-jaguar-ddc16a8c2b.jpg' alt='Camiseta juvenil preta jaguar frente'>", "Costas": "<img src='https://cdn.awsli.com.br/2500x2500/1274/1274265/produto/197000745/camiseta-juvenil-costas-jaguar-3c136053a6.jpg' alt='Camiseta juvenil preta jaguar costas'>" },
+    "Marinho Índigo":{ "Frente": "", "Costas": "" },
+    "Cinza Mescla":  { "Frente": "", "Costas": "" },
+    "Cinza Grafite": { "Frente": "", "Costas": "" }
+  }
+};
+
+// ========================
+// PRINT BOX (0..1) relativo à base renderizada
+// ========================
+const SHIRT_PRINT_BOX = {
+  Frente: { x: 0.225, y: 0.15, w: 0.55, h: 0.68 },
+  Costas: { x: 0.23,  y: 0.05, w: 0.54, h: 0.78 }
+};
+
+// ========================
+// HELPERS DE PREVIEW
+// ========================
+function getBaseImage(color, view) {
+  const category = document.getElementById("category").value;
+  const html = baseImages?.[category]?.[color]?.[view];
+  return html || '<div style="width:100%; height:100%; background:#ccc;"></div>';
+}
+
+function getRenderedBaseRect() {
+  const previewEl = document.getElementById("preview");
+  const base = document.getElementById("baseShirtImg");
+  if (!previewEl || !base || !base.naturalWidth || !base.naturalHeight) return null;
+
+  const prev = previewEl.getBoundingClientRect();
+
+  const cs = window.getComputedStyle(base);
+  const padL = parseFloat(cs.paddingLeft)  || 0;
+  const padR = parseFloat(cs.paddingRight) || 0;
+  const padT = parseFloat(cs.paddingTop)   || 0;
+  const padB = parseFloat(cs.paddingBottom)|| 0;
+
+  const innerW = prev.width  - (padL + padR);
+  const innerH = prev.height - (padT + padB);
+
+  const nw = base.naturalWidth, nh = base.naturalHeight;
+  const scale = Math.min(innerW / nw, innerH / nh);
+  const drawW = nw * scale;
+  const drawH = nh * scale;
+
+  const offsetX = (innerW - drawW) / 2 + padL;
+  const offsetY = (innerH - drawH) / 2 + padT;
+
+  return { left: prev.left + offsetX, top: prev.top + offsetY, width: drawW, height: drawH };
+}
+
+function getRenderedShirtRect() {
+  const baseRect = getRenderedBaseRect();
+  if (!baseRect) return null;
+  const view = currentView || "Frente";
+  const box = SHIRT_PRINT_BOX[view] || { x:0, y:0, w:1, h:1 };
+  return {
+    left:   baseRect.left + box.x * baseRect.width,
+    top:    baseRect.top  + box.y * baseRect.height,
+    width:  box.w * baseRect.width,
+    height: box.h * baseRect.height
+  };
+}
+
+function getPxPerCmPreview() {
+  const rect = getRenderedShirtRect();
+  if (!rect || rect.width <= 0) return null;
+  return rect.width / MAX_PRINT_WIDTH_CM; // px por cm
+}
+
+// Retângulo relativo (0..1) da estampa dentro da print box do preview
+function getPreviewRelRect(node) {
+  if (!node) return null;
+
+  const prevTransform = node.style.transform || "";
+  node.style.transform = "none";
+
+  const shirtRect = getRenderedShirtRect();
+  const stampRect = node.getBoundingClientRect();
+
+  node.style.transform = prevTransform;
+
+  if (!shirtRect || !shirtRect.width || !shirtRect.height) return null;
+
+  let rx = (stampRect.left - shirtRect.left) / shirtRect.width;
+  let ry = (stampRect.top  - shirtRect.top  ) / shirtRect.height;
+  let rw =  stampRect.width                   / shirtRect.width;
+  let rh =  stampRect.height                  / shirtRect.height;
+
+  const clamp = (v, a=0, b=1) => Math.max(a, Math.min(b, v));
+  const rx1 = clamp(rx), ry1 = clamp(ry);
+  const rw1 = clamp(rx + rw) - rx1;
+  const rh1 = clamp(ry + rh) - ry1;
+
+  return { rx: rx1, ry: ry1, rw: rw1, rh: rh1 };
+}
+
+// ========================
+// UI — CORES / OPÇÕES
+// ========================
+function updateColorOptions() {
+  const fabricType = document.getElementById("fabricType").value;
+  const category   = document.getElementById("category").value;
+  const container  = document.getElementById("colorOptionsContainer");
+  container.innerHTML = "";
+
+  let options = [];
+  if (fabricType === "100% algodão") {
+    options = [
+      { value: "Preto", color: "#000000", label: "Preto" },
+      { value: "Branco", color: "#FFFFFF", label: "Branco" },
+      { value: "Marinho", color: "#001f3f", label: "Marinho" }
+    ];
+  } else {
+    options = [
+      { value: "Preta Jaguar",   color: "#000000", label: "Preta" },
+      { value: "Marinho Índigo", color: "#003366", label: "Azul Marinho" },
+      { value: "Cinza Mescla",   color: "#cccccc", label: "Cinza Claro" },
+      { value: "Cinza Grafite",  color: "#333333", label: "Cinza Escuro" }
+    ];
+  }
+
+  // Filtra por imagens disponíveis na categoria
+  options = options.filter(opt => {
+    const imgs = baseImages?.[category]?.[opt.value];
+    return imgs && ((imgs.Frente && imgs.Frente.trim() !== "") || (imgs.Costas && imgs.Costas.trim() !== ""));
+  });
+
+  if (!options.length) {
+    container.style.display = "none";
+    selectedColor = "";
+    updateBasePreview();
+    return;
+  }
+  container.style.display = "flex";
+
+  options.forEach((opt, idx) => {
+    const div = document.createElement("div");
+    div.classList.add("colorOption");
+    div.dataset.value = opt.value;
+    if (idx === 0) { selectedColor = opt.value; div.classList.add("selected"); }
+    const circle = document.createElement("div");
+    circle.classList.add("colorCircle");
+    circle.style.backgroundColor = opt.color;
+    const label = document.createElement("span");
+    label.classList.add("colorLabel");
+    label.textContent = opt.label;
+    div.append(circle, label);
+
+    div.addEventListener("click", function() {
+      selectedColor = this.dataset.value;
+      document.querySelectorAll(".colorOption").forEach(el => el.classList.remove("selected"));
+      this.classList.add("selected");
+      updateBasePreview();
+    });
+    container.appendChild(div);
+  });
+
+  if (!selectedColor && options.length) selectedColor = options[0].value;
+  updateBasePreview();
+}
+
+function populateSubLocations() {
+  const mainLoc = document.getElementById("stampLocation").value;
+  const sub = document.getElementById("subLocation");
+  sub.innerHTML = "";
+  const opts = (mainLoc === "Frente") ? ["Frontal","Peito","Livre"] : ["Costas","Livre"];
+  opts.forEach(opt => {
+    const o = document.createElement("option");
+    o.value = opt; o.text = opt; sub.append(o);
+  });
+}
+
+// ========================
+// PREVIEW RENDER
+// ========================
+function ensureShirtBoxEl() {
+  const preview = document.getElementById("preview");
+  let el = document.getElementById("shirtBoxOverlay");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "shirtBoxOverlay";
+    el.style.position = "absolute";
+    el.style.border = "2px dashed #36C5C4";
+    el.style.borderRadius = "4px";
+    el.style.pointerEvents = "none";
+    el.style.zIndex = "5";
+    preview.appendChild(el);
+  }
+  return el;
+}
+
+function updateShirtBoxOverlay() {
+  const el = ensureShirtBoxEl();
+  if (!showShirtBox) { el.style.display = "none"; return; }
+  const rect = getRenderedShirtRect();
+  if (!rect) { el.style.display = "none"; return; }
+  const previewBox = document.getElementById("preview").getBoundingClientRect();
+  el.style.left   = (rect.left - previewBox.left) + "px";
+  el.style.top    = (rect.top  - previewBox.top ) + "px";
+  el.style.width  = rect.width  + "px";
+  el.style.height = rect.height + "px";
+  el.style.display = "block";
+}
+
+function toggleShirtBox(checked) { showShirtBox = !!checked; updateShirtBoxOverlay(); }
+
+function updateBasePreview() {
+  const mainLoc = document.getElementById("stampLocation").value || "Frente";
+  currentView = mainLoc;
+
+  if (!selectedColor) selectedColor = "Preto";
+
+  const preview = document.getElementById("preview");
+  preview.innerHTML = getBaseImage(selectedColor, mainLoc);
+
+  const baseImgEl = preview.querySelector("img");
+  if (baseImgEl) {
+    baseImgEl.id = "baseShirtImg";
+    baseImgEl.draggable = false;
+    baseImgEl.style.userSelect = "none";
+    baseImgEl.addEventListener("load", () => {
+      updateShirtBoxOverlay();
+      // Reaplicar tamanhos em px (px/cm muda com resize)
+      stamps.forEach(s => { if (s.side===currentView) applyStampCmToNode(s); });
+      // Re-anexar as estampas do lado atual
+      stamps.forEach(refreshStampSideInPreview);
+    });
+  }
+
+  updateShirtBoxOverlay();
+
+  // recoloca estampas do lado atual já existentes
+  stamps.filter(s=>s.side===currentView && !s.hidden).forEach(s=>{
+    if (!s.node.parentNode) preview.appendChild(s.node);
+  });
+}
+
+function stampLocationChanged() {
+  populateSubLocations();
+  updateBasePreview();
+  updateStampSizeDefault();
+  updateShirtBoxOverlay();
+}
+
+window.addEventListener("resize", updateShirtBoxOverlay);
+
+// ========================
+// MULTI-ESTAMPAS
+// ========================
+function clampCm(v){ return Math.max(5, Math.min(v||20, MAX_PRINT_WIDTH_CM)); }
+
+function applyStampCmToNode(s) {
+  const pxPerCm = getPxPerCmPreview(); if (!pxPerCm || !s.node) return;
+  const cm = clampCm(s.cm ?? 20);
+  s.node.style.width = (cm * pxPerCm) + 'px';
+  s.node.style.height = 'auto';
+}
+
+function centerNodeInsideShirtBox(node){
+  const shirtRect = getRenderedShirtRect();
+  const previewBox = document.getElementById("preview").getBoundingClientRect();
+  const r = node.getBoundingClientRect();
+  const left = (shirtRect.left - previewBox.left) + (shirtRect.width  - r.width ) / 2;
+  const top  = (shirtRect.top  - previewBox.top ) + (shirtRect.height - r.height) / 2;
+  node.style.left = left + 'px';
+  node.style.top  = top  + 'px';
+}
+
+function renderStampsList() {
+  const list = document.getElementById('stampsList');
+  if (!list) return;
+  list.innerHTML = '';
+  stamps.forEach(s => {
+    const item = document.createElement('div');
+    item.className = 'stampItem' + (s.id === activeStampId ? ' active' : '');
+    const img = document.createElement('img');
+    img.className = 'stampThumb';
+    img.src = s.dataURL;
+
+    const meta = document.createElement('div');
+    meta.className = 'stampMeta';
+
+    const side = document.createElement('select');
+    ['Frente','Costas'].forEach(v=>{
+      const o=document.createElement('option'); o.value=v; o.text=v; side.append(o);
+    });
+    side.value = s.side;
+    side.onchange = () => { s.side = side.value; refreshStampSideInPreview(s); };
+
+    const cm = document.createElement('input');
+    cm.type='number'; cm.min=5; cm.max=MAX_PRINT_WIDTH_CM; cm.step=1;
+    cm.value = (s.cm ?? 20);
+    cm.style.width='70px';
+    cm.onchange = () => { s.cm = clampCm(parseFloat(cm.value||'20')); if (s.side===currentView) applyStampCmToNode(s); };
+
+    const toggle = document.createElement('input');
+    toggle.type = 'checkbox';
+    toggle.checked = !s.hidden;
+    toggle.onchange = () => { s.hidden = !toggle.checked; s.node.style.display = s.hidden ? 'none' : 'block'; };
+
+    meta.append(
+      labelWrap('Lado:', side),
+      labelWrap('Largura (cm):', cm),
+      labelWrap('Visível', toggle),
+    );
+
+    const btns = document.createElement('div');
+    btns.className='stampRowBtns';
+    const dup = mkBtn('Duplicar', ()=> duplicateStamp(s.id));
+    const del = mkBtn('Remover', ()=> removeStamp(s.id));
+    btns.append(dup,del);
+
+    item.append(img, meta, btns);
+    item.onclick = (e)=>{ if(e.target.tagName!=='BUTTON' && e.target.type!=='checkbox') setActiveStamp(s.id); };
+    list.appendChild(item);
+  });
+}
+
+function labelWrap(txt, node){
+  const w=document.createElement('label'); w.className='labelWrap';
+  const span=document.createElement('span'); span.textContent=txt; w.append(span,node); return w;
+}
+function mkBtn(t,fn){ const b=document.createElement('button'); b.textContent=t; b.onclick=e=>{e.stopPropagation(); fn();}; return b; }
+
+function setActiveStamp(id){
+  activeStampId = id;
+  setAlignHudVisible(!!getActiveStamp());
+  renderStampsList();
+}
+
+function duplicateStamp(id){
+  const s = stamps.find(x=>x.id===id); if(!s) return;
+  addStampFromDataURL(s.dataURL, (s.name||'Estampa')+' (cópia)', s.side, s.cm);
+}
+
+function removeStamp(id){
+  const idx = stamps.findIndex(x=>x.id===id);
+  if (idx<0) return;
+  const s = stamps[idx];
+  if (s.node && s.node.parentNode) s.node.parentNode.removeChild(s.node);
+  stamps.splice(idx,1);
+  if (activeStampId===id) activeStampId = stamps[0]?.id || null;
+  setAlignHudVisible(!!activeStampId);
+  renderStampsList();
+}
+
+function refreshStampSideInPreview(s){
+  const preview = document.getElementById("preview");
+  if (s.side === currentView && !s.hidden) {
+    if (!s.node.parentNode) preview.appendChild(s.node);
+    applyStampCmToNode(s);
+  } else {
+    if (s.node.parentNode) s.node.parentNode.removeChild(s.node);
+  }
+}
+
+function promptAddStamp() {
+  document.getElementById('stampFile').click();
+}
+
+function updateStampPreview() {
+  const input = document.getElementById("stampFile");
+  if (!input.files.length) { alert("Selecione um arquivo de estampa."); return; }
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const side = document.getElementById('stampLocation').value || 'Frente';
+    const cm = clampCm(parseFloat(document.getElementById('stampSize').value || '20'));
+    addStampFromDataURL(e.target.result, file.name, side, cm);
+    input.value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function addStampFromDataURL(dataURL, name='Estampa', side='Frente', cm=20) {
+  const preview = document.getElementById("preview");
+  const img = document.createElement("img");
+  img.src = dataURL;
+  img.alt = name;
+  img.classList.add("artOverlay");
+  img.style.position = "absolute";
+  img.style.transform = "none";
+  img.style.cursor = "move";
+  img.style.maxWidth = "80%";
+  img.draggable = false;
+
+  img.addEventListener("mousedown", startDragGeneric);
+  img.addEventListener("touchstart", startDragTouchGeneric, {passive:false});
+
+  if (side === currentView) preview.appendChild(img);
+
+  const sObj = { id: 'st'+Math.random().toString(36).slice(2,8), node: img, dataURL, side, name, cm: clampCm(cm), hidden:false };
+  applyStampCmToNode(sObj);
+  centerNodeInsideShirtBox(img);
+
+  stamps.push(sObj);
+  activeStampId = sObj.id;
+  setAlignHudVisible(true);
+  renderStampsList();
+}
+
+// ========================
+// DRAG GENÉRICO
+// ========================
+function startDragGeneric(e) {
+  const node = e.currentTarget;
+  isDragging = true;
+  const rect = node.getBoundingClientRect();
+  dragOffsetX = e.clientX - rect.left;
+  dragOffsetY = e.clientY - rect.top;
+  activeStampId = (stamps.find(s=>s.node===node)?.id)||activeStampId;
+  e.preventDefault();
+}
+document.addEventListener("mousemove", function(e){
+  if (!isDragging) return;
+  const s = getActiveStamp(); if(!s) return; const currentStamp = s.node;
+  const shirtRect = getRenderedShirtRect() || document.getElementById("preview").getBoundingClientRect();
+  const w = currentStamp.offsetWidth, h=currentStamp.offsetHeight;
+  let left = e.clientX - shirtRect.left - dragOffsetX;
+  let top  = e.clientY - shirtRect.top  - dragOffsetY;
+  left = Math.max(0, Math.min(left, shirtRect.width  - w));
+  top  = Math.max(0, Math.min(top,  shirtRect.height - h));
+  const previewBox = document.getElementById("preview").getBoundingClientRect();
+  currentStamp.style.left = (shirtRect.left + left - previewBox.left)+'px';
+  currentStamp.style.top  = (shirtRect.top  + top  - previewBox.top )+'px';
+});
+document.addEventListener("mouseup", ()=>{ isDragging=false; });
+
+function startDragTouchGeneric(ev){
+  const node = ev.currentTarget;
+  const t = ev.touches[0];
+  const rect = node.getBoundingClientRect();
+  dragOffsetX = t.clientX - rect.left;
+  dragOffsetY = t.clientY - rect.top;
+  isDragging = true;
+  activeStampId = (stamps.find(s=>s.node===node)?.id)||activeStampId;
+  ev.preventDefault();
+}
+document.addEventListener("touchmove", function(ev){
+  if (!isDragging) return;
+  const s = getActiveStamp(); if(!s) return; const currentStamp = s.node;
+  const t = ev.touches[0];
+  const shirtRect = getRenderedShirtRect() || document.getElementById("preview").getBoundingClientRect();
+  const w=currentStamp.offsetWidth, h=currentStamp.offsetHeight;
+  let left = t.clientX - shirtRect.left - dragOffsetX;
+  let top  = t.clientY - shirtRect.top  - dragOffsetY;
+  left = Math.max(0, Math.min(left, shirtRect.width  - w));
+  top  = Math.max(0, Math.min(top,  shirtRect.height - h));
+  const previewBox = document.getElementById("preview").getBoundingClientRect();
+  currentStamp.style.left = (shirtRect.left + left - previewBox.left)+'px';
+  currentStamp.style.top  = (shirtRect.top  + top  - previewBox.top )+'px';
+}, {passive:false});
+document.addEventListener("touchend", ()=>{ isDragging=false; });
+
+// ========================
+// HUD ALINHAMENTO
+// ========================
+function setAlignHudVisible(show) {
+  const hud = document.getElementById('alignHud');
+  if (!hud) return;
+  hud.style.display = show ? 'flex' : 'none';
+}
+
+function alignStamp(mode){
+  const s = getActiveStamp(); if(!s) return;
+  const currentStamp = s.node;
+
+  const step = 5;
+  const shirtRect = getRenderedShirtRect();
+  const previewBox = document.getElementById("preview").getBoundingClientRect();
+  const w = currentStamp.offsetWidth;
+  const h = currentStamp.offsetHeight;
+
+  const leftMin = shirtRect.left - previewBox.left;
+  const topMin  = shirtRect.top  - previewBox.top;
+  const leftMax = leftMin + shirtRect.width  - w;
+  const topMax  = topMin  + shirtRect.height - h;
+  const centerLeft = leftMin + (shirtRect.width  - w) / 2;
+  const centerTop  = topMin  + (shirtRect.height - h) / 2;
+
+  let left = parseFloat(currentStamp.style.left) || (currentStamp.getBoundingClientRect().left - previewBox.left);
+  let top  = parseFloat(currentStamp.style.top)  || (currentStamp.getBoundingClientRect().top  - previewBox.top);
+
+  switch (mode) {
+    case 'centerX':    left = centerLeft; break;
+    case 'centerY':    top  = centerTop;  break;
+    case 'centerBoth': left = centerLeft; top = centerTop; break;
+    case 'left':       left = leftMin;    break;
+    case 'right':      left = leftMax;    break;
+    case 'top':        top  = topMin;     break;
+    case 'bottom':     top  = topMax;     break;
+    case 'moveLeft':   left -= step;      break;
+    case 'moveRight':  left += step;      break;
+    case 'moveUp':     top  -= step;      break;
+    case 'moveDown':   top  += step;      break;
+  }
+
+  left = Math.max(leftMin, Math.min(left, leftMax));
+  top  = Math.max(topMin,  Math.min(top,  topMax));
+
+  currentStamp.style.transform = "none";
+  currentStamp.style.left = left + "px";
+  currentStamp.style.top  = top  + "px";
+}
+
+// press-and-hold
+let _nudgeInterval = null;
+let _nudgeDelay = null;
+function _nudgeOnce(mode){ alignStamp(mode); }
+function startNudge(mode) {
+  stopNudge();
+  _nudgeOnce(mode);
+  _nudgeDelay = setTimeout(() => {
+    _nudgeInterval = setInterval(() => _nudgeOnce(mode), 30);
+  }, 200);
+}
+function stopNudge() {
+  if (_nudgeDelay)    { clearTimeout(_nudgeDelay); _nudgeDelay = null; }
+  if (_nudgeInterval) { clearInterval(_nudgeInterval); _nudgeInterval = null; }
+}
+document.addEventListener('mouseup', stopNudge);
+document.addEventListener('touchend', stopNudge, {passive:true});
+document.addEventListener('touchcancel', stopNudge, {passive:true});
+window.addEventListener('blur', stopNudge);
+
+// ========================
+// QUANTIDADES
+// ========================
+function updateSizeTable() {
+  const category = document.getElementById("category").value;
+  let sizes = [];
+  if (category === "Masculina") {
+    sizes = ["P","M","G","GG","X1","X2","X3","X4","X5","X6","X7","X8"];
+  } else if (category === "Feminina") {
+    sizes = ["P","M","G","GG"];
+  } else {
+    sizes = ["1","2","4","6","8","10","12","14"];
+  }
+
+  const table = document.getElementById("sizeTable");
+  table.innerHTML = "";
+  const thead = document.createElement("thead");
+  thead.innerHTML = "<tr><th>Tamanho</th><th>Quantidade</th></tr>";
+  table.appendChild(thead);
+  const tbody = document.createElement("tbody");
+
+  sizes.forEach(s => {
+    const tr = document.createElement("tr");
+    const td1 = document.createElement("td"); td1.textContent = s;
+    const td2 = document.createElement("td");
+    td2.classList.add("quantityControl");
+    const input = document.createElement("input");
+    input.type = "number"; input.min = "0"; input.value = "0"; input.dataset.size = s;
+    td2.appendChild(input);
+    tr.appendChild(td1); tr.appendChild(td2);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+}
+
+function collectSizes() {
+  const inputs = document.querySelectorAll("#sizeTable input[type=number]");
+  const arr = [];
+  inputs.forEach(inp => {
+    const qty = parseInt(inp.value || "0", 10);
+    arr.push({ size: inp.dataset.size, qty });
+  });
+  return arr;
+}
+
+function showSizeSection() {
+  document.getElementById("configSection").style.display = "none";
+  document.getElementById("sizeSection").style.display   = "block";
+}
+function backToConfig() {
+  document.getElementById("sizeSection").style.display   = "none";
+  document.getElementById("configSection").style.display = "flex";
+}
+
+// ========================
+// UTILS
+// ========================
+function loadImage(src, cors = false) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    if (cors) img.crossOrigin = "Anonymous";
+    img.onload  = () => resolve(img);
+    img.onerror = () => reject(new Error("Falha ao carregar " + src + (cors ? " (cors)" : "")));
+    img.src     = src;
+  });
+}
+
+function hexToRgb(hex) {
+  return {
+    r: parseInt(hex.slice(1,3), 16),
+    g: parseInt(hex.slice(3,5), 16),
+    b: parseInt(hex.slice(5,7), 16)
+  };
+}
+
+function showLoading(state, text) {
+  const btn = document.getElementById('btnDefineQuantities');
+  if (!btn) return;
+  if (state) { btn.disabled = true; console.log(text || "Processando..."); }
+  else { btn.disabled = false; }
+}
+
+// ========================
+// LAYOUTS -> PDF
+// ========================
+const PDF_BASES = {
+  white: {
+    Frente: "https://cdn.awsli.com.br/1274/1274265/arquivos/camiseta-branca---frente.png",
+    Costas: "https://cdn.awsli.com.br/1274/1274265/arquivos/camiseta-branca---costas.png"
+  },
+  black: {
+    Frente: "https://cdn.awsli.com.br/1274/1274265/arquivos/camiseta-preta---frente---sem-fundo.png",
+    Costas: "https://cdn.awsli.com.br/1274/1274265/arquivos/camiseta-preta---costas---sem-fundo.png"
+  }
+};
+
+const COLOR_BASE_MAP = {
+  "Preto": "black",
+  "Marinho": "black",
+  "Preta Jaguar": "black",
+  "Cinza Grafite": "black",
+  "Branco": "white",
+  "Cinza Mescla": "white"
+};
+
+const COLOR_HEX = {
+  "Preto":"#000000","Branco":"#ffffff","Marinho":"#0a1f44",
+  "Cinza Mescla":"#c7c7c7","Cinza Grafite":"#3a3a3a",
+  "Vermelho":"#b1001a","Azul Royal":"#1546ff","Verde":"#0c7c34","Amarelo":"#ffc400",
+  "Preta Jaguar":"#000000","Marinho Índigo":"#0b2e5a"
+};
+
+async function tintShirtForPDF(baseUrl, targetHex, baseKind) {
+  let base;
+  try { base = await loadImage(baseUrl, true); } catch { base = await loadImage(baseUrl, false); }
+  const w = base.naturalWidth, h = base.naturalHeight;
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d");
+
+  ctx.fillStyle = targetHex; ctx.fillRect(0,0,w,h);
+  ctx.globalCompositeOperation = "destination-in";
+  ctx.drawImage(base, 0, 0, w, h);
+
+  if (baseKind === "black") { ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = 0.55; }
+  else { ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = 0.85; }
+  ctx.drawImage(base, 0, 0, w, h);
+
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+  return c.toDataURL("image/png");
+}
+
+function getPdfShirtRect(ox, oy, drawW, drawH, view) {
+  const side = (view === "Costas") ? "Costas" : "Frente";
+  const b = SHIRT_PRINT_BOX[side];
+  return {
+    x: ox + b.x * drawW,
+    y: oy + b.y * drawH,
+    w: b.w * drawW,
+    h: b.h * drawH
+  };
+}
+
+function fitInsideByRatio(boxW, boxH, ratio) {
+  let w = boxW, h = w / ratio;
+  if (h > boxH) { h = boxH; w = h * ratio; }
+  return { w, h };
+}
+
+// === GERAÇÃO DO PDF ===
+async function buildPDF(orderData, opts = { returnBlob: false, filename: "pedido-camiseta.pdf" }) {
+  const { jsPDF } = window.jspdf;
+
+  // layout de fundo (mesmo do seu protótipo)
+  const LAYOUT_BG = "https://cdn.awsli.com.br/1274/1274265/arquivos/layout-base-final.png";
+
+  const colorHex = COLOR_HEX[orderData.color] || "#000000";
+
+  // Regiões dentro do layout
+  const QUAD =  { x: 0.0021, y: 0.69,  w: 0.214, h: 0.31 }; // quadrado de miniaturas
+  const SHIRT_AREA = { x: 0.370,  y: 0.300, w: 0.52,  h: 0.62 }; // área geral da(s) camiseta(s)
+
+  const pdf = new jsPDF({ orientation: "l", unit: "mm", format: "a4" });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const margin = 8;
+
+  // Fundo
+  const layoutImg = await loadImage(LAYOUT_BG, true);
+  let bgW = pageW - 2*margin;
+  let bgH = (bgW / layoutImg.naturalWidth) * layoutImg.naturalHeight;
+  if (bgH > pageH - 2*margin) { bgH = pageH - 2*margin; bgW = (bgH / layoutImg.naturalHeight) * layoutImg.naturalWidth; }
+  const bgX = (pageW - bgW)/2, bgY = (pageH - bgH)/2;
+
+  const bgCanvas = document.createElement("canvas");
+  bgCanvas.width  = layoutImg.naturalWidth; bgCanvas.height = layoutImg.naturalHeight;
+  bgCanvas.getContext("2d").drawImage(layoutImg, 0, 0);
+  const layoutDataURL = bgCanvas.toDataURL("image/png");
+  pdf.addImage(layoutDataURL, "PNG", bgX, bgY, bgW, bgH);
+
+  // Quadrado de cor de fundo (borda) e grade de minis
+  const qx = bgX + QUAD.x * bgW, qy = bgY + QUAD.y * bgH, qw = QUAD.w * bgW, qh = QUAD.h * bgH;
+  pdf.setDrawColor(0, 0, 0);
+  pdf.rect(qx, qy, qw, qh, "S");
+
+  // === Camisetas por lado usado ===
+  const usedSides = ['Frente','Costas'].filter(side => stamps.some(s=>!s.hidden && s.side===side));
+  const numSides = usedSides.length || 1;
+  const gap = 6; // mm entre colunas
+  const aw = SHIRT_AREA.w * bgW;
+  const ah = SHIRT_AREA.h * bgH;
+
+  let colIndex = 0;
+  for (const side of usedSides.length ? usedSides : ['Frente']) {
+    const baseKind = COLOR_BASE_MAP[orderData.color] || "white";
+    const baseUrl  = (PDF_BASES[baseKind][side] || PDF_BASES[baseKind].Frente);
+    const tintedDataURL = await tintShirtForPDF(baseUrl, colorHex, baseKind);
+
+    // Slot para coluna
+    const perColW = (aw - (numSides-1)*gap) / numSides;
+    const slotX = bgX + SHIRT_AREA.x * bgW + colIndex*(perColW + gap);
+    const slotY = bgY + SHIRT_AREA.y * bgH;
+
+    const shirtImg = await loadImage(tintedDataURL);
+    const ratioShirt = (shirtImg.naturalWidth || 1000) / (shirtImg.naturalHeight || 1000);
+    let drawW = perColW, drawH = drawW / ratioShirt;
+    if (drawH > ah) { drawH = ah; drawW = drawH * ratioShirt; }
+    const ox = slotX + (perColW - drawW)/2, oy = slotY + (ah - drawH)/2;
+
+    pdf.addImage(tintedDataURL, "PNG", ox, oy, drawW, drawH);
+
+    // Print box no PDF (debug opcional)
+    const pdfRect = getPdfShirtRect(ox, oy, drawW, drawH, side);
+    if (SHOW_PDF_SHIRT_BOX) {
+      pdf.setDrawColor(54, 197, 196); pdf.setLineWidth(0.6);
+      if (pdf.setLineDashPattern) pdf.setLineDashPattern([2,2],0);
+      pdf.rect(pdfRect.x, pdfRect.y, pdfRect.w, pdfRect.h);
+      if (pdf.setLineDashPattern) pdf.setLineDashPattern([],0);
+      pdf.setFontSize(8); pdf.setTextColor(54,197,196);
+      const b = SHIRT_PRINT_BOX[side];
+      pdf.text(`PRINT_BOX ${side} x:${b.x} y:${b.y} w:${b.w} h:${b.h}`, pdfRect.x, Math.max(oy - 2, pdfRect.y - 1));
+    }
+
+    // Estampas desse lado
+    const sideStamps = stamps.filter(s=>!s.hidden && s.side===side);
+    for (const s of sideStamps) {
+      const rel = getPreviewRelRect(s.node);
+      if (!rel) continue;
+      try {
+        const stampImg = await loadImage(s.dataURL);
+        const ratio = stampImg.naturalWidth / stampImg.naturalHeight;
+        const boxW = rel.rw * pdfRect.w;
+        const boxH = rel.rh * pdfRect.h;
+        const cx = pdfRect.x + (rel.rx + rel.rw/2) * pdfRect.w;
+        const cy = pdfRect.y + (rel.ry + rel.rh/2) * pdfRect.h;
+        const fit = fitInsideByRatio(boxW, boxH, ratio);
+        pdf.addImage(s.dataURL, "PNG", cx - fit.w/2, cy - fit.h/2, fit.w, fit.h);
+      } catch {}
+    }
+
+    // Título do lado (opcional)
+    pdf.setFontSize(10); pdf.setTextColor(0,0,0);
+    pdf.text(side, ox, oy - 2);
+
+    colIndex++;
+  }
+
+  // === Grade de miniaturas (todas as estampas visíveis)
+  const allVisible = stamps.filter(s=>!s.hidden);
+  const colsMini = 3;
+  const pad = 2;
+  const cellW = (qw - pad*(colsMini+1)) / colsMini;
+  const cellH = cellW;
+
+  let ix = 0;
+  pdf.setFontSize(7); pdf.setTextColor(0,0,0);
+  for (const s of allVisible) {
+    const row = Math.floor(ix / colsMini);
+    const col = ix % colsMini;
+    const cx = qx + pad + col*(cellW + pad);
+    const cy = qy + pad + row*(cellH + pad);
+    try {
+      const im = await loadImage(s.dataURL);
+      const r = im.naturalWidth / im.naturalHeight;
+      let w = cellW, h = w / r;
+      if (h > cellH) { h = cellH; w = h * r; }
+      pdf.addImage(s.dataURL, "PNG", cx + (cellW - w)/2, cy + (cellH - h)/2, w, h);
+      pdf.setDrawColor(0,0,0); pdf.setLineWidth(0.3);
+      pdf.rect(cx, cy, cellW, cellH);
+      const label = (s.side||'') + (s.name?` • ${s.name}`:'');
+      pdf.text(label, cx, cy + cellH + 3, { baseline: 'top' });
+    } catch {}
+    ix++;
+  }
+
+  // === Página 2 — Detalhes
+  pdf.addPage();
+  pdf.setFontSize(16); pdf.setTextColor(0,0,0);
+  pdf.text("Detalhes do Pedido", 10, 16);
+  pdf.setDrawColor(0,0,0);
+  pdf.line(10, 18, pdf.internal.pageSize.getWidth()-10, 18);
+
+  const nonZeroSizes = (orderData.sizes || []).filter(s => parseInt(s.qty || "0", 10) > 0);
+  const totalQty = nonZeroSizes.reduce((sum, s) => sum + parseInt(s.qty, 10), 0);
+
+  const usedSidesLabel = (['Frente','Costas'].filter(side => stamps.some(s=>!s.hidden && s.side===side))).join(', ') || orderData.location;
+
+  pdf.autoTable({
+    startY: 22,
+    head: [["Propriedade", "Valor"]],
+    body: [
+      ["Categoria", orderData.category],
+      ["Malha", orderData.fabricType],
+      ["Cor", orderData.color],
+      ["Lados com estampa", usedSidesLabel || "—"],
+      ["Total de Itens", String(totalQty)]
+    ],
+    styles: { fontSize: 12, cellPadding: 4 },
+    headStyles: { fillColor: [240,240,240] },
+    theme: "grid"
+  });
+
+  let afterMeta = (pdf.lastAutoTable && pdf.lastAutoTable.finalY ? pdf.lastAutoTable.finalY : 40) + 8;
+
+  // Tabela de estampas
+  const stampRows = allVisible.map(s => [
+    s.name || '(sem nome)',
+    s.side,
+    (s.cm||0).toFixed(0) + ' cm'
+  ]);
+  pdf.setFontSize(14);
+  pdf.text("Estampas", 10, afterMeta);
+  pdf.autoTable({
+    startY: afterMeta + 4,
+    head: [["Estampa", "Lado", "Largura"]],
+    body: stampRows.length ? stampRows : [["—","—","—"]],
+    styles: { fontSize: 12, cellPadding: 4 },
+    headStyles: { fillColor: [240,240,240] },
+    theme: "grid"
+  });
+  afterMeta = pdf.lastAutoTable?.finalY + 8 || (afterMeta + 12);
+
+  // Tabela de tamanhos
+  if (nonZeroSizes.length) {
+    pdf.setFontSize(14);
+    pdf.text("Quantidades por Tamanho", 10, afterMeta);
+    pdf.autoTable({
+      startY: afterMeta + 4,
+      head: [["Tamanho", "Quantidade"]],
+      body: nonZeroSizes.map(s => [s.size, String(s.qty)]),
+      styles: { fontSize: 12, cellPadding: 4 },
+      headStyles: { fillColor: [240,240,240] },
+      theme: "grid"
+    });
+  } else {
+    pdf.setFontSize(12);
+    pdf.text("Nenhum tamanho selecionado (todas as quantidades = 0).", 10, afterMeta);
+  }
+
+  if (opts.returnBlob) return pdf.output("blob");
+  pdf.save(opts.filename || "pedido-camiseta.pdf");
+}
+
+// Wrapper público
+async function gerarPDF() {
+  // Caso use o toggle visual no HTML:
+  const cb = document.getElementById('chkPdfShirtBox');
+  if (cb) SHOW_PDF_SHIRT_BOX = cb.checked === true;
+
+  const orderData = {
+    category:    document.getElementById("category").value,
+    fabricType:  document.getElementById("fabricType").value,
+    color:       selectedColor || "Preto",
+    location:    document.getElementById("stampLocation").value,
+    subLocation: document.getElementById("subLocation").value,
+    sizes:       collectSizes()
+  };
+  await buildPDF(orderData, { returnBlob: false, filename: "pedido-camiseta.pdf" });
+}
+
+async function sendWhatsApp() {
+  const orderData = {
+    category:    document.getElementById("category").value,
+    fabricType:  document.getElementById("fabricType").value,
+    color:       selectedColor || "Preto",
+    location:    document.getElementById("stampLocation").value,
+    subLocation: document.getElementById("subLocation").value,
+    sizes:       collectSizes()
+  };
+
+  try {
+    showLoading(true, "Gerando PDF...");
+    const pdfBlob = await buildPDF(orderData, { returnBlob: true });
+
+    const fd = new FormData();
+    fd.append('pdf', pdfBlob, 'pedido-camiseta.pdf');
+    fd.append('order', JSON.stringify(orderData));
+
+    const resp = await fetch('/api/send-order', { method: 'POST', body: fd });
+    const json = await resp.json();
+    showLoading(false);
+    alert(json.ok ? "Pedido enviado com sucesso. Atendimento será notificado via WhatsApp."
+                  : ("Erro no envio: " + (json.error || JSON.stringify(json))));
+  } catch (err) {
+    showLoading(false);
+    console.error(err);
+    alert("Erro ao gerar/enviar PDF: " + err.message);
+  }
+}
+
+// ========================
+// SLIDER / TAMANHO
+// ========================
+function updateStampSizeDefault() {
+  const subLoc = document.getElementById("subLocation").value;
+  const input  = document.getElementById("stampSize");
+  const slider = document.getElementById("stampSizeContainer");
+
+  if (subLoc === "Livre") {
+    slider.style.display = "flex";
+    if (!input.value || input.value === "0") input.value = 20;
+  } else {
+    slider.style.display = "none";
+    if (subLoc === "Peito")        input.value = 12;
+    else if (subLoc === "Frontal") input.value = 28;
+    else if (subLoc === "Costas")  input.value = 28;
+  }
+  updateStampSize();
+}
+
+function updateStampSize() {
+  const s = getActiveStamp();
+  const input = document.getElementById("stampSize");
+  const cm = clampCm(parseFloat(input.value || "20"));
+  document.getElementById("stampSizeValue").textContent = cm.toFixed(0) + " cm";
+  if (s && s.side===currentView) { s.cm = cm; applyStampCmToNode(s); }
+}
+
+// ========================
+// TROCAR LADO
+// ========================
+function toggleView() {
+  currentView = (currentView === "Frente") ? "Costas" : "Frente";
+  document.getElementById("stampLocation").value = currentView;
+  stampLocationChanged();
+  stamps.forEach(refreshStampSideInPreview);
+}
+
+// ========================
+// INIT
+// ========================
+function initConfigurator() {
+  if (!selectedColor) selectedColor = "Preto";
+
+  const stampSizeInput = document.getElementById("stampSize");
+  if (stampSizeInput) {
+    if (!stampSizeInput.value || stampSizeInput.value === "0") stampSizeInput.value = 22;
+    stampSizeInput.addEventListener("input", updateStampSize);
+  }
+
+  updateColorOptions();
+  populateSubLocations();
+  updateStampSizeDefault();
+  stampLocationChanged();
+  updateSizeTable();
+
+  toggleShirtBox(true);
+  setAlignHudVisible(false);
+  renderStampsList();
+}
+
+// Expor globais (on* do HTML)
+window.updateColorOptions   = updateColorOptions;
+window.updateSizeTable      = updateSizeTable;
+window.updateStampPreview   = updateStampPreview;
+window.stampLocationChanged = stampLocationChanged;
+window.toggleView           = toggleView;
+window.showSizeSection      = showSizeSection;
+window.backToConfig         = backToConfig;
+window.gerarPDF             = gerarPDF;
+window.sendWhatsApp         = sendWhatsApp;
+window.toggleShirtBox       = toggleShirtBox;
+window.alignStamp           = alignStamp;
+window.startNudge           = startNudge;
+window.stopNudge            = stopNudge;
+window.promptAddStamp       = promptAddStamp;
+
+document.addEventListener("DOMContentLoaded", initConfigurator);
+</script>
+
+</body>
+</html>
