@@ -825,6 +825,7 @@ function applyStampCmToNode(s) {
   const cm = clampCm(s.cm ?? 20);
   s.node.style.width = (cm * pxPerCm) + 'px';
   s.node.style.height = 'auto';
+  updateStampRel(s);
 }
 
 function centerNodeInsideShirtBox(node){
@@ -1002,7 +1003,7 @@ function addStampFromDataURL(dataURL, name='Estampa', side='Frente', cm=20) {
 
   if (side === currentView) preview.appendChild(img);
 
-  const sObj = { id: 'st'+Math.random().toString(36).slice(2,8), node: img, dataURL, side, name, cm: clampCm(cm), hidden:false };
+  const sObj = { id: 'st'+Math.random().toString(36).slice(2,8), node: img, dataURL, side, name, cm: clampCm(cm), hidden:false, rel: null };
   applyStampCmToNode(sObj);
   centerNodeInsideShirtBox(img);
 
@@ -1013,6 +1014,16 @@ function addStampFromDataURL(dataURL, name='Estampa', side='Frente', cm=20) {
   syncUiState();
 
 }
+
+function updateStampRel(s){
+  if (!s || !s.node) return;
+  // Só faz sentido capturar se a estampa estiver no preview do lado atual
+  if (s.side !== currentView) return;
+
+  const rel = getPreviewRelRect(s.node);
+  if (rel) s.rel = rel;
+}
+
 
 // ========================
 // DRAG GENÉRICO
@@ -1365,7 +1376,7 @@ async function buildPDF(orderData, opts = { returnBlob: false, filename: "pedido
     // Estampas desse lado
     const sideStamps = stamps.filter(s=>!s.hidden && s.side===side);
     for (const s of sideStamps) {
-      const rel = getPreviewRelRect(s.node);
+      const rel = s.rel;
       if (!rel) continue;
       try {
         const stampImg = await loadImage(s.dataURL);
