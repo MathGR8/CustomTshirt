@@ -73,6 +73,8 @@ export const StampModule = {
       const cm   = Utils.clampCm(parseFloat(document.getElementById('stampSize')?.value || '20'));
 
       const stamp = await PDFModule.createStampFromFile(file, { side, cm, name: file.name });
+      // Espera a imagem decodificar: sem isso a altura é 0 ao centralizar
+      await stamp.node.decode().catch(() => {});
 
       if (stamp.side === AppState.currentView) {
         document.getElementById("preview")?.appendChild(stamp.node);
@@ -106,15 +108,7 @@ export const StampModule = {
    */
   addStampFromDataURL(dataURL, name = 'Estampa', side = 'Frente', cm = 20, rel = null) {
     const preview = document.getElementById("preview");
-    const img = document.createElement("img");
-    img.src = dataURL;
-    img.alt = name;
-    img.classList.add("artOverlay");
-    img.style.cssText = "position:absolute; transform:none; cursor:move; max-width:80%;";
-    img.draggable = false;
-
-    img.addEventListener("mousedown",  DragModule.startDragGeneric.bind(DragModule));
-    img.addEventListener("touchstart", DragModule.startDragTouchGeneric.bind(DragModule), { passive: false });
+    const img = this.createStampNode(dataURL, name);
 
     if (side === AppState.currentView && preview) preview.appendChild(img);
 
@@ -137,7 +131,49 @@ export const StampModule = {
   },
 
   /**
+   * Cria o nó <img> arrastável de uma estampa (não anexa ao DOM).
+   * @param {string} src - URL/dataURL da imagem.
+   * @param {string} [name] - Texto alternativo.
+   * @returns {HTMLImageElement}
+   */
+  createStampNode(src, name = 'Estampa') {
+    const img = document.createElement("img");
+    img.src = src;
+    img.alt = name;
+    img.classList.add("artOverlay");
+    img.style.cssText = "position:absolute; transform:none; cursor:move; max-width:80%;";
+    img.draggable = false;
+    img.addEventListener("mousedown",  DragModule.startDragGeneric.bind(DragModule));
+    img.addEventListener("touchstart", DragModule.startDragTouchGeneric.bind(DragModule), { passive: false });
+    return img;
+  },
+
+  /**
+   * Recria uma estampa a partir dos dados salvos num item do pedido.
+   * A posição salva (rel) é aplicada quando a camiseta do lado dela for exibida.
+   * @param {Object} dados - Estampa salva (sem nó DOM).
+   * @returns {Object} Estampa pronta para AppState.stamps.
+   */
+  restoreStamp(dados) {
+    const s = {
+      ...dados,
+      id: Utils.genId(),
+      _relWait: false,
+      rel: dados.rel ? { ...dados.rel } : null,
+      pendingRel: dados.rel ? { ...dados.rel } : null
+    };
+    s.node = this.createStampNode(s.previewDataURL || s.dataURL, s.name);
+    if (s.hidden) s.node.style.display = 'none';
+    // Ao terminar de carregar a imagem, aplica tamanho e a posição salva
+    s.node.addEventListener('load', () => {
+      if (s.node.parentNode) this.applyStampCmToNode(s);
+    }, { once: true });
+    return s;
+  },
+
+  /**
    * Aplica a largura em centímetros ao nó DOM da estampa, convertendo para pixels.
+   * Se houver posição pendente (estampa restaurada de um item), posiciona por ela.
    * @param {Object} s - Objeto da estampa.
    */
   applyStampCmToNode(s) {
@@ -146,7 +182,28 @@ export const StampModule = {
     const cm = Utils.clampCm(s.cm ?? 20);
     s.node.style.width  = (cm * pxPerCm) + 'px';
     s.node.style.height = 'auto';
+    if (s.pendingRel) {
+      // Ainda não dá para posicionar (lado oculto ou imagem carregando): mantém o rel salvo
+      if (!this._placeFromRel(s, s.pendingRel)) return;
+      s.pendingRel = null;
+    }
     this.updateStampRel(s);
+  },
+
+  /**
+   * Posiciona o nó pela posição relativa (0..1) à área de impressão.
+   * @returns {boolean} true se conseguiu posicionar.
+   * @private
+   */
+  _placeFromRel(s, rel) {
+    if (s.side !== AppState.currentView || !s.node.parentNode) return false;
+    if (!s.node.complete || !s.node.naturalWidth) return false;
+    const shirt = PreviewGeom.getRenderedShirtRect();
+    const prev  = document.getElementById("preview")?.getBoundingClientRect();
+    if (!shirt || !prev) return false;
+    s.node.style.left = (shirt.left - prev.left + rel.rx * shirt.width)  + 'px';
+    s.node.style.top  = (shirt.top  - prev.top  + rel.ry * shirt.height) + 'px';
+    return true;
   },
 
   /**
@@ -188,7 +245,16 @@ export const StampModule = {
    */
   updateStampRel(s) {
     if (!s || !s.node) return;
-    if (s.side !== AppState.currentView) return;
+    if (s.side !== AppState.currentView || !s.node.parentNode) return;
+    if (s.pendingRel) return;
+    // Sem a imagem carregada a altura é 0 e o rel ficaria errado: mede ao carregar
+    if (!s.node.complete || !s.node.naturalWidth) {
+      if (!s._relWait) {
+        s._relWait = true;
+        s.node.addEventListener('load', () => { s._relWait = false; this.updateStampRel(s); }, { once: true });
+      }
+      return;
+    }
     const rel = PreviewGeom.getPreviewRelRect(s.node);
     if (rel) s.rel = rel;
   },

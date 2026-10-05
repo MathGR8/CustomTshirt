@@ -130,7 +130,7 @@ export const UIModule = {
    * Atualiza o tamanho padrão da estampa conforme a sub-localização selecionada.
    * Peito: 10 cm (no peito, à direita) | Frontal: 22 cm | Costas: 28 cm | Livre: exibe slider.
    */
-  updateStampSizeDefault() {
+  updateStampSizeDefault(applyToActive = true) {
     const subLoc = document.getElementById("subLocation")?.value;
     const input  = document.getElementById("stampSize");
     const slider = document.getElementById("stampSizeContainer");
@@ -144,6 +144,12 @@ export const UIModule = {
       if      (subLoc === "Peito")   input.value = CHEST_PRESET.cm;
       else if (subLoc === "Frontal") input.value = 22;
       else if (subLoc === "Costas")  input.value = 28;
+    }
+    // Trocar Frente/Costas só atualiza o slider: não redimensiona a estampa ativa
+    if (!applyToActive) {
+      const labelEl = document.getElementById("stampSizeValue");
+      if (labelEl) labelEl.textContent = Utils.clampCm(parseFloat(input.value || "20")).toFixed(0) + " cm";
+      return;
     }
     this.updateStampSize();
 
@@ -179,7 +185,7 @@ export const UIModule = {
   stampLocationChanged() {
     this.populateSubLocations();
     this.updateBasePreview();
-    this.updateStampSizeDefault();
+    this.updateStampSizeDefault(false);
     this.updateShirtBoxOverlay();
     Logger.info('UI', `Local da estampa alterado para ${document.getElementById("stampLocation")?.value}`);
   },

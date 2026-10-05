@@ -50,6 +50,9 @@ export const AppState = {
    */
   orderItems: [],
 
+  /** Índice do item do pedido aberto no editor (null = montando um item novo). */
+  editingIndex: null,
+
   // ---- Controle de Drag ----
 
   /** Indica se um arrasto está em andamento. */

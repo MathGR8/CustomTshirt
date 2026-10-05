@@ -41,6 +41,12 @@
     </div>
   </header>
 
+  <!-- Itens já salvos no pedido: permite reabrir um item para edição -->
+  <section id="orderPanel" aria-label="Itens do pedido">
+    <p class="sectionTitle">Itens do pedido</p>
+    <div id="orderList"></div>
+  </section>
+
   <div class="mainContainer">
 
     <!-- ==================== PAINEL ESQUERDO ==================== -->
@@ -209,6 +215,9 @@
 
   <!-- Rodapé de ações -->
   <footer class="appFooter">
+    <button type="button" id="btnCancelEdit" class="btn-outline" onclick="OrderModule.cancelEdit()" style="display:none;">
+      Cancelar edição
+    </button>
     <button type="button" id="btnSaveItem" class="btn-dark" onclick="OrderModule.saveItem()">
       ➕ Salvar no Pedido
     </button>

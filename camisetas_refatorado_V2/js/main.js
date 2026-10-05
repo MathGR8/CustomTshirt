@@ -99,4 +99,6 @@ document.addEventListener("DOMContentLoaded", () => {
   registerGlobalEvents(window._modules);
   // Inicializa a aplicação (popula UI, configura estado inicial)
   initConfigurator();
+  // Carrega o pedido salvo no navegador e desenha "Itens do pedido"
+  OrderModule.init();
 });

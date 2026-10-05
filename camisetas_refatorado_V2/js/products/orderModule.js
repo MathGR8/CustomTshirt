@@ -4,24 +4,46 @@
  *
  * Responsabilidades:
  *  - Salvar o item atual (camiseta + estampas + quantidades) no pedido.
+ *  - Listar os itens já salvos ("Itens do pedido") com Editar, Duplicar e Remover.
+ *  - Reabrir um item salvo no editor e, ao salvar, atualizar esse mesmo item.
+ *  - Guardar o pedido no navegador (localStorage) para retomar depois.
  *  - Limpar o pedido completo.
- *  - Resetar o estado da tela após salvar um item.
  *
- * Dependências: appState.js, logger.js, noticeModule.js, sizeModule.js, alignModule.js.
- * Módulos relacionados: pdfModule.js, stampModule.js, uiModule.js.
+ * Dependências: appState.js, constants.js, logger.js, noticeModule.js,
+ *               sizeModule.js, alignModule.js, uiModule.js.
+ * Módulos relacionados: pdfModule.js, stampModule.js (via window._modules).
  */
 
 import { AppState } from '../core/appState.js';
+import { COLOR_HEX } from '../core/constants.js';
 import { Logger } from '../core/logger.js';
 import { NoticeModule } from '../ui/noticeModule.js';
+import { UIModule } from '../ui/uiModule.js';
 import { SizeModule } from './sizeModule.js';
 import { AlignModule } from '../preview/alignModule.js';
 
+/** Chave do pedido salvo no navegador. */
+const STORAGE_KEY = 'artrock.pedido.v1';
+
+/** Soma das quantidades de um item ({ P: 2, M: 3 } → 5). */
+const totalPecas = q => Object.values(q || {}).reduce((s, n) => s + (parseInt(n, 10) || 0), 0);
+
 export const OrderModule = {
+  /** Carrega o pedido salvo no navegador e desenha a lista. Chamado na inicialização. */
+  init() {
+    try {
+      const salvo = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      if (Array.isArray(salvo)) AppState.orderItems = salvo;
+    } catch (e) {
+      Logger.warn('STATE', 'Não foi possível ler o pedido salvo: ' + e.message);
+    }
+    this._refresh();
+  },
+
   /**
-   * Salva o item atual no pedido.
+   * Salva o item atual no pedido — ou, se um item estiver em edição, atualiza esse item.
    * Valida que há estampas adicionadas e pelo menos uma quantidade maior que zero.
-   * Após salvar, limpa as estampas da tela e reseta as quantidades.
+   * Depois limpa o editor para o próximo item.
    */
   saveItem() {
     const total = SizeModule.collectSizes().reduce((sum, s) => sum + (parseInt(s.qty || 0, 10) || 0), 0);
@@ -36,37 +58,115 @@ export const OrderModule = {
       category: category,
       fabric:   document.getElementById("fabricType")?.value,
       color:    AppState.selectedColor,
-      // Deep copy das estampas para preservar o estado no momento do salvamento
-      // Cópia leve: descarta o nó DOM e compartilha as imagens (strings imutáveis)
-      stamps:     AppState.stamps.map(({ node, ...dados }) => ({ ...dados, rel: dados.rel ? { ...dados.rel } : null })),
+      // Cópia leve: descarta o nó DOM e os controles internos e compartilha as
+      // imagens (strings imutáveis). Posição ainda não aplicada (lado oculto) vale como rel.
+      stamps: AppState.stamps.map(({ node, pendingRel, _relWait, ...dados }) => {
+        const rel = pendingRel || dados.rel;
+        return { ...dados, rel: rel ? { ...rel } : null };
+      }),
       quantities: JSON.parse(JSON.stringify(AppState.quantities[category] || {}))
     };
 
-    AppState.orderItems.push(item);
-    Logger.info('STATE', `Item #${AppState.orderItems.length} salvo no pedido.`);
-    NoticeModule.show("success", "Modelo #" + AppState.orderItems.length + " salvo no pedido!");
-
-    // Remove as estampas do DOM e limpa o estado
-    AppState.stamps.forEach(s => {
-      if (s.node && s.node.parentNode) s.node.parentNode.removeChild(s.node);
-    });
-    AppState.stamps = [];
-    AppState.activeStampId = null;
-    AlignModule.setHudVisible(false);
-
-    // Reseta as quantidades da categoria atual no estado
-    if (AppState.quantities[category]) {
-      Object.keys(AppState.quantities[category]).forEach(k => {
-        AppState.quantities[category][k] = 0;
-      });
+    const idx = AppState.editingIndex;
+    if (idx != null && AppState.orderItems[idx]) {
+      AppState.orderItems[idx] = item;
+      Logger.info('STATE', `Item #${idx + 1} atualizado no pedido.`);
+      NoticeModule.show("success", `Modelo #${idx + 1} atualizado no pedido!`);
+    } else {
+      AppState.orderItems.push(item);
+      Logger.info('STATE', `Item #${AppState.orderItems.length} salvo no pedido.`);
+      NoticeModule.show("success", "Modelo #" + AppState.orderItems.length + " salvo no pedido!");
     }
+
+    AppState.editingIndex = null;
+    this._resetEditor(category);
+    this._persist();
+    this._refresh();
+  },
+
+  /**
+   * Reabre um item salvo no editor (camiseta, estampas com posição/tamanho e quantidades).
+   * @param {number} index - Posição do item em AppState.orderItems.
+   */
+  editItem(index) {
+    const item = AppState.orderItems[index];
+    if (!item) return;
+    if (AppState.editingIndex === index) return;
+    if (AppState.stamps.length &&
+        !confirm('Abrir este item no editor? O que está no editor e não foi salvo será descartado.')) return;
+
+    const { StampModule } = window._modules || {};
+    if (!StampModule) return;
+
+    this._resetEditor(document.getElementById("category")?.value);
+    AppState.editingIndex = index;
+
+    // Produto
+    const catEl = document.getElementById("category");
+    const fabEl = document.getElementById("fabricType");
+    if (catEl) catEl.value = item.category;
+    if (fabEl) fabEl.value = item.fabric;
+    AppState.selectedColor = item.color;
+    AppState.quantities[item.category] = JSON.parse(JSON.stringify(item.quantities || {}));
+
+    // Estampas (cópias: o item salvo só muda quando o usuário salvar)
+    AppState.stamps = (item.stamps || []).map(d => StampModule.restoreStamp(d));
+    const primeira = AppState.stamps.find(s => !s.hidden) || AppState.stamps[0];
+
+    // Mostra o lado da primeira estampa visível
+    const lado = primeira?.side === 'Costas' ? 'Costas' : 'Frente';
+    const locEl = document.getElementById("stampLocation");
+    if (locEl) locEl.value = lado;
+    AppState.currentView = lado;
+    UIModule.populateSubLocations();
+    UIModule.updateColorOptions();   // redesenha a camiseta e reanexa as estampas do lado atual
 
     SizeModule.updateSizeTable();
     SizeModule.backToConfig();
+    StampModule.setActiveStamp(primeira?.id || null);
 
-    // Atualiza a UI via StampModule (referência lazy para evitar circular)
-    const { StampModule } = window._modules || {};
-    if (StampModule) StampModule.syncUiState();
+    this._refresh();
+    NoticeModule.show('info', `Editando o Modelo #${index + 1}. Altere o que quiser e clique em "Salvar alterações".`);
+    Logger.info('STATE', `Item #${index + 1} aberto para edição.`);
+    document.getElementById('overallContainer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+
+  /** Cancela a edição de um item: descarta as mudanças e limpa o editor. */
+  cancelEdit() {
+    if (AppState.editingIndex == null) return;
+    if (!confirm('Cancelar a edição? As alterações não salvas serão descartadas.')) return;
+    const n = AppState.editingIndex + 1;
+    AppState.editingIndex = null;
+    this._resetEditor(document.getElementById("category")?.value);
+    this._refresh();
+    NoticeModule.show('info', `Edição do Modelo #${n} cancelada.`);
+  },
+
+  /** Cria uma cópia de um item logo depois dele. */
+  duplicateItem(index) {
+    const item = AppState.orderItems[index];
+    if (!item) return;
+    AppState.orderItems.splice(index + 1, 0, JSON.parse(JSON.stringify(item)));
+    if (AppState.editingIndex != null && AppState.editingIndex > index) AppState.editingIndex++;
+    this._persist();
+    this._refresh();
+    NoticeModule.show('success', `Modelo #${index + 1} duplicado.`);
+  },
+
+  /** Remove um item do pedido. */
+  removeItem(index) {
+    if (!AppState.orderItems[index]) return;
+    if (!confirm(`Remover o Modelo #${index + 1} do pedido?`)) return;
+    AppState.orderItems.splice(index, 1);
+    if (AppState.editingIndex === index) {
+      // O conteúdo continua no editor e pode ser salvo como item novo
+      AppState.editingIndex = null;
+      NoticeModule.show('info', 'Item removido. O que está no editor pode ser salvo como um novo item.');
+    } else if (AppState.editingIndex != null && AppState.editingIndex > index) {
+      AppState.editingIndex--;
+    }
+    this._persist();
+    this._refresh();
   },
 
   /**
@@ -76,10 +176,123 @@ export const OrderModule = {
   clearOrder() {
     if (confirm("Deseja realmente limpar todo o pedido?")) {
       AppState.orderItems = [];
+      AppState.editingIndex = null;
       Logger.info('STATE', 'Pedido limpo pelo usuário.');
-      const { StampModule } = window._modules || {};
-      if (StampModule) StampModule.syncUiState();
+      this._persist();
+      this._refresh();
       NoticeModule.show("info", "Pedido limpo.");
+    }
+  },
+
+  /** Desenha a lista "Itens do pedido". */
+  renderOrderList() {
+    const list = document.getElementById('orderList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (!AppState.orderItems.length) {
+      list.innerHTML = '<p class="orderEmpty">Nenhum item salvo ainda. Monte sua camiseta e clique em "Salvar no Pedido".</p>';
+      return;
+    }
+
+    AppState.orderItems.forEach((item, i) => {
+      const editando = AppState.editingIndex === i;
+      const card = document.createElement('div');
+      card.className = 'orderCard' + (editando ? ' editing' : '');
+
+      // Miniatura: primeira estampa visível sobre a cor da camiseta
+      const thumb = document.createElement('div');
+      thumb.className = 'orderThumb';
+      thumb.style.background = COLOR_HEX[item.color] || '#ccc';
+      const est = (item.stamps || []).find(s => !s.hidden) || (item.stamps || [])[0];
+      if (est) {
+        const img = document.createElement('img');
+        img.src = est.previewDataURL || est.dataURL;
+        img.alt = est.name || 'Estampa';
+        thumb.appendChild(img);
+      }
+
+      const info = document.createElement('div');
+      info.className = 'orderInfo';
+      const nEst = (item.stamps || []).filter(s => !s.hidden).length;
+      const titulo = document.createElement('strong');
+      titulo.textContent = `Modelo #${i + 1}` + (editando ? ' • em edição' : '');
+      info.appendChild(titulo);
+      [
+        `${item.category} • ${item.fabric}`,
+        `Cor: ${item.color}`,
+        `${nEst} estampa(s) • ${totalPecas(item.quantities)} peça(s)`
+      ].forEach(t => {
+        const d = document.createElement('span');
+        d.textContent = t;
+        info.appendChild(d);
+      });
+
+      const btns = document.createElement('div');
+      btns.className = 'orderBtns';
+      btns.append(
+        _btn(editando ? 'Em edição' : '✏️ Editar', () => this.editItem(i), '', editando),
+        _btn('Duplicar', () => this.duplicateItem(i), 'btn-outline'),
+        _btn('Remover', () => this.removeItem(i), 'btn-danger')
+      );
+
+      card.append(thumb, info, btns);
+      list.appendChild(card);
+    });
+  },
+
+  /** Atualiza botões do rodapé conforme o modo (novo item × editando). @private */
+  _updateEditingUi() {
+    const idx = AppState.editingIndex;
+    const btnSave   = document.getElementById('btnSaveItem');
+    const btnCancel = document.getElementById('btnCancelEdit');
+    if (btnSave) btnSave.textContent = idx != null ? `💾 Salvar alterações do Modelo #${idx + 1}` : '➕ Salvar no Pedido';
+    if (btnCancel) btnCancel.style.display = idx != null ? '' : 'none';
+  },
+
+  /** Redesenha lista, rodapé e contadores. @private */
+  _refresh() {
+    this.renderOrderList();
+    this._updateEditingUi();
+    const { StampModule } = window._modules || {};
+    if (StampModule) StampModule.syncUiState();
+    else UIModule.syncUiState();
+  },
+
+  /** Remove as estampas do editor e zera as quantidades da categoria. @private */
+  _resetEditor(category) {
+    AppState.stamps.forEach(s => {
+      if (s.node && s.node.parentNode) s.node.parentNode.removeChild(s.node);
+    });
+    AppState.stamps = [];
+    AppState.activeStampId = null;
+    AlignModule.setHudVisible(false);
+
+    if (category && AppState.quantities[category]) {
+      Object.keys(AppState.quantities[category]).forEach(k => { AppState.quantities[category][k] = 0; });
+    }
+    SizeModule.updateSizeTable();
+    SizeModule.backToConfig();
+  },
+
+  /** Grava o pedido no navegador (pode falhar com imagens muito grandes). @private */
+  _persist() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.orderItems));
+    } catch (e) {
+      Logger.warn('STATE', 'Pedido não salvo no navegador: ' + e.message);
+      NoticeModule.show('error', 'O pedido não pôde ser guardado no navegador (imagens muito grandes). Ele continua disponível até fechar a página.');
     }
   }
 };
+
+/** Cria um botão com texto, ação e classe opcional. */
+function _btn(texto, fn, cls = '', disabled = false) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = texto;
+  if (cls) b.className = cls;
+  b.disabled = disabled;
+  b.onclick = e => { e.stopPropagation(); fn(); };
+  return b;
+}

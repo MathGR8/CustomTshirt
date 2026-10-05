@@ -13,6 +13,11 @@
  * novo canvas e o anterior vai para a pilha de "desfazer". Ao salvar, a imagem
  * vira PNG e substitui a da estampa (preview, miniatura e PDF).
  *
+ * Escala: girar amplia o canvas (para caber a diagonal) e recortar o reduz.
+ * Ao salvar, a largura em cm da estampa é recalculada na mesma proporção
+ * (px por cm constante), então a arte mantém o tamanho real na camiseta e
+ * não "encolhe" a cada giro. O centro da estampa também é preservado.
+ *
  * Dependências: logger.js, noticeModule.js, helpers.js. A estampa é achada
  * pelo id em AppState; StampModule vem de window._modules (evita circular).
  */
@@ -21,6 +26,7 @@ import { AppState } from '../core/appState.js';
 import { Logger } from '../core/logger.js';
 import { NoticeModule } from '../ui/noticeModule.js';
 import { Utils } from '../utils/helpers.js';
+import { PreviewGeom } from '../preview/previewGeometry.js';
 
 const MAX_UNDO = 10;     // quantos passos de "desfazer" guardar
 const MAX_SIDE = 4096;   // lado máximo (px) da imagem em edição
@@ -129,7 +135,7 @@ const HTML = `
         <button type="button" data-op="g-90">⟲ 90°</button><button type="button" data-op="g90">⟳ 90°</button>
         <button type="button" data-op="eh">⇋ Horizontal</button><button type="button" data-op="ev">⇅ Vertical</button>
       </div>
-      <div class="editRow"><label>Ângulo <input type="number" id="editAngulo" value="15" min="-180" max="180"> °</label>
+      <div class="editRow"><label>Ângulo <input type="number" id="editAngulo" value="15" min="-360" max="360"> °</label>
         <button type="button" data-op="gl">Girar</button></div>
     </fieldset>
     <fieldset><legend>Recorte</legend>
@@ -224,12 +230,26 @@ function desenhar() {
 }
 
 /** Guarda o canvas atual para "desfazer" e passa a trabalhar no novo. */
-function aplicar(novo) {
+function aplicar(novo, manterGiro = false) {
   ed.undo.push(ed.work);
   if (ed.undo.length > MAX_UNDO) ed.undo.shift();
   ed.work = novo;
   ed.crop = null;
+  if (!manterGiro) ed.giro = null; // outra ferramenta: o próximo giro parte da imagem atual
   desenhar();
+}
+
+/**
+ * Gira somando ao ângulo dos giros consecutivos anteriores, sempre a partir da
+ * imagem de antes do primeiro giro. Assim 15° + 15° = um único giro de 30°,
+ * sem acumular bordas transparentes (que fariam a arte encolher).
+ */
+function girar(graus) {
+  if (!ed.giro) ed.giro = { base: ed.work, angulo: 0 };
+  ed.giro.angulo = ((ed.giro.angulo + graus) % 360 + 360) % 360;
+  const a = ed.giro.angulo;
+  // Múltiplos de 90° (ou 0°) não precisam de margem extra
+  aplicar(a === 0 ? clonar(ed.giro.base) : Ops.girar(ed.giro.base, a), true);
 }
 
 /** Carrega uma imagem (URL) num canvas, limitando o lado maior a MAX_SIDE. */
@@ -252,7 +272,15 @@ export const EditModule = {
     try {
       const dlg = montar();
       const work = await carregarCanvas(stamp.pdfRenderDataURL || stamp.dataURL);
-      ed = { ...(ed || {}), dlg, stamp, work, undo: [], crop: null, ini: null };
+      // larguraInicial: referência para manter a escala (px por cm) ao salvar
+      ed = { ...(ed || {}), dlg, stamp, work, undo: [], crop: null, ini: null, giro: null,
+             larguraInicial: work.width, alturaInicial: work.height };
+      // Se a última edição salva foi um giro, continua a partir da imagem sem giro
+      // (girar 15° hoje e 15° amanhã = um giro de 30°, sem bordas extras acumuladas)
+      const r = stamp.rotacao;
+      if (r && r.resultado === (stamp.pdfRenderDataURL || stamp.dataURL)) {
+        ed.giro = { base: await carregarCanvas(r.base), angulo: r.angulo };
+      }
       desenhar();
       if (!dlg.open) dlg.showModal();
     } catch (err) {
@@ -266,9 +294,9 @@ export const EditModule = {
     if (!ed || !ed.stamp) return;
     const w = ed.work;
     switch (op) {
-      case 'g-90': return aplicar(Ops.girar(w, -90));
-      case 'g90':  return aplicar(Ops.girar(w, 90));
-      case 'gl':   return aplicar(Ops.girar(w, lim(parseFloat($('editAngulo').value) || 0, -180, 180)));
+      case 'g-90': return girar(-90);
+      case 'g90':  return girar(90);
+      case 'gl':   return girar(lim(parseFloat($('editAngulo').value) || 0, -360, 360));
       case 'eh':   return aplicar(Ops.espelhar(w, true));
       case 'ev':   return aplicar(Ops.espelhar(w, false));
       case 'rec':
@@ -279,7 +307,7 @@ export const EditModule = {
       case 'inv':  return aplicar(Ops.inverter(w));
       case 'pin':  return aplicar(Ops.pintar(w, $('editCor').value));
       case 'aj':   return aplicar(Ops.ajustar(w, +$('editBr').value, +$('editCt').value, +$('editSa').value));
-      case 'undo': if (ed.undo.length) { ed.work = ed.undo.pop(); ed.crop = null; desenhar(); } return;
+      case 'undo': if (ed.undo.length) { ed.work = ed.undo.pop(); ed.crop = null; ed.giro = null; desenhar(); } return;
       case 'orig': {
         // Volta à imagem original (a de antes da primeira edição salva)
         const o = ed.stamp.original;
@@ -299,16 +327,57 @@ export const EditModule = {
     if (!s.original) s.original = { dataURL: s.dataURL, previewDataURL: s.previewDataURL, pdfRenderDataURL: s.pdfRenderDataURL };
     s.dataURL = s.previewDataURL = s.pdfRenderDataURL = url;
     s.width = ed.work.width; s.height = ed.work.height;
+    // Lembra a imagem de antes do giro para a próxima edição continuar o mesmo giro
+    s.rotacao = ed.giro && ed.giro.angulo
+      ? { base: ed.giro.base.toDataURL('image/png'), angulo: ed.giro.angulo, resultado: url }
+      : null;
 
-    const { StampModule } = window._modules || {};
-    // Quando a nova imagem carregar, a altura muda (largura em cm é mantida): recalcula a posição
-    s.node.addEventListener('load', () => StampModule?.updateStampRel(s), { once: true });
+    // Mantém a escala da arte: a largura em cm acompanha a largura em px.
+    // (Antes a largura em cm ficava igual e a arte girada encolhia.)
+    const fx = ed.work.width  / ed.larguraInicial;
+    const fy = ed.work.height / ed.alturaInicial;
+    const cmAntes = s.cm ?? 20;
+    const cmIdeal = cmAntes * fx;
+    s.cm = Math.round(Utils.clampCm(cmIdeal) * 10) / 10;
+    const limitada = cmIdeal > s.cm + 0.5;
+    const k = s.cm / cmIdeal; // < 1 só quando a largura foi limitada
+
+    // Posição relativa (PDF) mantendo o centro — vale também para estampas do lado oculto
+    if (s.rel) {
+      const cx = s.rel.rx + s.rel.rw / 2, cy = s.rel.ry + s.rel.rh / 2;
+      const rw = s.rel.rw * fx * k, rh = s.rel.rh * fy * k;
+      s.rel = { rx: cx - rw / 2, ry: cy - rh / 2, rw, rh };
+    }
+
+    const { StampModule, DragModule } = window._modules || {};
+    // Centro atual da estampa no preview (para recentralizar depois de trocar a imagem)
+    const centro = s.node.parentNode && s.node.offsetWidth
+      ? { x: s.node.offsetLeft + s.node.offsetWidth / 2, y: s.node.offsetTop + s.node.offsetHeight / 2 }
+      : null;
+    s.node.addEventListener('load', () => {
+      if (!StampModule) return;
+      StampModule.applyStampCmToNode(s);
+      if (centro && s.node.parentNode && DragModule) {
+        const shirt = PreviewGeom.getRenderedShirtRect();
+        const prev  = document.getElementById('preview')?.getBoundingClientRect();
+        if (shirt && prev) {
+          DragModule.updateStampPosition(s,
+            centro.x - s.node.offsetWidth  / 2 - (shirt.left - prev.left),
+            centro.y - s.node.offsetHeight / 2 - (shirt.top  - prev.top));
+        }
+      }
+      StampModule.updateStampRel(s);
+    }, { once: true });
     s.node.src = url;
 
     ed.stamp = null;
     ed.dlg.close();
     StampModule?.renderStampsList();
-    NoticeModule.show('success', 'Estampa editada com sucesso.');
-    Logger.info('IMAGE', `Estampa editada: ${s.name} (${s.width}×${s.height}px)`);
+    if (limitada) {
+      NoticeModule.show('info', `Estampa editada. Ela ficou maior que a área de impressão e foi limitada a ${s.cm} cm de largura.`);
+    } else {
+      NoticeModule.show('success', 'Estampa editada com sucesso.');
+    }
+    Logger.info('IMAGE', `Estampa editada: ${s.name} (${s.width}×${s.height}px, ${cmAntes} → ${s.cm} cm)`);
   }
 };
