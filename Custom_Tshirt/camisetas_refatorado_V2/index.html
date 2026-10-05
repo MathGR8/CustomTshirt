@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Configure e personalize sua camiseta ArtRock: escolha cor, envie a estampa e gere o pedido em PDF." />
+  <title>Configurar Camiseta - ArtRock (Demo)</title>
+
+  <!-- Folha de estilos externa (extraída do HTML original) -->
+  <link rel="stylesheet" href="css/styles.css" />
+
+  <!-- jsPDF + AutoTable (dependências externas, carregadas antes do módulo principal) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- JSZip (junta as artes num .zip para enviar ao atendimento) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- PDF.js (para rasterização de PDFs como estampa) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  </script>
+</head>
+<body>
+
+<!-- Barra de avisos (UX) -->
+<div id="uiNotice" role="status" aria-live="polite"></div>
+
+<div id="overallContainer">
+
+  <!-- Cabeçalho -->
+  <header class="appHeader">
+    <img src="https://cdn.awsli.com.br/400x300/1274/1274265/logo/logo-art-rock-200-5fh0snhoio.png" alt="ArtRock">
+    <h1>Personalize sua camiseta</h1>
+    <div>
+      <!-- Atalho: leva até a lista "Seu pedido" (útil no celular, onde ela fica embaixo) -->
+      <button type="button" id="orderSummaryBadge" title="Ver itens do pedido"
+              onclick="document.getElementById('orderPanel').scrollIntoView({ behavior: 'smooth', block: 'start' })">
+        📦 Itens: <span id="orderCount">0</span>
+      </button>
+      <button type="button" class="btn-outline" onclick="OrderModule.clearOrder()">
+        Limpar
+      </button>
+    </div>
+  </header>
+
+  <div class="mainContainer">
+
+    <!-- ==================== ITENS DO PEDIDO (lateral) ==================== -->
+    <!-- Itens já salvos: reabrir para edição, renomear, duplicar e remover -->
+    <aside id="orderPanel" aria-label="Itens do pedido">
+      <p class="sectionTitle">Seu pedido</p>
+      <div id="orderList"></div>
+    </aside>
+
+    <!-- ==================== PAINEL ESQUERDO ==================== -->
+    <aside id="leftPanel" aria-label="Configurações do produto">
+
+      <!-- Configurações -->
+      <div id="configSection">
+        <p class="sectionTitle">Produto</p>
+
+        <div id="setor1">
+          <div class="seletor" id="seletorCtg">
+            <label for="category">Categoria</label>
+            <select id="category" onchange="UIModule.updateColorOptions(); SizeModule.updateSizeTable();">
+              <option value="Masculina" selected>Masculina</option>
+              <option value="Feminina">Feminina</option>
+              <option value="Infantil/Juvenil">Infantil/Juvenil</option>
+            </select>
+          </div>
+          <div class="seletor" id="seletorMalha">
+            <label for="fabricType">Tipo de Malha</label>
+            <select id="fabricType" onchange="UIModule.updateColorOptions()">
+              <option value="100% algodão" selected>100% algodão</option>
+              <option value="Premium mesclado">Premium mesclado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="seletor" id="seletorCor">
+          <span class="fieldLabel" id="colorLabel">Cor</span>
+          <div id="colorOptionsContainer" role="radiogroup" aria-labelledby="colorLabel"></div>
+        </div>
+
+        <p class="sectionTitle">Estampa</p>
+
+        <div class="seletor" id="enviaEstampa">
+          <span class="fieldLabel">Envie sua Arte</span>
+          <!-- Ao escolher o arquivo a estampa já é adicionada (sem 2º clique) -->
+          <label class="uploadBtn" for="stampFile">
+            <span>＋ Adicionar estampa</span>
+            <small>PNG, JPG, SVG ou PDF</small>
+          </label>
+          <input type="file" id="stampFile" class="visuallyHidden" accept=".svg,.png,.jpg,.jpeg,.pdf"
+                 aria-label="Selecionar arquivo de estampa" onchange="StampModule.updateStampPreview()" />
+        </div>
+
+        <div id="locationSection" class="seletor">
+          <div style="display:flex; gap:10px; width:100%;">
+            <div id="locationContainer" style="flex:1;">
+              <label for="stampLocation">Local</label>
+              <select id="stampLocation" onchange="UIModule.stampLocationChanged()">
+                <option value="Frente" selected>Frente</option>
+                <option value="Costas">Costas</option>
+              </select>
+            </div>
+            <div id="subLocationContainer" style="flex:1;">
+              <label for="subLocation">Tamanho rápido</label>
+              <select id="subLocation" onchange="UIModule.updateStampSizeDefault()"></select>
+            </div>
+          </div>
+        </div>
+
+        <div id="stampSizeContainer" class="seletor" style="display:none;">
+          <label for="stampSize">
+            Largura da estampa ativa
+            <span id="stampSizeValue">0 cm</span>
+          </label>
+          <input type="range" id="stampSize" min="5" max="38" value="22" aria-label="Largura da estampa em centímetros" />
+        </div>
+
+        <button type="button" id="btnDefineQuantities" onclick="SizeModule.showSizeSection(); SizeModule.updateSizeTable()">
+          📋 Definir Quantidades
+        </button>
+      </div>
+
+      <!-- Seção de tamanhos -->
+      <div id="sizeSection" style="display:none;">
+        <div class="sizeSectionHeader">
+          <h2>Tamanhos e Quantidades</h2>
+          <button type="button" class="btn-outline" onclick="SizeModule.backToConfig()">← Voltar</button>
+        </div>
+        <table id="sizeTable" class="tableSizes"></table>
+        <p id="totalPiecesLabel" style="margin-top:8px; font-size:13px; color:var(--color-text-muted); text-align:right;"></p>
+      </div>
+
+    </aside><!-- /leftPanel -->
+
+    <!-- ==================== PAINEL CENTRAL ==================== -->
+    <main id="middlePanel">
+
+      <div class="previewWrapper">
+        <div id="previewContainer" class="previewContainer">
+          <!-- Badge de lado -->
+          <div id="currentSideBadge">Frente</div>
+
+          <div class="shirtPreview" id="preview"></div>
+
+          <!-- HUD de alinhamento -->
+          <div id="alignHud" role="toolbar" aria-label="Ferramentas de alinhamento">
+            <div class="centerCol">
+              <button type="button" class="align-button"
+                      onclick="StampModule.alignStamp('centerX')"
+                      title="Centralizar horizontalmente"
+                      aria-label="Centralizar horizontalmente">Centro ⟷</button>
+              <button type="button" class="align-button"
+                      onclick="StampModule.alignStamp('top')"
+                      title="Alinhar ao topo"
+                      aria-label="Alinhar ao topo">Topo ⤒</button>
+              <button type="button" class="align-button"
+                      onclick="StampModule.alignStamp('bottom')"
+                      title="Alinhar à base"
+                      aria-label="Alinhar à base">Baixo ⤓</button>
+            </div>
+            <div class="dpad" role="group" aria-label="Mover estampa">
+              <button id="btnNudgeUp" class="cell"
+                onmousedown="StampModule.startNudge('moveUp')"    onmouseup="StampModule.stopNudge()" onmouseleave="StampModule.stopNudge()"
+                ontouchstart="StampModule.startNudge('moveUp');return false;" ontouchend="StampModule.stopNudge()" ontouchcancel="StampModule.stopNudge()"
+                aria-label="Mover para cima">▲</button>
+              <button id="btnNudgeLeft" class="cell"
+                onmousedown="StampModule.startNudge('moveLeft')"  onmouseup="StampModule.stopNudge()" onmouseleave="StampModule.stopNudge()"
+                ontouchstart="StampModule.startNudge('moveLeft');return false;" ontouchend="StampModule.stopNudge()" ontouchcancel="StampModule.stopNudge()"
+                aria-label="Mover para esquerda">◀</button>
+              <button id="btnNudgeRight" class="cell"
+                onmousedown="StampModule.startNudge('moveRight')" onmouseup="StampModule.stopNudge()" onmouseleave="StampModule.stopNudge()"
+                ontouchstart="StampModule.startNudge('moveRight');return false;" ontouchend="StampModule.stopNudge()" ontouchcancel="StampModule.stopNudge()"
+                aria-label="Mover para direita">▶</button>
+              <button id="btnNudgeDown" class="cell"
+                onmousedown="StampModule.startNudge('moveDown')"  onmouseup="StampModule.stopNudge()" onmouseleave="StampModule.stopNudge()"
+                ontouchstart="StampModule.startNudge('moveDown');return false;" ontouchend="StampModule.stopNudge()" ontouchcancel="StampModule.stopNudge()"
+                aria-label="Mover para baixo">▼</button>
+            </div>
+          </div>
+
+          <!-- Botão trocar vista -->
+          <button type="button" id="btnToggleView" onclick="UIModule.toggleView()" aria-label="Alternar entre frente e costas">
+            🔄 Frente / Costas
+          </button>
+        </div>
+
+        <!-- Opções abaixo do preview -->
+        <div class="previewOptions">
+          <label>
+            <input type="checkbox" id="chkShowShirtBox" checked onchange="UIModule.toggleShirtBox(this.checked)">
+            Mostrar área de impressão
+          </label>
+          <label>
+            <input type="checkbox" id="chkPdfShirtBox" />
+            Área de impressão no PDF (debug)
+          </label>
+        </div>
+      </div>
+
+    </main><!-- /middlePanel -->
+
+    <!-- ==================== PAINEL DIREITO ==================== -->
+    <aside id="rightPanel" aria-label="Lista de estampas">
+      <div class="stampsPanelHeader">
+        <p class="sectionTitle" style="margin:0; border:none;">Estampas</p>
+        <span class="badge" id="stampsCountBadge">0</span>
+      </div>
+      <div id="stampsList"></div>
+      <button type="button" class="btn-danger" id="btnClearAll" onclick="StampModule.clearAllStamps()" style="margin-top:auto; display:none;">
+        🗑 Limpar tudo
+      </button>
+    </aside><!-- /rightPanel -->
+
+  </div><!-- /mainContainer -->
+
+  <!-- Rodapé de ações -->
+  <footer class="appFooter">
+    <button type="button" id="btnCancelEdit" class="btn-outline" onclick="OrderModule.cancelEdit()" style="display:none;">
+      ✕ Cancelar edição
+    </button>
+    <button type="button" id="btnSaveItem" class="btn-dark" onclick="OrderModule.saveItem()">
+      ➕ Salvar no Pedido
+    </button>
+    <button type="button" id="btnGerarPdf" class="btn-dark" onclick="PDFModule.gerarPDF()" disabled
+            title="Adicione itens ao pedido para gerar o PDF">
+      📄 Gerar PDF do Pedido
+    </button>
+  </footer>
+
+</div><!-- /overallContainer -->
+
+<!--
+  Ponto de entrada da aplicação.
+  type="module" habilita ES Modules e garante que o script seja executado
+  após o DOM estar carregado (comportamento equivalente a defer).
+-->
+<script type="module" src="js/main.js"></script>
+
+</body>
+</html>
