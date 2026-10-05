@@ -689,8 +689,8 @@ img#baseShirtImg.feminine-shirt {
   #btnToggleView { bottom: 8px; right: 8px; }
   /* No celular, a camiseta aparece primeiro, depois as opções e a lista de estampas */
   #middlePanel { order: 1; }
-  #leftPanel   { order: 2; }
-  #rightPanel  { order: 3; }
+  #rightPanel  { order: 2; }
+  #leftPanel   { order: 3; }
   .stampMeta { grid-template-columns: 1fr 1fr 1fr; }
 }
 @media (max-width: 600px) {
@@ -999,7 +999,8 @@ button.stepBtn:active { background: #d6d6d6; transform: none; }
    as opções, ações fixas embaixo e alvos de toque maiores.
    ============================================= */
 @media (max-width: 1100px) {
-  html, body { overflow-x: hidden; }
+  /* clip (e não hidden) para não quebrar o position: sticky do preview e do rodapé */
+  html, body { overflow-x: clip; }
   #overallContainer { width: 100%; margin: 0; border: none; border-radius: 0; box-shadow: none; overflow: visible; }
   .appHeader {
     flex-direction: row; flex-wrap: wrap; height: auto;
@@ -1020,8 +1021,10 @@ button.stepBtn:active { background: #d6d6d6; transform: none; }
   .previewOptions { flex-direction: row; flex-wrap: wrap; gap: 4px 14px; justify-content: center; margin: 4px 0 0; }
   #alignHud { transform: scale(0.85); transform-origin: right bottom; bottom: 44px; right: 4px; }
 
-  #leftPanel   { order: 2; }
-  #rightPanel  { order: 3; }
+  /* Lista de estampas logo abaixo da camiseta: ajustar tamanho/lado e ver o
+     resultado na mesma tela (a camiseta fica fixa no topo) */
+  #rightPanel  { order: 2; border-bottom: 1px solid var(--color-border); }
+  #leftPanel   { order: 3; }
   #orderPanel  { order: 4; width: 100%; border-right: none; border-top: 1px solid var(--color-border); padding: 12px; }
   #leftPanel, #rightPanel { padding: 14px 12px; }
   #stampsList { overflow: visible; }
@@ -1090,4 +1093,11 @@ button#orderSummaryBadge:hover { background: rgba(255,255,255,0.3); filter: none
   .previewOptions { font-size: 11px; }
   .appFooter { gap: 6px; }
   .appFooter button { font-size: 13px; padding: 12px 6px; }
+}
+
+@media (max-width: 1100px) {
+  /* Sem estampas, a lista vira só uma linha (não empurra as opções para baixo) */
+  #stampsList p { padding: 6px 0 !important; }
+  #rightPanel { gap: 6px; }
+  #btnClearAll { margin-top: 4px !important; }
 }
