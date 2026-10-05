@@ -175,6 +175,9 @@ export const UIModule = {
     if (s && s.side === AppState.currentView && StampModule) {
       s.cm = cm;
       StampModule.applyStampCmToNode(s);
+      // Mantém o campo "Largura (cm)" da lista igual ao slider
+      const campo = document.querySelector('#stampsList .stampItem.active input[type="number"]');
+      if (campo) campo.value = cm;
     }
   },
 

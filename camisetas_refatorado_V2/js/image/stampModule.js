@@ -400,6 +400,7 @@ export const StampModule = {
       cmInput.max   = MAX_PRINT_WIDTH_CM;
       cmInput.step  = 1;
       cmInput.value = (s.cm ?? 20);
+      cmInput.inputMode = 'decimal';
       cmInput.onchange = () => {
         s.cm = Utils.clampCm(parseFloat(cmInput.value || '20'));
         if (s.side === AppState.currentView) this.applyStampCmToNode(s);
@@ -418,7 +419,7 @@ export const StampModule = {
 
       meta.append(
         _labelWrap('Lado:', sideSelect),
-        _labelWrap('Largura (cm):', cmInput),
+        _labelWrap('Largura (cm):', Utils.stepper(cmInput)),
         _labelWrap('Visível', visToggle)
       );
 

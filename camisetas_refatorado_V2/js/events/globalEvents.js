@@ -116,6 +116,7 @@ export function initConfigurator() {
   if (stampSizeInput) {
     if (!stampSizeInput.value || stampSizeInput.value === "0") stampSizeInput.value = 22;
     stampSizeInput.addEventListener("input", Utils.debounce(() => UIModule.updateStampSize(), 40));
+    Utils.stepper(stampSizeInput); // botões − e + ao lado do slider
   }
 
   UIModule.updateColorOptions();

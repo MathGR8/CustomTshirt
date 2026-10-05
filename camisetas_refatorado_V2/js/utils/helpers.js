@@ -75,6 +75,62 @@ export const Utils = {
    * @param {number} delay - Tempo de espera em milissegundos.
    * @returns {Function} Nova função que aguarda o delay antes de executar.
    */
+  /**
+   * Põe botões "−" e "+" em volta de um campo numérico (ou slider).
+   * Respeita min/max/step do campo; segurar o botão repete. A cada passo
+   * dispara os eventos 'input' e 'change' do campo, como se o usuário digitasse.
+   * Se o campo já estiver na página, é trocado pelo conjunto no mesmo lugar.
+   * @param {HTMLInputElement} input - Campo a controlar.
+   * @returns {HTMLDivElement} O conjunto [− campo +].
+   */
+  stepper(input) {
+    const wrap = document.createElement('div');
+    wrap.className = 'stepper' + (input.type === 'range' ? ' stepperRange' : '');
+    if (input.parentNode) input.parentNode.replaceChild(wrap, input);
+
+    const passo = dir => {
+      const step = parseFloat(input.step) || 1;
+      const min  = input.min !== '' ? parseFloat(input.min) : -Infinity;
+      const max  = input.max !== '' ? parseFloat(input.max) : Infinity;
+      const atual = parseFloat(input.value) || 0;
+      // Arredonda para o passo (ex.: 22,4 → 23 ao apertar "+")
+      const base = dir > 0 ? Math.floor(atual / step) * step : Math.ceil(atual / step) * step;
+      const novo = Math.max(min, Math.min(max, base + dir * step));
+      if (novo === atual) return;
+      input.value = String(+novo.toFixed(4));
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    const botao = (txt, dir, rotulo) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'stepBtn';
+      b.textContent = txt;
+      b.setAttribute('aria-label', rotulo);
+      let espera = null, repete = null, ultimoToque = 0;
+      const parar = () => { clearTimeout(espera); clearInterval(repete); espera = repete = null; };
+      b.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        ultimoToque = Date.now();
+        passo(dir);
+        espera = setTimeout(() => { repete = setInterval(() => passo(dir), 90); }, 400);
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, parar));
+      // Teclado (Enter/Espaço) gera só o click. O click que vem logo depois de
+      // um toque/clique já foi contado no pointerdown e é ignorado.
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        if (Date.now() - ultimoToque > 800) passo(dir);
+      });
+      return b;
+    };
+
+    wrap.append(botao('−', -1, 'Diminuir'), input, botao('+', 1, 'Aumentar'));
+    return wrap;
+  },
+
   debounce(fn, delay) {
     let t;
     return (...args) => {

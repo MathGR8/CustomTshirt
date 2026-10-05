@@ -25,6 +25,9 @@ import { AlignModule } from '../preview/alignModule.js';
 /** Chave usada por uma versão anterior que guardava o pedido no navegador. */
 const OLD_STORAGE_KEY = 'artrock.pedido.v1';
 
+/** Nome exibido do item: o que o cliente deu ou "Modelo N". */
+export const nomeItem = (item, i) => (item?.name || '').trim() || `Modelo ${i + 1}`;
+
 /** Soma das quantidades de um item ({ P: 2, M: 3 } → 5). */
 const totalPecas = q => Object.values(q || {}).reduce((s, n) => s + (parseInt(n, 10) || 0), 0);
 
@@ -65,13 +68,15 @@ export const OrderModule = {
 
     const idx = AppState.editingIndex;
     if (idx != null && AppState.orderItems[idx]) {
+      item.name = AppState.orderItems[idx].name; // mantém o nome dado pelo cliente
       AppState.orderItems[idx] = item;
       Logger.info('STATE', `Item #${idx + 1} atualizado no pedido.`);
-      NoticeModule.show("success", `Modelo #${idx + 1} atualizado no pedido!`);
+      NoticeModule.show("success", `"${nomeItem(item, idx)}" atualizado no pedido!`);
     } else {
       AppState.orderItems.push(item);
-      Logger.info('STATE', `Item #${AppState.orderItems.length} salvo no pedido.`);
-      NoticeModule.show("success", "Modelo #" + AppState.orderItems.length + " salvo no pedido!");
+      const n = AppState.orderItems.length - 1;
+      Logger.info('STATE', `Item #${n + 1} salvo no pedido.`);
+      NoticeModule.show("success", `"${nomeItem(item, n)}" salvo no pedido!`);
     }
 
     AppState.editingIndex = null;
@@ -121,20 +126,57 @@ export const OrderModule = {
     StampModule.setActiveStamp(primeira?.id || null);
 
     this._refresh();
-    NoticeModule.show('info', `Editando o Modelo #${index + 1}. Altere o que quiser e clique em "Salvar alterações".`);
+    NoticeModule.show('info', `Editando "${nomeItem(item, index)}". Altere e clique em "Salvar alterações".`);
     Logger.info('STATE', `Item #${index + 1} aberto para edição.`);
     document.getElementById('overallContainer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+
+  /**
+   * Renomeia um item do pedido (nome aparece na lista, nos avisos e no PDF).
+   * Nome vazio volta ao padrão "Modelo N".
+   */
+  renameItem(index, nome) {
+    const item = AppState.orderItems[index];
+    if (!item) return;
+    item.name = String(nome || '').trim().slice(0, 40);
+    this._refresh();
+  },
+
+  /** Troca o título do card por um campo de texto para renomear. @private */
+  _startRename(index, tituloEl) {
+    const item = AppState.orderItems[index];
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'orderRename';
+    inp.maxLength = 40;
+    inp.value = nomeItem(item, index);
+    inp.setAttribute('aria-label', 'Nome do item');
+    let feito = false;
+    const concluir = salvar => {
+      if (feito) return;
+      feito = true;
+      if (salvar) this.renameItem(index, inp.value);
+      else this._refresh();
+    };
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); concluir(true); }
+      if (e.key === 'Escape') concluir(false);
+    });
+    inp.addEventListener('blur', () => concluir(true));
+    tituloEl.replaceWith(inp);
+    inp.focus();
+    inp.select();
   },
 
   /** Cancela a edição de um item: descarta as mudanças e limpa o editor. */
   cancelEdit() {
     if (AppState.editingIndex == null) return;
     if (!confirm('Cancelar a edição? As alterações não salvas serão descartadas.')) return;
-    const n = AppState.editingIndex + 1;
+    const nome = nomeItem(AppState.orderItems[AppState.editingIndex], AppState.editingIndex);
     AppState.editingIndex = null;
     this._resetEditor(document.getElementById("category")?.value);
     this._refresh();
-    NoticeModule.show('info', `Edição do Modelo #${n} cancelada.`);
+    NoticeModule.show('info', `Edição de "${nome}" cancelada.`);
   },
 
   /** Cria uma cópia de um item logo depois dele. */
@@ -144,19 +186,20 @@ export const OrderModule = {
     // Cópia sem JSON: preserva o arquivo original (File) de cada arte
     const copia = {
       ...item,
+      name: item.name ? `${item.name.trim()} (cópia)` : '',
       stamps: item.stamps.map(st => ({ ...st, rel: st.rel ? { ...st.rel } : null })),
       quantities: { ...item.quantities }
     };
     AppState.orderItems.splice(index + 1, 0, copia);
     if (AppState.editingIndex != null && AppState.editingIndex > index) AppState.editingIndex++;
     this._refresh();
-    NoticeModule.show('success', `Modelo #${index + 1} duplicado.`);
+    NoticeModule.show('success', `"${nomeItem(item, index)}" duplicado.`);
   },
 
   /** Remove um item do pedido. */
   removeItem(index) {
     if (!AppState.orderItems[index]) return;
-    if (!confirm(`Remover o Modelo #${index + 1} do pedido?`)) return;
+    if (!confirm(`Remover "${nomeItem(AppState.orderItems[index], index)}" do pedido?`)) return;
     AppState.orderItems.splice(index, 1);
     if (AppState.editingIndex === index) {
       // O conteúdo continua no editor e pode ser salvo como item novo
@@ -189,7 +232,7 @@ export const OrderModule = {
     list.innerHTML = '';
 
     if (!AppState.orderItems.length) {
-      list.innerHTML = '<p class="orderEmpty">Nenhum item salvo ainda. Monte sua camiseta e clique em "Salvar no Pedido".</p>';
+      list.innerHTML = '<p class="orderEmpty">Nenhum item ainda.<br>Monte sua camiseta e toque em <b>Salvar no Pedido</b>.</p>';
       return;
     }
 
@@ -213,12 +256,27 @@ export const OrderModule = {
       const info = document.createElement('div');
       info.className = 'orderInfo';
       const nEst = (item.stamps || []).filter(s => !s.hidden).length;
+
+      // Nome (clique no nome ou no lápis para renomear)
+      const linhaNome = document.createElement('div');
+      linhaNome.className = 'orderName';
       const titulo = document.createElement('strong');
-      titulo.textContent = `Modelo #${i + 1}` + (editando ? ' • em edição' : '');
-      info.appendChild(titulo);
+      titulo.textContent = nomeItem(item, i);
+      titulo.title = 'Clique para renomear';
+      titulo.onclick = e => { e.stopPropagation(); this._startRename(i, titulo); };
+      const btnNome = _btn('✎', () => this._startRename(i, titulo), 'iconBtn');
+      btnNome.title = 'Renomear';
+      btnNome.setAttribute('aria-label', `Renomear ${nomeItem(item, i)}`);
+      linhaNome.append(titulo, btnNome);
+      info.appendChild(linhaNome);
+      if (editando) {
+        const tag = document.createElement('span');
+        tag.className = 'orderTag';
+        tag.textContent = 'em edição';
+        info.appendChild(tag);
+      }
       [
-        `${item.category} • ${item.fabric}`,
-        `Cor: ${item.color}`,
+        `${item.category} • ${item.color}`,
         `${nEst} estampa(s) • ${totalPecas(item.quantities)} peça(s)`
       ].forEach(t => {
         const d = document.createElement('span');
@@ -229,7 +287,7 @@ export const OrderModule = {
       const btns = document.createElement('div');
       btns.className = 'orderBtns';
       btns.append(
-        _btn(editando ? 'Em edição' : '✏️ Editar', () => this.editItem(i), '', editando),
+        _btn(editando ? 'Editando' : 'Editar', () => this.editItem(i), '', editando),
         _btn('Duplicar', () => this.duplicateItem(i), 'btn-outline'),
         _btn('Remover', () => this.removeItem(i), 'btn-danger')
       );
@@ -244,7 +302,10 @@ export const OrderModule = {
     const idx = AppState.editingIndex;
     const btnSave   = document.getElementById('btnSaveItem');
     const btnCancel = document.getElementById('btnCancelEdit');
-    if (btnSave) btnSave.textContent = idx != null ? `💾 Salvar alterações do Modelo #${idx + 1}` : '➕ Salvar no Pedido';
+    if (btnSave) {
+      btnSave.textContent = idx != null ? '💾 Salvar alterações' : '➕ Salvar no Pedido';
+      btnSave.title = idx != null ? `Salvar alterações em "${nomeItem(AppState.orderItems[idx], idx)}"` : '';
+    }
     if (btnCancel) btnCancel.style.display = idx != null ? '' : 'none';
   },
 

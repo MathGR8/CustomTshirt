@@ -626,7 +626,8 @@ img#baseShirtImg.feminine-shirt {
    ============================================= */
 #uiNotice {
   display: none;
-  position: absolute;
+  position: fixed;
+  top: 6px;
   width: auto;
   min-width: 200px;
   padding: 2px 15px;
@@ -699,27 +700,26 @@ img#baseShirtImg.feminine-shirt {
 }
 
 /* =============================================
-   ITENS DO PEDIDO (reabrir um item para edição)
+   SEU PEDIDO — coluna lateral com os itens salvos
+   (reabrir para edição, renomear, duplicar, remover)
    ============================================= */
 #orderPanel {
-  padding: 8px 16px 10px;
-  border-bottom: 1px solid var(--color-border);
+  width: 200px;
+  flex-shrink: 0;
+  padding: 14px 10px;
+  border-right: 1px solid var(--color-border);
   background: #fafafa;
-}
-#orderPanel .sectionTitle { margin-bottom: 6px; }
-#orderList {
   display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 4px;
+  flex-direction: column;
+  overflow-y: auto;
   scrollbar-width: thin;
 }
-.orderEmpty { font-size: 12px; color: var(--color-text-muted); }
+#orderList { display: flex; flex-direction: column; gap: 8px; }
+.orderEmpty { font-size: 12px; color: var(--color-text-muted); line-height: 1.45; }
 .orderCard {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 6px 8px;
   padding: 8px;
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -730,18 +730,32 @@ img#baseShirtImg.feminine-shirt {
   box-shadow: 0 0 0 3px rgba(237,48,81,0.15);
 }
 .orderThumb {
-  width: 56px; height: 56px;
-  flex-shrink: 0;
+  width: 44px; height: 44px;
   display: flex; align-items: center; justify-content: center;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   overflow: hidden;
 }
 .orderThumb img { max-width: 80%; max-height: 80%; object-fit: contain; }
-.orderInfo { display: flex; flex-direction: column; font-size: 11px; color: var(--color-text-muted); line-height: 1.35; }
-.orderInfo strong { font-size: 12px; color: var(--color-text); }
-.orderBtns { display: flex; flex-direction: column; gap: 4px; }
-.orderBtns button { padding: 4px 8px; font-size: 11px; }
+.orderInfo { display: flex; flex-direction: column; min-width: 0; font-size: 11px; color: var(--color-text-muted); line-height: 1.35; }
+.orderName { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.orderName strong {
+  font-size: 12px; color: var(--color-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  cursor: text;
+}
+.orderTag { color: var(--color-primary); font-weight: 700; }
+input.orderRename {
+  width: 100%; font: inherit; font-size: 12px; font-weight: 700;
+  padding: 2px 4px; border: 1.5px solid var(--color-primary); border-radius: var(--radius-sm);
+}
+button.iconBtn {
+  flex-shrink: 0; width: 22px; height: 22px; padding: 0;
+  background: transparent; color: var(--color-text-muted); font-size: 13px;
+}
+button.iconBtn:hover { background: #eee; color: var(--color-text); filter: none; }
+.orderBtns { grid-column: 1 / -1; display: flex; gap: 4px; }
+.orderBtns button { flex: 1; padding: 4px 2px; font-size: 11px; }
 
 /* =============================================
    RODAPÉ DE AÇÕES (antes era estilo inline no HTML)
@@ -895,4 +909,185 @@ button.btn-whatsapp:hover { background: #188a4a; filter: none; }
   .dlgFoot { flex-direction: column-reverse; }
   .dlgFoot button { width: 100%; padding: 12px; font-size: 15px; }
   #orderPanel { padding: 8px 10px; }
+}
+
+/* =============================================
+   BOTÕES − / + (quantidades, largura da estampa, slider)
+   ============================================= */
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-surface);
+  max-width: 100%;
+}
+.stepper input[type="number"] {
+  width: 48px; min-width: 0;
+  border: none; border-radius: 0;
+  text-align: center;
+  padding: 4px 2px;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.stepper input[type="number"]::-webkit-outer-spin-button,
+.stepper input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.stepper input[type="number"]:focus { box-shadow: inset 0 0 0 2px var(--color-primary); }
+button.stepBtn {
+  width: 30px; padding: 0;
+  background: #f1f1f1; color: var(--color-text);
+  border-radius: 0; font-size: 17px; font-weight: 700; line-height: 1;
+  touch-action: manipulation; user-select: none;
+}
+button.stepBtn:hover { background: #e4e4e4; filter: none; }
+button.stepBtn:active { background: #d6d6d6; transform: none; }
+/* Slider com − e + nas pontas */
+.stepper.stepperRange { display: flex; align-items: center; gap: 8px; border: none; overflow: visible; background: none; width: 100%; }
+.stepperRange input[type="range"] { flex: 1; }
+.stepperRange button.stepBtn {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border: 1px solid var(--color-border); border-radius: 50%;
+}
+.labelWrap .stepper input[type="number"] { width: 42px; font-size: 12px; }
+
+/* Botão de envio de arte (o arquivo é adicionado assim que escolhido) */
+.uploadBtn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 12px;
+  border: 2px dashed var(--color-primary);
+  border-radius: var(--radius-md);
+  background: rgba(237, 48, 81, 0.05);
+  color: var(--color-primary);
+  font-weight: 700; font-size: 14px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.uploadBtn:hover { background: rgba(237, 48, 81, 0.1); }
+.uploadBtn small { font-weight: 400; font-size: 11px; color: var(--color-text-muted); }
+#stampFile:focus-visible + .uploadBtn, .uploadBtn:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.visuallyHidden {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* =============================================
+   DESKTOP: a página inteira cabe na tela, sem rolagem.
+   Cada painel rola por dentro quando precisa.
+   ============================================= */
+@media (min-width: 1101px) {
+  html, body { height: 100%; overflow: hidden; }
+  #overallContainer {
+    width: min(1600px, calc(100vw - 12px));
+    height: calc(100vh - 12px);
+    height: calc(100dvh - 12px);
+    margin: 6px auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .appHeader, .appFooter { flex-shrink: 0; }
+  .mainContainer { flex: 1; height: auto; min-height: 0; }
+  #leftPanel  { width: 25%; min-width: 240px; }
+  #rightPanel { width: 23%; min-width: 220px; }
+  #middlePanel { min-width: 0; min-height: 0; }
+  .previewWrapper { flex: 1; min-height: 0; }
+  .previewContainer { flex: 1; height: auto; min-height: 300px; max-width: 560px; }
+}
+
+/* =============================================
+   CELULAR / TABLET: camiseta fixa no topo enquanto se rola
+   as opções, ações fixas embaixo e alvos de toque maiores.
+   ============================================= */
+@media (max-width: 1100px) {
+  html, body { overflow-x: hidden; }
+  #overallContainer { width: 100%; margin: 0; border: none; border-radius: 0; box-shadow: none; overflow: visible; }
+  .appHeader {
+    flex-direction: row; flex-wrap: wrap; height: auto;
+    padding: 8px 12px; gap: 8px;
+  }
+  .appHeader img { height: 28px; }
+  .appHeader h1 { font-size: 15px; flex: 1; text-align: center; }
+  .mainContainer { flex-direction: column; height: auto; min-height: 0; }
+
+  /* Camiseta sempre visível (fixa no topo ao rolar) */
+  #middlePanel {
+    order: 1;
+    position: sticky; top: 0; z-index: 30;
+    padding: 6px 8px 4px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  }
+  .previewContainer { height: 40vh; height: 40dvh; min-height: 230px; max-width: 100%; }
+  .previewOptions { flex-direction: row; flex-wrap: wrap; gap: 4px 14px; justify-content: center; margin: 4px 0 0; }
+  #alignHud { transform: scale(0.85); transform-origin: right bottom; bottom: 44px; right: 4px; }
+
+  #leftPanel   { order: 2; }
+  #rightPanel  { order: 3; }
+  #orderPanel  { order: 4; width: 100%; border-right: none; border-top: 1px solid var(--color-border); padding: 12px; }
+  #leftPanel, #rightPanel { padding: 14px 12px; }
+  #stampsList { overflow: visible; }
+
+  /* Ações sempre à mão */
+  .appFooter {
+    position: sticky; bottom: 0; z-index: 40;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.08);
+  }
+  .appFooter button { flex: 1; padding: 12px 8px; font-size: 14px; white-space: normal; }
+
+  /* Alvos de toque maiores e fonte 16px (evita zoom automático no iPhone) */
+  select, input[type="number"], input[type="text"], textarea { font-size: 16px; }
+  select { padding: 9px 10px; }
+  button.stepBtn { width: 42px; font-size: 20px; }
+  .stepper input[type="number"] { width: 56px; padding: 8px 2px; }
+  .labelWrap .stepper input[type="number"] { width: 48px; font-size: 16px; }
+  .stepperRange button.stepBtn { width: 40px; height: 40px; }
+  .stampRowBtns button, .orderBtns button { padding: 9px 4px; font-size: 13px; }
+  .colorCircle { width: 30px; height: 30px; }
+  .quantityControl { justify-content: center; }
+  .tableSizes td { padding: 6px; }
+  .stampMeta { grid-template-columns: 1fr 1fr; }
+  #uiNotice { left: 8px; right: 8px; min-width: 0; height: auto; padding: 8px 12px; text-align: center; }
+}
+
+/* =============================================
+   AJUSTES FINOS DE UX
+   ============================================= */
+/* Aviso flutuante embaixo, no centro (não cobre o cabeçalho nem os botões) */
+#uiNotice {
+  top: auto; bottom: 72px; right: auto; left: 50%;
+  margin: 0; transform: translateX(-50%);
+  max-width: min(560px, calc(100vw - 24px));
+  height: auto; min-height: 38px; padding: 8px 16px;
+  text-align: center; box-shadow: var(--shadow-md);
+  animation: toastIn 0.2s ease;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+/* Badge de itens do cabeçalho é um botão */
+button#orderSummaryBadge { color: #fff; border: none; cursor: pointer; }
+button#orderSummaryBadge:hover { background: rgba(255,255,255,0.3); filter: none; }
+
+/* Local / Tamanho rápido alinhados */
+#locationContainer, #subLocationContainer { display: flex; flex-direction: column; gap: 6px; }
+#locationContainer select, #subLocationContainer select { width: 100%; }
+
+/* Campos da lista de estampas */
+.labelWrap .stepper { align-self: flex-start; }
+.labelWrap input[type="checkbox"] { align-self: flex-start; width: 18px; height: 18px; }
+.orderName strong { white-space: normal; overflow-wrap: anywhere; }
+
+@media (max-width: 1100px) {
+  #uiNotice { bottom: calc(76px + env(safe-area-inset-bottom)); left: 50%; right: auto; }
+  /* Lista de estampas compacta: miniatura à esquerda, campos à direita */
+  .stampItem { display: grid; grid-template-columns: 72px 1fr; align-items: start; gap: 8px 12px; }
+  .stampItem .stampThumb { width: 72px; height: 72px; align-self: center; }
+  .stampItem .stampRowBtns { grid-column: 1 / -1; }
+  .stampMeta { grid-template-columns: 1fr; gap: 6px; }
+  .stampMeta .labelWrap { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
+  .stampMeta .labelWrap select { flex: 1; max-width: 150px; }
+  .previewOptions { font-size: 11px; }
+  .appFooter { gap: 6px; }
+  .appFooter button { font-size: 13px; padding: 12px 6px; }
 }

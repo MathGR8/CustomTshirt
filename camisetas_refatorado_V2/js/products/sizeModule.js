@@ -16,6 +16,7 @@
 import { AppState } from '../core/appState.js';
 import { Logger } from '../core/logger.js';
 import { UIModule } from '../ui/uiModule.js';
+import { Utils } from '../utils/helpers.js';
 
 export const SizeModule = {
   /**
@@ -57,6 +58,8 @@ export const SizeModule = {
       const inp = document.createElement("input");
       inp.type  = "number";
       inp.min   = "0";
+      inp.step  = "1";
+      inp.inputMode = "numeric";
       // Recupera o valor salvo ou define como 0
       inp.value = AppState.quantities[category][sz] || "0";
       inp.dataset.size = sz;
@@ -70,7 +73,7 @@ export const SizeModule = {
         this._updateTotalLabel();
       });
 
-      td2.appendChild(inp);
+      td2.appendChild(Utils.stepper(inp));
       tr.append(td1, td2);
       tbody.appendChild(tr);
     });

@@ -35,22 +35,25 @@
     <img src="https://cdn.awsli.com.br/400x300/1274/1274265/logo/logo-art-rock-200-5fh0snhoio.png" alt="ArtRock">
     <h1>Personalize sua camiseta</h1>
     <div>
-      <span id="orderSummaryBadge">
+      <!-- Atalho: leva até a lista "Seu pedido" (útil no celular, onde ela fica embaixo) -->
+      <button type="button" id="orderSummaryBadge" title="Ver itens do pedido"
+              onclick="document.getElementById('orderPanel').scrollIntoView({ behavior: 'smooth', block: 'start' })">
         📦 Itens: <span id="orderCount">0</span>
-      </span>
+      </button>
       <button type="button" class="btn-outline" onclick="OrderModule.clearOrder()">
         Limpar
       </button>
     </div>
   </header>
 
-  <!-- Itens já salvos no pedido: permite reabrir um item para edição -->
-  <section id="orderPanel" aria-label="Itens do pedido">
-    <p class="sectionTitle">Itens do pedido</p>
-    <div id="orderList"></div>
-  </section>
-
   <div class="mainContainer">
+
+    <!-- ==================== ITENS DO PEDIDO (lateral) ==================== -->
+    <!-- Itens já salvos: reabrir para edição, renomear, duplicar e remover -->
+    <aside id="orderPanel" aria-label="Itens do pedido">
+      <p class="sectionTitle">Seu pedido</p>
+      <div id="orderList"></div>
+    </aside>
 
     <!-- ==================== PAINEL ESQUERDO ==================== -->
     <aside id="leftPanel" aria-label="Configurações do produto">
@@ -85,13 +88,14 @@
         <p class="sectionTitle">Estampa</p>
 
         <div class="seletor" id="enviaEstampa">
-          <label for="stampFile">Envie sua Arte</label>
-          <div class="fileInputSection">
-            <input type="file" id="stampFile" accept=".svg,.png,.jpg,.jpeg,.pdf" aria-label="Selecionar arquivo de estampa" />
-            <div class="actionsRow">
-              <button type="button" onclick="StampModule.updateStampPreview()">＋ Adicionar Estampa</button>
-            </div>
-          </div>
+          <span class="fieldLabel">Envie sua Arte</span>
+          <!-- Ao escolher o arquivo a estampa já é adicionada (sem 2º clique) -->
+          <label class="uploadBtn" for="stampFile">
+            <span>＋ Adicionar estampa</span>
+            <small>PNG, JPG, SVG ou PDF</small>
+          </label>
+          <input type="file" id="stampFile" class="visuallyHidden" accept=".svg,.png,.jpg,.jpeg,.pdf"
+                 aria-label="Selecionar arquivo de estampa" onchange="StampModule.updateStampPreview()" />
         </div>
 
         <div id="locationSection" class="seletor">
@@ -219,7 +223,7 @@
   <!-- Rodapé de ações -->
   <footer class="appFooter">
     <button type="button" id="btnCancelEdit" class="btn-outline" onclick="OrderModule.cancelEdit()" style="display:none;">
-      Cancelar edição
+      ✕ Cancelar edição
     </button>
     <button type="button" id="btnSaveItem" class="btn-dark" onclick="OrderModule.saveItem()">
       ➕ Salvar no Pedido

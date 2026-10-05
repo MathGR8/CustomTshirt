@@ -520,7 +520,8 @@ export const PDFModule = {
     // Identificação do item no topo
     pdf.setFontSize(10);
     pdf.setTextColor(0, 0, 0);
-    pdf.text('ITEM #' + itemNum + ' - ' + orderData.category + ' (' + orderData.color + ')', bgX + 0, bgY + 0);
+    const nome = (orderData.name || '').trim();
+    pdf.text('ITEM #' + itemNum + (nome ? ' - ' + nome : '') + ' - ' + orderData.category + ' (' + orderData.color + ')', bgX + 0, bgY + 0);
 
     const qx = bgX + QUAD.x * bgW;
     const qy = bgY + QUAD.y * bgH;
@@ -578,14 +579,22 @@ export const PDFModule = {
         catch (e) { imgs.push({ s, src, im: null }); }
       }
 
-      // Para cada grade possível, mede a menor área de estampa desenhada
-      // (estampa encaixada na célula, com 10% de respiro) e fica com a melhor
-      const ocupacao = (cw, ch) => imgs.reduce((min, { im }) => {
+      // Respiro entre a arte e a moldura (proporcional à célula)
+      const respiro = (cw, ch) => Math.min(cw, ch) * 0.08;
+      // Arte encaixada na célula mantendo a proporção (largura E altura aproveitadas)
+      const encaixar = (cw, ch, r) => {
+        const p = respiro(cw, ch);
+        const iw = cw - 2 * p, ih = ch - 2 * p;
+        const w = Math.min(iw, ih * r);
+        return { w, h: w / r, p };
+      };
+      // Para cada grade possível, mede a menor arte desenhada e fica com a
+      // grade em que ela é maior (desempate: maior área total)
+      const ocupacao = (cw, ch) => imgs.reduce((acc, { im }) => {
         const r = im ? im.naturalWidth / im.naturalHeight : 1;
-        const iw = cw * 0.8, ih = ch * 0.8;
-        const w = Math.min(iw, ih * r), h = w / r;
-        return Math.min(min, w * h);
-      }, Infinity);
+        const { w, h } = encaixar(cw, ch, r);
+        return { min: Math.min(acc.min, w * h), soma: acc.soma + w * h };
+      }, { min: Infinity, soma: 0 });
       let best = null;
       for (let c = 1; c <= n; c++) {
         const r = Math.ceil(n / c);
@@ -594,7 +603,10 @@ export const PDFModule = {
         const ch = (qh - (r - 1) * gapG) / r;
         if (cw <= 0 || ch <= 0) continue;
         const score = ocupacao(cw, ch);
-        if (!best || score > best.score) best = { cols: c, rows: r, cw, ch, score };
+        if (!best || score.min > best.score.min * 1.001 ||
+            (score.min > best.score.min * 0.999 && score.soma > best.score.soma)) {
+          best = { cols: c, rows: r, cw, ch, score };
+        }
       }
       const { cols, rows, cw: thumbW, ch: thumbH } = best;
 
@@ -611,24 +623,21 @@ export const PDFModule = {
           if (!im) throw new Error('imagem não carregou');
           const r  = im.naturalWidth / im.naturalHeight;
 
-          // Fundo com a cor da camiseta
-          pdf.setFillColor(rgb.r, rgb.g, rgb.b);
-          pdf.rect(startX, startY, thumbW, thumbH, 'F');
+          // A moldura acompanha a proporção da arte (altura e largura ajustadas)
+          // e fica centralizada na célula
+          const { w, h, p } = encaixar(thumbW, thumbH, r);
+          const fw = w + 2 * p, fh = h + 2 * p;
+          const fx = startX + (thumbW - fw) / 2;
+          const fy = startY + (thumbH - fh) / 2;
 
-          // Moldura preta
+          // Fundo com a cor da camiseta + moldura preta
+          pdf.setFillColor(rgb.r, rgb.g, rgb.b);
+          pdf.rect(fx, fy, fw, fh, 'F');
           pdf.setDrawColor(0, 0, 0);
           pdf.setLineWidth(0.5);
-          pdf.rect(startX, startY, thumbW, thumbH, 'S');
+          pdf.rect(fx, fy, fw, fh, 'S');
 
-          // Estampa centralizada com padding
-          const stampPadding = Math.min(thumbW, thumbH) * 0.1;
-          const innerW = thumbW - stampPadding * 2;
-          const innerH = thumbH - stampPadding * 2;
-          let w = innerW, h = w / r;
-          if (h > innerH) { h = innerH; w = h * r; }
-          const stampX = startX + (thumbW - w) / 2;
-          const stampY = startY + (thumbH - h) / 2;
-          pdf.addImage(stampThumbSrc, 'PNG', stampX, stampY, w, h);
+          pdf.addImage(stampThumbSrc, 'PNG', fx + p, fy + p, w, h);
         } catch (e) {
           Logger.warn('PDF', `Erro ao renderizar miniatura "${s.name}" no PDF: ${e.message}`);
         }
@@ -639,7 +648,7 @@ export const PDFModule = {
     pdf.addPage();
     pdf.setFontSize(12);
     pdf.setTextColor(0, 0, 0);
-    pdf.text('DETALHES DO ITEM #' + itemNum, 10, 12);
+    pdf.text('DETALHES DO ITEM #' + itemNum + (nome ? ' - ' + nome.toUpperCase() : ''), 10, 12);
     pdf.setDrawColor(200, 200, 200);
     pdf.line(10, 14, pageW - 10, 14);
 
