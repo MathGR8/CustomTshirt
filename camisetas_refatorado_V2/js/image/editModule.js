@@ -4,7 +4,8 @@
  *
  * Ferramentas:
  *  - Girar 90° (esq./dir.), girar em ângulo livre e espelhar (horizontal/vertical)
- *  - Recortar (arrastando sobre a imagem) e aparar bordas transparentes
+ *  - Recortar (arrastando sobre a imagem; a seleção pode ser movida e
+ *    redimensionada pelas bordas e cantos) e aparar bordas transparentes
  *  - Cor: preto e branco, inverter, pintar com uma cor única,
  *         brilho / contraste / saturação
  *  - Desfazer, restaurar o original, cancelar e salvar
@@ -126,9 +127,10 @@ const Ops = {
 // ---------- Interface ----------
 
 const HTML = `
-<div class="editHead"><strong>Editar estampa</strong><span id="editInfo"></span></div>
+<div class="editHead"><div><strong>Editar estampa</strong><span id="editInfo"></span></div>
+  <button type="button" data-op="cancel" class="editClose" aria-label="Fechar sem salvar" title="Fechar sem salvar">✕</button></div>
 <div class="editBody">
-  <div class="editStage"><div class="editWrap" id="editWrap"><canvas id="editCanvas"></canvas><div id="editSel"></div></div></div>
+  <div class="editStage"><div class="editWrap" id="editWrap"><canvas id="editCanvas"></canvas><div id="editSel"><i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i><i data-h="e"></i><i data-h="se"></i><i data-h="s"></i><i data-h="sw"></i><i data-h="w"></i></div></div></div>
   <div class="editTools">
     <fieldset><legend>Girar e espelhar</legend>
       <div class="editRow">
@@ -139,7 +141,7 @@ const HTML = `
         <button type="button" data-op="gl">Girar</button></div>
     </fieldset>
     <fieldset><legend>Recorte</legend>
-      <p class="editHint">Arraste sobre a imagem para escolher a área.</p>
+      <p class="editHint">Arraste sobre a imagem para escolher a área. Depois, arraste as bordas ou cantos para ajustar, ou o meio para mover.</p>
       <div class="editRow"><button type="button" data-op="rec">Aplicar corte</button>
         <button type="button" data-op="apar">Aparar transparência</button></div>
     </fieldset>
@@ -159,7 +161,6 @@ const HTML = `
   <button type="button" data-op="undo" class="btn-outline">↶ Desfazer</button>
   <button type="button" data-op="orig" class="btn-outline">Restaurar original</button>
   <span style="flex:1"></span>
-  <button type="button" data-op="cancel" class="btn-outline">Cancelar</button>
   <button type="button" data-op="save" class="btn-dark">Salvar</button>
 </div>`;
 
@@ -187,26 +188,78 @@ function montar() {
   };
   ['editBr', 'editCt', 'editSa'].forEach(id => $(id).addEventListener('input', prev));
 
-  // Seleção do recorte arrastando (mouse ou toque)
+  // Seleção do recorte (mouse ou toque):
+  //  - arrastar fora da seleção cria uma nova
+  //  - arrastar uma borda/canto redimensiona; arrastar o meio move
   const wrap = $('editWrap'), cv = $('editCanvas');
   const pt = e => {
     const r = cv.getBoundingClientRect();
     return { x: lim((e.clientX - r.left) * cv.width / r.width, 0, cv.width),
              y: lim((e.clientY - r.top) * cv.height / r.height, 0, cv.height) };
   };
-  wrap.addEventListener('pointerdown', e => { ed.ini = pt(e); ed.crop = null; wrap.setPointerCapture(e.pointerId); });
-  wrap.addEventListener('pointermove', e => {
-    if (!ed.ini) return;
+  wrap.addEventListener('pointerdown', e => {
     const p = pt(e);
-    ed.crop = { x: Math.min(ed.ini.x, p.x), y: Math.min(ed.ini.y, p.y),
-                w: Math.abs(p.x - ed.ini.x), h: Math.abs(p.y - ed.ini.y) };
+    const modo = ed.crop ? alvoSelecao(p) : null;
+    ed.ini = { p, modo: modo || 'novo', crop: ed.crop ? { ...ed.crop } : null };
+    if (!modo) ed.crop = null;
+    wrap.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  wrap.addEventListener('pointermove', e => {
+    const p = pt(e);
+    if (!ed.ini) { wrap.style.cursor = CURSORES[ed.crop ? alvoSelecao(p) : ''] || 'crosshair'; return; }
+    const { p: p0, modo, crop: c0 } = ed.ini;
+    if (modo === 'novo') {
+      ed.crop = { x: Math.min(p0.x, p.x), y: Math.min(p0.y, p.y),
+                  w: Math.abs(p.x - p0.x), h: Math.abs(p.y - p0.y) };
+    } else if (modo === 'mover') {
+      ed.crop = { ...c0,
+        x: lim(c0.x + p.x - p0.x, 0, cv.width  - c0.w),
+        y: lim(c0.y + p.y - p0.y, 0, cv.height - c0.h) };
+    } else {
+      // Redimensiona só as bordas indicadas pelo modo (n, s, e, w e cantos)
+      const min = 4;
+      let l = c0.x, t = c0.y, r = c0.x + c0.w, b = c0.y + c0.h;
+      if (modo.includes('w')) l = Math.min(p.x, r - min);
+      if (modo.includes('e')) r = Math.max(p.x, l + min);
+      if (modo.includes('n')) t = Math.min(p.y, b - min);
+      if (modo.includes('s')) b = Math.max(p.y, t + min);
+      ed.crop = { x: l, y: t, w: r - l, h: b - t };
+    }
     mostrarSelecao();
   });
-  wrap.addEventListener('pointerup', () => {
+  const soltar = () => {
     ed.ini = null;
     if (ed.crop && (ed.crop.w < 4 || ed.crop.h < 4)) { ed.crop = null; mostrarSelecao(); }
-  });
+  };
+  wrap.addEventListener('pointerup', soltar);
+  wrap.addEventListener('pointercancel', soltar);
   return dlg;
+}
+
+/** Cursor do mouse para cada parte da seleção. */
+const CURSORES = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize',
+                   nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize',
+                   mover: 'move' };
+
+/**
+ * Diz qual parte da seleção está sob o ponto p (coordenadas do canvas):
+ * um canto/borda ('nw', 'n', 'e'…), 'mover' (dentro) ou null (fora).
+ * A tolerância é em px de tela, maior no toque para facilitar no celular.
+ */
+function alvoSelecao(p) {
+  const c = ed.crop, cv = $('editCanvas');
+  if (!c) return null;
+  const k = cv.getBoundingClientRect().width / cv.width;          // px de tela por px da imagem
+  const tol = (matchMedia('(pointer: coarse)').matches ? 18 : 10) / k;
+  const perto = (a, b) => Math.abs(a - b) <= tol;
+  const dentroX = p.x >= c.x - tol && p.x <= c.x + c.w + tol;
+  const dentroY = p.y >= c.y - tol && p.y <= c.y + c.h + tol;
+  if (!dentroX || !dentroY) return null;
+  let v = perto(p.y, c.y) ? 'n' : perto(p.y, c.y + c.h) ? 's' : '';
+  let h = perto(p.x, c.x) ? 'w' : perto(p.x, c.x + c.w) ? 'e' : '';
+  if (v || h) return v + h;
+  return 'mover';
 }
 
 /** Posiciona o retângulo tracejado do recorte sobre a imagem. */

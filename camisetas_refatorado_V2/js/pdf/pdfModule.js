@@ -31,6 +31,7 @@ import { Utils } from '../utils/helpers.js';
 import { NoticeModule } from '../ui/noticeModule.js';
 import { DragModule } from '../events/dragModule.js';
 import { UIModule } from '../ui/uiModule.js';
+import { ContactModule } from '../ui/contactModule.js';
 
 export const PDFModule = {
 
@@ -557,51 +558,57 @@ export const PDFModule = {
     }
 
     // ============================================================
-    //  ALTERAÇÃO 2: Miniaturas adaptativas conforme quantidade
-    //  1 estampa  → miniatura grande (quadrado)
-    //  2 estampas → grandes, 1 coluna vertical (uma abaixo da outra)
-    //  3+ estampas → um quadrado para CADA estampa, em grade que
-    //                ajusta colunas/linhas para todas caberem
+    //  Miniaturas das estampas: sempre PREENCHEM toda a área
+    //  PDF_LAYOUT.THUMBS.area, qualquer que seja a quantidade.
+    //  A área é dividida em uma grade de colunas × linhas; escolhe-se a
+    //  grade em que cada estampa fica MAIOR (testando todas as opções).
+    //  As células esticam para ocupar a área inteira; a última linha,
+    //  se incompleta, fica centralizada.
     // ============================================================
     const allVisible = orderData.stamps.filter(s => !s.hidden);
     const rgb        = Utils.hexToRgb(colorHex);
 
     if (allVisible.length > 0) {
-      const pad = 2;
-      const n   = allVisible.length;
+      const n    = allVisible.length;
       const gapG = PDF_LAYOUT.THUMBS.gap * bgW;
-      // 1 estampa usa o tamanho padrão ONE; 2 ou mais usam o padrão MULTI
-      const maxSide = (n === 1 ? PDF_LAYOUT.THUMBS.ONE : PDF_LAYOUT.THUMBS.MULTI).maxSide * bgW;
+      const imgs = [];
+      for (const s of allVisible) {
+        const src = s.pdfRenderDataURL || s.previewDataURL || s.dataURL;
+        try { imgs.push({ s, src, im: await Utils.loadImage(src) }); }
+        catch (e) { imgs.push({ s, src, im: null }); }
+      }
 
-      // Testa 1..n colunas e escolhe a grade com o maior quadrado que cabe
-      // dentro da área (limitado a maxSide)
+      // Para cada grade possível, mede a menor área de estampa desenhada
+      // (estampa encaixada na célula, com 10% de respiro) e fica com a melhor
+      const ocupacao = (cw, ch) => imgs.reduce((min, { im }) => {
+        const r = im ? im.naturalWidth / im.naturalHeight : 1;
+        const iw = cw * 0.8, ih = ch * 0.8;
+        const w = Math.min(iw, ih * r), h = w / r;
+        return Math.min(min, w * h);
+      }, Infinity);
       let best = null;
       for (let c = 1; c <= n; c++) {
         const r = Math.ceil(n / c);
-        const size = Math.max(1, Math.min(
-          maxSide,
-          (qw - pad * 2 - (c - 1) * gapG) / c,
-          (qh - pad * 2 - (r - 1) * gapG) / r
-        ));
-        if (!best || size > best.size + 0.01) best = { cols: c, rows: r, size };
+        if (c > 1 && (c - 1) * r >= n) continue; // coluna sobrando: grade inválida
+        const cw = (qw - (c - 1) * gapG) / c;
+        const ch = (qh - (r - 1) * gapG) / r;
+        if (cw <= 0 || ch <= 0) continue;
+        const score = ocupacao(cw, ch);
+        if (!best || score > best.score) best = { cols: c, rows: r, cw, ch, score };
       }
-      const { cols, rows } = best;
-      const thumbW = best.size, thumbH = best.size;
+      const { cols, rows, cw: thumbW, ch: thumbH } = best;
 
-      // Bloco de quadrados centralizado na horizontal e ENCOSTADO NA BASE da área
-      const gridW = cols * thumbW + (cols - 1) * gapG;
-      const gridH = rows * thumbH + (rows - 1) * gapG;
-      const gx = qx + (qw - gridW) / 2;
-      const gy = qy + qh - pad - gridH;
+      for (let i = 0; i < n; i++) {
+        const { s, src: stampThumbSrc, im } = imgs[i];
+        const row = Math.floor(i / cols);
+        // Última linha incompleta: centraliza as células restantes
+        const naLinha = row === rows - 1 ? n - row * cols : cols;
+        const offX = (cols - naLinha) * (thumbW + gapG) / 2;
+        const startX = qx + offX + (i % cols) * (thumbW + gapG);
+        const startY = qy + row * (thumbH + gapG);
 
-      for (let i = 0; i < allVisible.length; i++) {
-        const s   = allVisible[i];
-        const startX = gx + (i % cols) * (thumbW + gapG);
-        const startY = gy + Math.floor(i / cols) * (thumbH + gapG);
-
-        const stampThumbSrc = s.pdfRenderDataURL || s.previewDataURL || s.dataURL;
         try {
-          const im = await Utils.loadImage(stampThumbSrc);
+          if (!im) throw new Error('imagem não carregou');
           const r  = im.naturalWidth / im.naturalHeight;
 
           // Fundo com a cor da camiseta
@@ -614,7 +621,7 @@ export const PDFModule = {
           pdf.rect(startX, startY, thumbW, thumbH, 'S');
 
           // Estampa centralizada com padding
-          const stampPadding = thumbW * 0.1;
+          const stampPadding = Math.min(thumbW, thumbH) * 0.1;
           const innerW = thumbW - stampPadding * 2;
           const innerH = thumbH - stampPadding * 2;
           let w = innerW, h = w / r;
@@ -695,9 +702,10 @@ export const PDFModule = {
     Logger.info('PDF', 'Gerando PDF do pedido...');
     const btnPdf = document.getElementById('btnGerarPdf');
     if (btnPdf) { btnPdf.disabled = true; btnPdf.textContent = '⏳ Gerando...'; }
+    let pdfBlob = null;
     try {
-      await this.buildPDF({ filename: 'pedido-artrock.pdf' });
-      NoticeModule.show('success', 'PDF gerado com sucesso!');
+      pdfBlob = await this.buildPDF({ returnBlob: true });
+      ContactModule.baixarPdf(pdfBlob);
       Logger.info('PDF', 'PDF gerado e baixado com sucesso.');
     } catch (e) {
       Logger.error('PDF', 'Erro ao gerar PDF: ' + e.message, e);
@@ -709,6 +717,8 @@ export const PDFModule = {
         UIModule.syncUiState();
       }
     }
+    // Pronto: pergunta se o cliente quer falar com o atendimento (WhatsApp)
+    if (pdfBlob) ContactModule.open(pdfBlob);
   },
 
   // ----------------------------------------------------------

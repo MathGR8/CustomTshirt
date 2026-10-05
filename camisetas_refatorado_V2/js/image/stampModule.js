@@ -73,6 +73,8 @@ export const StampModule = {
       const cm   = Utils.clampCm(parseFloat(document.getElementById('stampSize')?.value || '20'));
 
       const stamp = await PDFModule.createStampFromFile(file, { side, cm, name: file.name });
+      // Arquivo original enviado pelo cliente (só em memória): vai junto no envio ao atendimento
+      stamp.file = file;
       // Espera a imagem decodificar: sem isso a altura é 0 ao centralizar
       await stamp.node.decode().catch(() => {});
 
@@ -281,6 +283,9 @@ export const StampModule = {
     if (!s) return;
     Logger.info('IMAGE', `Duplicando estampa: ${s.name}`);
     this.addStampFromDataURL(s.dataURL, (s.name || 'Estampa') + ' (cópia)', s.side, s.cm, s.rel);
+    // A cópia usa a mesma arte: mantém a referência ao arquivo original
+    const copia = AppState.stamps[AppState.stamps.length - 1];
+    if (copia) { copia.file = s.file; copia.original = s.original; }
   },
 
   /**

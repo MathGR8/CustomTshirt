@@ -151,18 +151,13 @@ export const PDF_LAYOUT = {
   },
 
   /**
-   * ÁREA DOS QUADRADOS (miniaturas) DAS ESTAMPAS. Os quadrados se encaixam
-   * na área e ficam encostados na parte de BAIXO dela (aproxime a área da
-   * margem inferior do PDF para que fiquem junto da margem).
-   * maxSide = lado máximo do quadrado, como fração da largura do fundo:
-   *   ONE   → padrão quando há apenas 1 estampa
-   *   MULTI → padrão quando há 2 ou mais estampas
-   * gap = espaço entre quadrados (fração da largura do fundo).
+   * ÁREA DOS QUADROS (miniaturas) DAS ESTAMPAS. Os quadros sempre preenchem
+   * a área inteira, qualquer que seja a quantidade de estampas: a área é
+   * dividida na grade (colunas × linhas) em que as estampas ficam maiores.
+   * gap = espaço entre quadros (fração da largura do fundo).
    */
   THUMBS: {
     area:  { x: 0.0021, y: 0.48, w: 0.17, h: 0.17 },
-    ONE:   { maxSide: 0.17 },
-    MULTI: { maxSide: 0.085 },
     gap:   0.007
   }
 };
@@ -175,3 +170,14 @@ export const PDF_LAYOUT = {
 //  top     = distância do topo da área de impressão (0.08 = um pouco abaixo)
 // ============================================================
 export const CHEST_PRESET = { cm: 10, centerX: 0.74, top: 0.08 };
+
+// ============================================================
+//  ATENDIMENTO (WhatsApp)
+//  number  = número do atendimento, só dígitos com DDI + DDD
+//            (55 = Brasil, 12 = DDD). >>> Troque aqui pelo número oficial <<<
+//  message = mensagem padrão (o cliente pode editar antes de enviar)
+// ============================================================
+export const WHATSAPP = {
+  number:  '5512982780352',
+  message: 'Olá, finalizei minha personalização e gostaria de fazer uma cotação!'
+};

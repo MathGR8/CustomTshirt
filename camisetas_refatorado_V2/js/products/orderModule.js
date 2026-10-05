@@ -6,7 +6,7 @@
  *  - Salvar o item atual (camiseta + estampas + quantidades) no pedido.
  *  - Listar os itens já salvos ("Itens do pedido") com Editar, Duplicar e Remover.
  *  - Reabrir um item salvo no editor e, ao salvar, atualizar esse mesmo item.
- *  - Guardar o pedido no navegador (localStorage) para retomar depois.
+ *  - O pedido fica só na memória da página: ao recarregar, começa do zero.
  *  - Limpar o pedido completo.
  *
  * Dependências: appState.js, constants.js, logger.js, noticeModule.js,
@@ -22,21 +22,17 @@ import { UIModule } from '../ui/uiModule.js';
 import { SizeModule } from './sizeModule.js';
 import { AlignModule } from '../preview/alignModule.js';
 
-/** Chave do pedido salvo no navegador. */
-const STORAGE_KEY = 'artrock.pedido.v1';
+/** Chave usada por uma versão anterior que guardava o pedido no navegador. */
+const OLD_STORAGE_KEY = 'artrock.pedido.v1';
 
 /** Soma das quantidades de um item ({ P: 2, M: 3 } → 5). */
 const totalPecas = q => Object.values(q || {}).reduce((s, n) => s + (parseInt(n, 10) || 0), 0);
 
 export const OrderModule = {
-  /** Carrega o pedido salvo no navegador e desenha a lista. Chamado na inicialização. */
+  /** Desenha a lista (vazia) na inicialização. O pedido não é guardado no navegador. */
   init() {
-    try {
-      const salvo = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      if (Array.isArray(salvo)) AppState.orderItems = salvo;
-    } catch (e) {
-      Logger.warn('STATE', 'Não foi possível ler o pedido salvo: ' + e.message);
-    }
+    // Remove o que uma versão anterior possa ter deixado salvo no navegador
+    try { localStorage.removeItem(OLD_STORAGE_KEY); } catch { /* sem acesso ao storage */ }
     this._refresh();
   },
 
@@ -80,7 +76,6 @@ export const OrderModule = {
 
     AppState.editingIndex = null;
     this._resetEditor(category);
-    this._persist();
     this._refresh();
   },
 
@@ -146,9 +141,14 @@ export const OrderModule = {
   duplicateItem(index) {
     const item = AppState.orderItems[index];
     if (!item) return;
-    AppState.orderItems.splice(index + 1, 0, JSON.parse(JSON.stringify(item)));
+    // Cópia sem JSON: preserva o arquivo original (File) de cada arte
+    const copia = {
+      ...item,
+      stamps: item.stamps.map(st => ({ ...st, rel: st.rel ? { ...st.rel } : null })),
+      quantities: { ...item.quantities }
+    };
+    AppState.orderItems.splice(index + 1, 0, copia);
     if (AppState.editingIndex != null && AppState.editingIndex > index) AppState.editingIndex++;
-    this._persist();
     this._refresh();
     NoticeModule.show('success', `Modelo #${index + 1} duplicado.`);
   },
@@ -165,7 +165,6 @@ export const OrderModule = {
     } else if (AppState.editingIndex != null && AppState.editingIndex > index) {
       AppState.editingIndex--;
     }
-    this._persist();
     this._refresh();
   },
 
@@ -178,8 +177,7 @@ export const OrderModule = {
       AppState.orderItems = [];
       AppState.editingIndex = null;
       Logger.info('STATE', 'Pedido limpo pelo usuário.');
-      this._persist();
-      this._refresh();
+        this._refresh();
       NoticeModule.show("info", "Pedido limpo.");
     }
   },
@@ -274,16 +272,6 @@ export const OrderModule = {
     SizeModule.updateSizeTable();
     SizeModule.backToConfig();
   },
-
-  /** Grava o pedido no navegador (pode falhar com imagens muito grandes). @private */
-  _persist() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.orderItems));
-    } catch (e) {
-      Logger.warn('STATE', 'Pedido não salvo no navegador: ' + e.message);
-      NoticeModule.show('error', 'O pedido não pôde ser guardado no navegador (imagens muito grandes). Ele continua disponível até fechar a página.');
-    }
-  }
 };
 
 /** Cria um botão com texto, ação e classe opcional. */

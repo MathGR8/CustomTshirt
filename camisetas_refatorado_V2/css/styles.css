@@ -684,7 +684,12 @@ img#baseShirtImg.feminine-shirt {
   #leftPanel, #middlePanel, #rightPanel { width: 100%; min-width: unset; border: none; }
   #leftPanel, #rightPanel { border-bottom: 1px solid var(--color-border); }
   .previewContainer { height: 380px; max-width: 100%; }
-  #btnToggleView { position: static; margin-top: 8px; }
+  /* Botão Frente/Costas continua sobre o preview (static o escondia dentro da caixa) */
+  #btnToggleView { bottom: 8px; right: 8px; }
+  /* No celular, a camiseta aparece primeiro, depois as opções e a lista de estampas */
+  #middlePanel { order: 1; }
+  #leftPanel   { order: 2; }
+  #rightPanel  { order: 3; }
   .stampMeta { grid-template-columns: 1fr 1fr 1fr; }
 }
 @media (max-width: 600px) {
@@ -768,6 +773,8 @@ input[type="checkbox"]:focus-visible {
    EDITOR DE IMAGEM DA ESTAMPA (janela "Editar")
    ============================================= */
 .editDlg {
+  /* margin:auto centraliza a janela (o reset "* { margin: 0 }" a jogava para o canto) */
+  margin: auto;
   width: min(920px, 96vw);
   max-height: 94vh;
   padding: 0;
@@ -779,7 +786,19 @@ input[type="checkbox"]:focus-visible {
 }
 .editDlg[open] { display: flex; flex-direction: column; }
 .editDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
-.editHead { padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
+.editHead {
+  padding: 10px 12px 10px 16px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+/* Botão X (fechar sem salvar), no canto superior direito */
+button.editClose, button.dlgClose {
+  width: 34px; height: 34px; padding: 0;
+  background: #fff; color: var(--color-text);
+  border: 1.5px solid #8a8a8a; border-radius: 50%;
+  font-size: 16px; line-height: 1;
+}
+button.editClose:hover, button.dlgClose:hover { background: #f1f1f1; border-color: var(--color-text); filter: none; }
 .editHead span { color: var(--color-text-muted); font-size: 12px; }
 .editBody { display: flex; gap: 14px; padding: 14px 16px; overflow: auto; flex: 1; min-height: 0; }
 /* Área da imagem (fundo xadrez mostra as partes transparentes) */
@@ -792,6 +811,21 @@ input[type="checkbox"]:focus-visible {
 .editWrap { position: relative; display: inline-block; touch-action: none; cursor: crosshair; }
 #editCanvas { display: block; max-width: 100%; max-height: 60vh; }
 #editSel { display: none; position: absolute; border: 2px dashed var(--color-primary); background: rgba(237, 48, 81, 0.12); pointer-events: none; }
+/* Alças de redimensionamento da seleção (só visuais: o clique é tratado no editWrap) */
+#editSel i {
+  position: absolute; width: 12px; height: 12px;
+  background: #fff; border: 2px solid var(--color-primary); border-radius: 2px;
+  transform: translate(-50%, -50%);
+}
+#editSel i[data-h="nw"] { left: 0;    top: 0; }
+#editSel i[data-h="n"]  { left: 50%;  top: 0; }
+#editSel i[data-h="ne"] { left: 100%; top: 0; }
+#editSel i[data-h="e"]  { left: 100%; top: 50%; }
+#editSel i[data-h="se"] { left: 100%; top: 100%; }
+#editSel i[data-h="s"]  { left: 50%;  top: 100%; }
+#editSel i[data-h="sw"] { left: 0;    top: 100%; }
+#editSel i[data-h="w"]  { left: 0;    top: 50%; }
+@media (pointer: coarse) { #editSel i { width: 18px; height: 18px; } }
 .editTools { width: 260px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; }
 .editTools fieldset { border: 1px solid var(--color-border); border-radius: 6px; padding: 8px 10px; margin: 0; }
 .editTools legend { font-size: 12px; font-weight: 600; padding: 0 4px; }
@@ -803,3 +837,62 @@ input[type="checkbox"]:focus-visible {
 .editSlide input { flex: 1; }
 .editFoot { display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--color-border); }
 @media (max-width: 700px) { .editBody { flex-direction: column; } .editTools { width: auto; } }
+
+/* =============================================
+   JANELA "SEU PROJETO ESTÁ PRONTO" (WhatsApp)
+   ============================================= */
+.contactDlg {
+  margin: auto;
+  width: min(520px, 94vw);
+  max-height: 92vh;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  overflow: hidden;
+}
+.contactDlg[open] { display: flex; flex-direction: column; }
+.contactDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
+.dlgHead {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 12px 12px 18px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 16px;
+}
+.dlgBody { padding: 14px 18px; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
+.dlgLabel { font-weight: 600; font-size: 13px; }
+.dlgLabel span { font-weight: 400; color: var(--color-text-muted); }
+.dlgBody textarea {
+  width: 100%; resize: vertical; min-height: 70px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  padding: 8px; font: inherit; font-size: 14px;
+}
+.dlgBody textarea:focus { outline: none; border-color: var(--color-primary); }
+.dlgHint { font-size: 12px; color: var(--color-text-muted); }
+.dlgSteps {
+  font-size: 13px; line-height: 1.45;
+  background: #e8f8ee; border: 1px solid #b6e6c6; color: #14532d;
+  border-radius: var(--radius-sm); padding: 8px 10px;
+}
+.dlgFoot {
+  display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px;
+  padding: 12px 18px; border-top: 1px solid var(--color-border);
+}
+.dlgFoot button { padding: 9px 14px; font-size: 13px; }
+button.btn-whatsapp { background: #1f9d55; color: #fff; }
+button.btn-whatsapp:hover { background: #188a4a; filter: none; }
+
+/* =============================================
+   CELULAR: editor, janela do WhatsApp e itens do pedido
+   ============================================= */
+@media (max-width: 700px) {
+  .editDlg { width: 100vw; max-width: 100vw; max-height: 100dvh; height: 100dvh; border-radius: 0; }
+  #editCanvas { max-height: 38vh; }
+  .editBody { padding: 10px; }
+  .editFoot { flex-wrap: wrap; }
+  .contactDlg { width: 100vw; max-width: 100vw; border-radius: 12px 12px 0 0; margin: auto auto 0; }
+  .dlgFoot { flex-direction: column-reverse; }
+  .dlgFoot button { width: 100%; padding: 12px; font-size: 15px; }
+  #orderPanel { padding: 8px 10px; }
+}

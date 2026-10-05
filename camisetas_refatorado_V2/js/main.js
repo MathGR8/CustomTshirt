@@ -27,6 +27,7 @@ import { UIModule }        from './ui/uiModule.js';
 import { NoticeModule }    from './ui/noticeModule.js';
 import { StampModule }     from './image/stampModule.js';
 import { EditModule }      from './image/editModule.js';
+import { ContactModule }   from './ui/contactModule.js';
 import { SizeModule }      from './products/sizeModule.js';
 import { OrderModule }     from './products/orderModule.js';
 import { PDFModule }       from './pdf/pdfModule.js';
@@ -45,6 +46,7 @@ window._modules = {
   NoticeModule,
   StampModule,
   EditModule,
+  ContactModule,
   SizeModule,
   OrderModule,
   PDFModule,
@@ -61,6 +63,7 @@ window._modules = {
 window.UIModule         = UIModule;
 window.StampModule      = StampModule;
 window.EditModule       = EditModule;
+window.ContactModule    = ContactModule;
 window.SizeModule       = SizeModule;
 window.PDFModule        = PDFModule;
 window.OrderModule      = OrderModule;
