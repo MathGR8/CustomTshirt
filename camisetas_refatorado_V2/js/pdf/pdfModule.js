@@ -445,8 +445,9 @@ export const PDFModule = {
     let drawW = g.w;
     let drawH = drawW / ratioShirt;
     if (drawH > g.h) { drawH = g.h; drawW = drawH * ratioShirt; }
-    // Alinhamento dentro da caixa: 'start' (esq./topo), 'end' (dir./base) ou centro
-    const al = a => (a === 'start' ? 0 : a === 'end' ? 1 : 0.5);
+    // Alinhamento dentro da caixa: 'start' (esq./topo), 'end' (dir./base), centro
+    // ou um número de 0 (esq./topo) a 1 (dir./base)
+    const al = a => (typeof a === 'number' ? Math.max(0, Math.min(1, a)) : a === 'start' ? 0 : a === 'end' ? 1 : 0.5);
     const ox = g.x + (g.w - drawW) * al(g.alignX);
     const oy = g.y + (g.h - drawH) * al(g.alignY);
     pdf.addImage(tinted, 'PNG', ox, oy, drawW, drawH);
@@ -538,21 +539,25 @@ export const PDFModule = {
     //  - 2 faces → diagonal (Frente no topo-esquerda, Costas embaixo-direita)
     //  - 1 face  → centralizada na área
     // ============================================================
-    const area = this._boxToMm(PDF_LAYOUT.SHIRTS.area, bgX, bgY, bgW, bgH);
+    // Padrão + ajustes da categoria (PDF_LAYOUT.SHIRTS.CATEGORIAS, constants.js)
+    const shirtsCfg = { ...PDF_LAYOUT.SHIRTS, ...(PDF_LAYOUT.SHIRTS.CATEGORIAS?.[orderData.category] || {}) };
+    const area = this._boxToMm(shirtsCfg.area, bgX, bgY, bgW, bgH);
 
     if (numSides === 2) {
-      const w = PDF_LAYOUT.SHIRTS.TWO.w * area.w;
-      const h = PDF_LAYOUT.SHIRTS.TWO.h * area.h;
+      const w = shirtsCfg.TWO.w * area.w;
+      const h = shirtsCfg.TWO.h * area.h;
+      // juntar (0 a 1): aproxima as duas camisetas (útil para as mais estreitas)
+      const juntar = Math.max(0, Math.min(1, Number(shirtsCfg.juntar) || 0));
       await this._drawShirtSide(pdf, orderData, 'Frente', {
-        x: area.x, y: area.y, w, h, alignX: 'start', alignY: 'start', label: 'FRENTE'
+        x: area.x, y: area.y, w, h, alignX: juntar, alignY: 'start', label: 'FRENTE'
       });
       await this._drawShirtSide(pdf, orderData, 'Costas', {
-        x: area.x + area.w - w, y: area.y + area.h - h, w, h, alignX: 'end', alignY: 'end', label: 'COSTAS'
+        x: area.x + area.w - w, y: area.y + area.h - h, w, h, alignX: 1 - juntar, alignY: 'end', label: 'COSTAS'
       });
     } else {
       const side = usedSides[0] || 'Frente';
-      const w = PDF_LAYOUT.SHIRTS.ONE.w * area.w;
-      const h = PDF_LAYOUT.SHIRTS.ONE.h * area.h;
+      const w = shirtsCfg.ONE.w * area.w;
+      const h = shirtsCfg.ONE.h * area.h;
       await this._drawShirtSide(pdf, orderData, side, {
         x: area.x + (area.w - w) / 2, y: area.y + (area.h - h) / 2, w, h, label: side
       });

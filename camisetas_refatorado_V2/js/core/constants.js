@@ -147,7 +147,25 @@ export const PDF_LAYOUT = {
   SHIRTS: {
     area: { x: 0.205, y: 0.250, w: 0.80, h: 0.70 },
     ONE:  { w: 0.65, h: 0.65 },
-    TWO:  { w: 0.62, h: 0.62 }
+    TWO:  { w: 0.62, h: 0.62 },
+
+    /**
+     * AJUSTES POR CATEGORIA (opcional). Qualquer valor colocado aqui substitui
+     * o padrão acima só para aquela categoria: area, ONE, TWO e juntar.
+     *
+     * juntar (só com Frente e Costas) — de 0 a 1, quanto aproximar as duas:
+     *   0   = Frente encostada à esquerda e Costas à direita (padrão; bom para
+     *         camisetas largas, como a masculina)
+     *   0.5 = cada camiseta no meio da sua caixa (vão menor)
+     *   1   = as duas o mais perto possível uma da outra
+     *   A camiseta feminina é mais estreita, então sobra espaço na caixa e,
+     *   com 0, fica um vão grande entre Frente e Costas.
+     *
+     * Exemplo: Feminina: { juntar: 0.6, TWO: { w: 0.55, h: 0.62 } }
+     */
+    CATEGORIAS: {
+      Feminina: { juntar: 0.5 }
+    }
   },
 
   /**
