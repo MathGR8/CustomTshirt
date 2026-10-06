@@ -19,6 +19,12 @@ const TEMPO_MINIMO_MS = 1400; // para a animação não "piscar" quando o PDF é
 const HTML = `
   <div class="klBox">
     <div class="klScene">
+      <!-- Cenário passando (parallax): nuvens devagar, morros, árvores e postes rápidos -->
+      <span class="klCloud" style="--t:0s;  --top:14px; --s:1"></span>
+      <span class="klCloud" style="--t:-4s; --top:34px; --s:.7"></span>
+      <div class="klLayer klHills"></div>
+      <div class="klLayer klTrees"></div>
+      <div class="klAsphalt"></div>
       <span class="klLine" style="--y:18%; --d:.55s; --w:70px"></span>
       <span class="klLine" style="--y:38%; --d:.42s; --w:110px; --delay:.15s"></span>
       <span class="klLine" style="--y:56%; --d:.5s;  --w:60px;  --delay:.3s"></span>

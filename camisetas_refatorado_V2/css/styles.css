@@ -1395,3 +1395,82 @@ button.ctLink:hover { color: var(--color-text); filter: none; }
 /* A janela inteira rola (e não só o corpo), para o resumo poder sobrepor o topo */
 .contactDlg.ctDlg { overflow-y: auto; overflow-x: hidden; }
 .ctDlg .ctBody { overflow: visible; }
+
+
+/* =============================================
+   KOMBI "ANDANDO": cenário passando ao fundo (parallax)
+   A Kombi fica no centro, sacolejando; o mundo passa por ela.
+   ============================================= */
+.klKombi { animation: klRodando 2.6s ease-in-out infinite; z-index: 3; }
+@keyframes klRodando {               /* pequenas acelerações, sem "ir e voltar" */
+  0%, 100% { transform: translateX(-4px) rotate(0deg); }
+  30%      { transform: translateX(6px)  rotate(-1.2deg); }
+  60%      { transform: translateX(2px)  rotate(-.3deg); }
+}
+.klBody { animation: klSacode .22s ease-in-out infinite alternate; }
+@keyframes klSacode { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+.klWheelSpin { animation-duration: .28s; }
+
+.klLayer {
+  position: absolute; left: 0; width: 200%;
+  background-repeat: repeat-x;
+  animation: klPassa linear infinite;
+  z-index: 1;
+}
+@keyframes klPassa { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.klHills {
+  bottom: 26px; height: 64px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='64'%3E%3Cpath d='M0 64 L0 40 Q60 6 120 34 T240 26 Q320 4 400 40 L400 64 Z' fill='%23e3e3e3'/%3E%3C/svg%3E");
+  background-size: 400px 64px;
+  animation-duration: 9s;
+}
+.klTrees {
+  bottom: 26px; height: 46px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='46'%3E%3Crect x='30' y='26' width='4' height='20' fill='%23c9c9c9'/%3E%3Ccircle cx='32' cy='20' r='13' fill='%23d4d4d4'/%3E%3Crect x='120' y='8' width='3' height='38' fill='%23cfcfcf'/%3E%3Crect x='112' y='8' width='19' height='3' fill='%23cfcfcf'/%3E%3Crect x='160' y='30' width='4' height='16' fill='%23c9c9c9'/%3E%3Ccircle cx='162' cy='26' r='9' fill='%23d9d9d9'/%3E%3C/svg%3E");
+  background-size: 200px 46px;
+  animation-duration: 1.6s;
+}
+/* Asfalto com as faixas (as faixas .klRoad passam por cima) */
+.klAsphalt {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 28px;
+  background: linear-gradient(#cdcdcd, #bdbdbd);
+  z-index: 1;
+}
+.klRoad { z-index: 2; bottom: 11px; background: repeating-linear-gradient(90deg, rgba(255,255,255,0.95) 0 26px, transparent 26px 52px); animation-duration: .25s; }
+.klKombi { bottom: 14px; }
+.klLine, .klPuff { z-index: 2; }
+.klCloud {
+  position: absolute; top: var(--top); right: -90px; z-index: 0;
+  width: 70px; height: 22px; border-radius: 22px;
+  background: #fff; box-shadow: 18px -8px 0 2px #fff, 38px 0 0 -2px #fff;
+  transform: scale(var(--s));
+  animation: klNuvem 8s linear infinite; animation-delay: var(--t);
+}
+@keyframes klNuvem { from { translate: 0 0; } to { translate: -560px 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .klLayer, .klCloud { animation: none !important; }
+}
+
+/* =============================================
+   CORREÇÃO: janela "Seu projeto está pronto" em telas baixas
+   Como flex coluna, a janela ESPREMIA o topo e o conteúdo ficava por cima
+   do texto. Agora ela rola normalmente e o botão do WhatsApp fica fixo
+   no rodapé, sempre visível.
+   ============================================= */
+.contactDlg.ctDlg[open] { display: block; }
+.ctDlg .ctHero, .ctDlg .ctBody, .ctDlg .ctFoot { flex-shrink: 0; }
+.ctDlg .ctFoot {
+  position: sticky; bottom: 0; z-index: 3;
+  background: linear-gradient(rgba(255,255,255,0), #fff 18px);
+  padding-top: 22px;
+}
+.ctDlg .ctBody { padding-bottom: 0; }
+@media (max-height: 700px) {
+  .ctHero { padding: 22px 22px 44px; }
+  .ctHero h2 { font-size: 20px; margin-top: 8px; }
+  .ctHero p { font-size: 13px; }
+  .ctCheck { width: 50px; height: 50px; }
+  .ctBubble textarea { min-height: 52px; }
+}
+/* Céu azul-claro para as nuvens e o cenário aparecerem */
+.klScene { background: linear-gradient(#d9eef9 0%, #eef7fc 55%, #f6f6f6 100%); }
