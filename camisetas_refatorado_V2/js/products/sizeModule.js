@@ -71,6 +71,7 @@ export const SizeModule = {
         AppState.quantities[category][sz] = Math.max(0, parseInt(inp.value || "0", 10) || 0);
         UIModule.syncUiState();
         this._updateTotalLabel();
+        window._modules?.HistoryModule?.commit('qtd-' + sz);
       });
 
       td2.appendChild(Utils.stepper(inp));

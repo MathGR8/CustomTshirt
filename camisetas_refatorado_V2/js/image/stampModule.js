@@ -90,6 +90,7 @@ export const StampModule = {
       this.setActiveStamp(stamp.id);
       UIModule.syncUiState();
       if (input) input.value = "";
+      window._modules?.HistoryModule?.commit('add-' + stamp.id);
 
       NoticeModule.show('success', `Estampa "${file.name}" adicionada com sucesso.`);
       Logger.info('IMAGE', `Estampa adicionada: ${file.name} (${cm} cm, lado: ${side})`);
@@ -128,6 +129,7 @@ export const StampModule = {
     AppState.stamps.push(sObj);
     this.setActiveStamp(sObj.id);
     UIModule.syncUiState();
+    window._modules?.HistoryModule?.commit('add-' + sObj.id);
     NoticeModule.show('success', `Estampa "${name}" adicionada com sucesso.`);
     Logger.info('IMAGE', `Estampa adicionada via dataURL: ${name}`);
   },
@@ -285,7 +287,10 @@ export const StampModule = {
     this.addStampFromDataURL(s.dataURL, (s.name || 'Estampa') + ' (cópia)', s.side, s.cm, s.rel);
     // A cópia usa a mesma arte: mantém a referência ao arquivo original
     const copia = AppState.stamps[AppState.stamps.length - 1];
-    if (copia) { copia.file = s.file; copia.original = s.original; }
+    if (copia) {
+      copia.file = s.file; copia.original = s.original;
+      window._modules?.HistoryModule?.commit('add-' + copia.id); // mesma chave: junta com o passo da cópia
+    }
   },
 
   /**
@@ -293,8 +298,8 @@ export const StampModule = {
    * Remove o nó DOM e o objeto do array de estampas.
    * @param {string} id - ID da estampa a ser removida.
    */
-  removeStamp(id) {
-    if (!confirm('Remover esta estampa?')) return;
+  removeStamp(id, confirmar = true) {
+    if (confirmar && !confirm('Remover esta estampa?')) return;
     const idx = AppState.stamps.findIndex(x => x.id === id);
     if (idx < 0) return;
     const s = AppState.stamps[idx];
@@ -306,6 +311,7 @@ export const StampModule = {
     this.setActiveStamp(newActive);
     AlignModule.setHudVisible(!!AppState.activeStampId);
     this.syncUiState();
+    window._modules?.HistoryModule?.commit('remove-' + id);
   },
 
   /**
@@ -335,6 +341,7 @@ export const StampModule = {
     AppState.activeStampId = null;
     AlignModule.setHudVisible(false);
     this.syncUiState();
+    window._modules?.HistoryModule?.commit('clear');
     NoticeModule.show('info', 'Todas as estampas foram removidas.');
     Logger.info('IMAGE', 'Todas as estampas foram removidas.');
   },
@@ -392,6 +399,7 @@ export const StampModule = {
       sideSelect.onchange = () => {
         s.side = sideSelect.value;
         this.refreshStampSideInPreview(s);
+        window._modules?.HistoryModule?.commit('side-' + s.id);
       };
 
       const cmInput = document.createElement('input');
@@ -404,6 +412,7 @@ export const StampModule = {
       cmInput.onchange = () => {
         s.cm = Utils.clampCm(parseFloat(cmInput.value || '20'));
         if (s.side === AppState.currentView) this.applyStampCmToNode(s);
+        window._modules?.HistoryModule?.commit('cm-' + s.id);
       };
 
       const visToggle = document.createElement('input');
@@ -415,6 +424,7 @@ export const StampModule = {
         this.refreshStampSideInPreview(s);
         s.node.style.display = s.hidden ? 'none' : 'block';
         UIModule.syncUiState();
+        window._modules?.HistoryModule?.commit('vis-' + s.id);
       };
 
       meta.append(
@@ -455,7 +465,7 @@ export const StampModule = {
    * Modos de movimento: moveLeft, moveRight, moveUp, moveDown.
    * @param {string} mode - Modo de alinhamento ou movimento.
    */
-  alignStamp(mode) {
+  alignStamp(mode, step = 5) {
     const s = AppState.getActiveStamp();
     if (!s) return;
     const node      = s.node;
@@ -468,7 +478,6 @@ export const StampModule = {
     const curY = node.getBoundingClientRect().top  - shirtRect.top;
     const maxX = shirtRect.width  - w;
     const maxY = shirtRect.height - h;
-    const step = 5;
 
     let tx = curX, ty = curY;
     switch (mode) {

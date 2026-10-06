@@ -100,6 +100,7 @@ export const UIModule = {
         this.setAttribute("aria-checked", "true");
         Logger.info('STATE', `Cor alterada para ${AppState.selectedColor}`);
         UIModule.updateBasePreview();
+        window._modules?.HistoryModule?.commit('cor');
       });
       container.appendChild(div);
     });
@@ -178,6 +179,7 @@ export const UIModule = {
       // Mantém o campo "Largura (cm)" da lista igual ao slider
       const campo = document.querySelector('#stampsList .stampItem.active input[type="number"]');
       if (campo) campo.value = cm;
+      window._modules?.HistoryModule?.commit('cm-' + s.id);
     }
   },
 
@@ -207,6 +209,7 @@ export const UIModule = {
       AppState.stamps.forEach(s => StampModule.refreshStampSideInPreview(s));
     }
     this._updateSideBadge();
+    window._modules?.HistoryModule?.commit('vista');
     Logger.info('UI', `Vista alternada para ${AppState.currentView}`);
   },
 

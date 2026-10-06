@@ -45,8 +45,10 @@ export const DragModule = {
     node.style.top  = (shirtRect.top  + top  - previewBox.top)  + 'px';
 
     // Atualiza a posição relativa para uso no PDF
-    const { StampModule } = window._modules || {};
+    const { StampModule, HistoryModule } = window._modules || {};
     if (StampModule) StampModule.updateStampRel(s);
+    // Arrastos, setas e alinhamentos seguidos viram um único passo de desfazer
+    HistoryModule?.commit('pos-' + s.id);
   },
 
   /**

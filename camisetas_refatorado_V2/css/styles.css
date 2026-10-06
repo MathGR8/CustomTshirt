@@ -1101,3 +1101,30 @@ button#orderSummaryBadge:hover { background: rgba(255,255,255,0.3); filter: none
   #rightPanel { gap: 6px; }
   #btnClearAll { margin-top: 4px !important; }
 }
+
+/* =============================================
+   DESFAZER / REFAZER / ATALHOS (cabeçalho)
+   ============================================= */
+button.hdrIcon {
+  width: 32px; height: 32px; padding: 0;
+  background: transparent; color: #fff;
+  border: 1.5px solid rgba(255,255,255,0.7); border-radius: 50%;
+  font-size: 17px; line-height: 1;
+}
+button.hdrIcon:hover:not(:disabled) { background: rgba(255,255,255,0.18); filter: none; }
+button.hdrIcon:disabled { opacity: 0.35; filter: none; }
+/* Sem teclado físico (celular/tablet) o botão de atalhos não faz sentido */
+@media (hover: none) and (pointer: coarse) { #btnShortcuts { display: none; } }
+
+/* Janela da lista de atalhos */
+.shortcutsTable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.shortcutsTable td { padding: 6px 4px; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+.shortcutsTable td:first-child { white-space: nowrap; padding-right: 14px; }
+.shortcutsTable th { text-align: left; padding: 14px 4px 4px; font-size: 12px; color: var(--color-text-muted); text-transform: uppercase; }
+kbd {
+  display: inline-block; padding: 1px 6px;
+  font: 600 12px/1.6 ui-monospace, Consolas, monospace;
+  background: #f4f4f4; border: 1px solid #ccc; border-bottom-width: 2px; border-radius: 4px;
+}
+/* Item do pedido focado pelo teclado (Delete remove, Enter edita) */
+.orderCard:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }

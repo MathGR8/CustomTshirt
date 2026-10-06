@@ -35,6 +35,10 @@
     <img src="https://cdn.awsli.com.br/400x300/1274/1274265/logo/logo-art-rock-200-5fh0snhoio.png" alt="ArtRock">
     <h1>Personalize sua camiseta</h1>
     <div>
+      <!-- Desfazer / refazer (também Ctrl+Z / Ctrl+Y) e lista de atalhos -->
+      <button type="button" id="btnUndo" class="hdrIcon" onclick="HistoryModule.undo()" title="Desfazer (Ctrl+Z)" aria-label="Desfazer" disabled>↶</button>
+      <button type="button" id="btnRedo" class="hdrIcon" onclick="HistoryModule.redo()" title="Refazer (Ctrl+Y)" aria-label="Refazer" disabled>↷</button>
+      <button type="button" id="btnShortcuts" class="hdrIcon" onclick="KeyboardModule.showHelp()" title="Atalhos de teclado (?)" aria-label="Atalhos de teclado">⌨</button>
       <!-- Atalho: leva até a lista "Seu pedido" (útil no celular, onde ela fica embaixo) -->
       <button type="button" id="orderSummaryBadge" title="Ver itens do pedido"
               onclick="document.getElementById('orderPanel').scrollIntoView({ behavior: 'smooth', block: 'start' })">

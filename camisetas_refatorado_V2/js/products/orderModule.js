@@ -82,6 +82,7 @@ export const OrderModule = {
     AppState.editingIndex = null;
     this._resetEditor(category);
     this._refresh();
+    window._modules?.HistoryModule?.commit('salvar');
   },
 
   /**
@@ -126,6 +127,7 @@ export const OrderModule = {
     StampModule.setActiveStamp(primeira?.id || null);
 
     this._refresh();
+    window._modules?.HistoryModule?.commit('abrir');
     NoticeModule.show('info', `Editando "${nomeItem(item, index)}". Altere e clique em "Salvar alterações".`);
     Logger.info('STATE', `Item #${index + 1} aberto para edição.`);
     document.getElementById('overallContainer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -140,6 +142,7 @@ export const OrderModule = {
     if (!item) return;
     item.name = String(nome || '').trim().slice(0, 40);
     this._refresh();
+    window._modules?.HistoryModule?.commit('nome-' + index);
   },
 
   /** Troca o título do card por um campo de texto para renomear. @private */
@@ -176,6 +179,7 @@ export const OrderModule = {
     AppState.editingIndex = null;
     this._resetEditor(document.getElementById("category")?.value);
     this._refresh();
+    window._modules?.HistoryModule?.commit('cancelar');
     NoticeModule.show('info', `Edição de "${nome}" cancelada.`);
   },
 
@@ -193,13 +197,14 @@ export const OrderModule = {
     AppState.orderItems.splice(index + 1, 0, copia);
     if (AppState.editingIndex != null && AppState.editingIndex > index) AppState.editingIndex++;
     this._refresh();
+    window._modules?.HistoryModule?.commit('dup-item');
     NoticeModule.show('success', `"${nomeItem(item, index)}" duplicado.`);
   },
 
   /** Remove um item do pedido. */
-  removeItem(index) {
+  removeItem(index, confirmar = true) {
     if (!AppState.orderItems[index]) return;
-    if (!confirm(`Remover "${nomeItem(AppState.orderItems[index], index)}" do pedido?`)) return;
+    if (confirmar && !confirm(`Remover "${nomeItem(AppState.orderItems[index], index)}" do pedido?`)) return;
     AppState.orderItems.splice(index, 1);
     if (AppState.editingIndex === index) {
       // O conteúdo continua no editor e pode ser salvo como item novo
@@ -209,6 +214,7 @@ export const OrderModule = {
       AppState.editingIndex--;
     }
     this._refresh();
+    window._modules?.HistoryModule?.commit('remover-item');
   },
 
   /**
@@ -220,8 +226,9 @@ export const OrderModule = {
       AppState.orderItems = [];
       AppState.editingIndex = null;
       Logger.info('STATE', 'Pedido limpo pelo usuário.');
-        this._refresh();
-      NoticeModule.show("info", "Pedido limpo.");
+      this._refresh();
+      window._modules?.HistoryModule?.commit('limpar-pedido');
+      NoticeModule.show("info", "Pedido limpo. (Ctrl+Z desfaz)");
     }
   },
 
@@ -240,6 +247,9 @@ export const OrderModule = {
       const editando = AppState.editingIndex === i;
       const card = document.createElement('div');
       card.className = 'orderCard' + (editando ? ' editing' : '');
+      card.tabIndex = 0;               // focável: Delete remove, Enter abre para editar
+      card.dataset.index = i;
+      card.setAttribute('aria-label', `Item ${nomeItem(item, i)}`);
 
       // Miniatura: primeira estampa visível sobre a cor da camiseta
       const thumb = document.createElement('div');

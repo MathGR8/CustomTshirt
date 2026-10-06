@@ -420,6 +420,7 @@ export const EditModule = {
         }
       }
       StampModule.updateStampRel(s);
+      window._modules?.HistoryModule?.commit('editar-' + s.id);
     }, { once: true });
     s.node.src = url;
 

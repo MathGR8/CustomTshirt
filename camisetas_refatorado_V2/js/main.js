@@ -28,6 +28,8 @@ import { NoticeModule }    from './ui/noticeModule.js';
 import { StampModule }     from './image/stampModule.js';
 import { EditModule }      from './image/editModule.js';
 import { ContactModule }   from './ui/contactModule.js';
+import { HistoryModule }   from './core/historyModule.js';
+import { KeyboardModule }  from './events/keyboardModule.js';
 import { SizeModule }      from './products/sizeModule.js';
 import { OrderModule }     from './products/orderModule.js';
 import { PDFModule }       from './pdf/pdfModule.js';
@@ -47,6 +49,8 @@ window._modules = {
   StampModule,
   EditModule,
   ContactModule,
+  HistoryModule,
+  KeyboardModule,
   SizeModule,
   OrderModule,
   PDFModule,
@@ -64,6 +68,8 @@ window.UIModule         = UIModule;
 window.StampModule      = StampModule;
 window.EditModule       = EditModule;
 window.ContactModule    = ContactModule;
+window.HistoryModule    = HistoryModule;
+window.KeyboardModule   = KeyboardModule;
 window.SizeModule       = SizeModule;
 window.PDFModule        = PDFModule;
 window.OrderModule      = OrderModule;
@@ -104,4 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initConfigurator();
   // Carrega o pedido salvo no navegador e desenha "Itens do pedido"
   OrderModule.init();
+  // Atalhos de teclado e histórico de desfazer (a partir do estado inicial)
+  KeyboardModule.init();
+  HistoryModule.init();
 });
