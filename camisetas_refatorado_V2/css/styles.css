@@ -1474,3 +1474,18 @@ button.ctLink:hover { color: var(--color-text); filter: none; }
 }
 /* Céu azul-claro para as nuvens e o cenário aparecerem */
 .klScene { background: linear-gradient(#d9eef9 0%, #eef7fc 55%, #f6f6f6 100%); }
+
+/* Depois de clicar em "Falar no WhatsApp": somem a mensagem e os botões de
+   envio; ficam o resumo, os passos e o "baixar os arquivos novamente" */
+.ctEnviado .ctLabel,
+.ctEnviado .ctBubble,
+.ctEnviado .ctWa,
+.ctEnviado .ctShare { display: none !important; }
+.ctEnviado .ctSteps { margin-top: 2px; }
+.ctEnviado .ctFoot { padding-top: 8px; }
+button.ctInline {
+  display: inline; padding: 0; margin-left: 4px;
+  background: none; color: #128C7E; font-size: 12px; font-weight: 700;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+button.ctInline:hover { filter: none; color: #0b6b60; }

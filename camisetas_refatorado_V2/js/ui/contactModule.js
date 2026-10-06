@@ -41,8 +41,8 @@ const HTML = `
   <div class="ctCheck" aria-hidden="true">
     <svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M15 27 L23 35 L38 18"/></svg>
   </div>
-  <h2>Seu projeto está pronto!</h2>
-  <p>O PDF do pedido já foi baixado. Agora é só falar com a gente para receber a sua cotação.</p>
+  <h2 id="ctTitulo">Seu projeto está pronto!</h2>
+  <p id="ctSubtitulo">O PDF do pedido já foi baixado. Agora é só falar com a gente para receber a sua cotação.</p>
 </div>
 <div class="ctBody">
   <div class="ctStats">
@@ -148,6 +148,7 @@ function montar() {
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'fechar') dlg.close();
     else if (act === 'wa')     ContactModule._enviarWhatsApp();
+    else if (act === 'wa-de-novo') ContactModule._abrirConversa();
     else if (act === 'share')  ContactModule._compartilhar();
     else if (act === 'baixar') ContactModule._baixarTudo();
   });
@@ -170,6 +171,10 @@ export const ContactModule = {
 
     $('waMsg').value = WHATSAPP.message;
     $('waSteps').hidden = true;
+    // Volta ao estado inicial (mensagem + botão do WhatsApp visíveis)
+    dlg.classList.remove('ctEnviado');
+    $('ctTitulo').textContent = 'Seu projeto está pronto!';
+    $('ctSubtitulo').textContent = 'O PDF do pedido já foi baixado. Agora é só falar com a gente para receber a sua cotação.';
     $('waFiles').innerHTML = '<span class="ctChip ctChipWait">Preparando os arquivos…</span>';
     // Resumo do pedido
     $('ctItens').textContent = AppState.orderItems.length;
@@ -213,22 +218,36 @@ export const ContactModule = {
 
   /** Baixa as artes (se ainda não baixou) e abre a conversa do atendimento. @private */
   _enviarWhatsApp() {
-    const msg = $('waMsg').value.trim() || WHATSAPP.message;
+    st.msg = $('waMsg').value.trim() || WHATSAPP.message;
     if (!st.artesBaixadas) this._baixarArtes();
-    // Abre na mesma ação do clique para o navegador não bloquear a janela
-    // ('noopener' faria window.open devolver null; o opener é zerado à mão)
-    const win = window.open(linkWhatsApp(msg), '_blank');
-    if (win) win.opener = null;
-    else window.location.href = linkWhatsApp(msg); // janela bloqueada: abre na mesma aba
+    this._abrirConversa();
+
+    // Depois de abrir a conversa ficam só as instruções e o "baixar de novo":
+    // a mensagem e o botão do WhatsApp somem (classe ctEnviado, ver CSS)
+    st.dlg.classList.add('ctEnviado');
+    $('ctTitulo').textContent = 'Quase lá! 🙌';
+    $('ctSubtitulo').textContent = 'Siga os passos abaixo para enviar seu pedido ao nosso atendimento.';
 
     const anexos = st.artes.length ? `<b>${PDF_NAME}</b> e <b>${st.zip ? ZIP_NAME : 'as artes'}</b>` : `<b>${PDF_NAME}</b>`;
     const steps = $('waSteps');
     steps.innerHTML = `
-      <li class="ok"><span>Conversa aberta com a sua mensagem</span></li>
+      <li class="ok"><span>Conversa aberta com a sua mensagem.
+        <button type="button" class="ctInline" data-act="wa-de-novo">Não abriu? Abrir de novo</button></span></li>
       <li><span>Toque no clipe 📎 e anexe ${anexos} (estão nos seus downloads)</span></li>
       <li><span>Envie e aguarde nosso retorno com a cotação 🚀</span></li>`;
     steps.hidden = false;
+    st.dlg.scrollTop = 0;
     Logger.info('UI', 'Conversa do WhatsApp aberta para o atendimento.');
+  },
+
+  /** Abre (ou reabre) a conversa do atendimento com a mensagem. @private */
+  _abrirConversa() {
+    const link = linkWhatsApp(st.msg || WHATSAPP.message);
+    // Abre na mesma ação do clique para o navegador não bloquear a janela
+    // ('noopener' faria window.open devolver null; o opener é zerado à mão)
+    const win = window.open(link, '_blank');
+    if (win) win.opener = null;
+    else window.location.href = link; // janela bloqueada: abre na mesma aba
   },
 
   /** Compartilha o PDF e as artes pelo menu do aparelho. @private */
