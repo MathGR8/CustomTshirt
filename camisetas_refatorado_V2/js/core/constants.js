@@ -145,9 +145,9 @@ export const PDF_LAYOUT = {
    * ONE e TWO são frações da própria área (a camiseta nunca é deformada).
    */
   SHIRTS: {
-    area: { x: 0.160, y: 0.145, w: 0.85, h: 0.90 },
-    ONE:  { w: 0.70, h: 1.00 },
-    TWO:  { w: 0.50, h: 0.46 }
+    area: { x: 0.205, y: 0.250, w: 0.80, h: 0.70 },
+    ONE:  { w: 0.65, h: 0.65 },
+    TWO:  { w: 0.62, h: 0.62 }
   },
 
   /**
@@ -157,7 +157,7 @@ export const PDF_LAYOUT = {
    * gap = espaço entre quadros (fração da largura do fundo).
    */
   THUMBS: {
-    area:  { x: 0.0021, y: 0.48, w: 0.17, h: 0.17 },
+    area:  { x: 0.0021, y: 0.48, w: 0.20, h: 0.50 },
     gap:   0.007
   }
 };
@@ -169,7 +169,7 @@ export const PDF_LAYOUT = {
 //            da visualização, onde fica o peito esquerdo de quem veste)
 //  top     = distância do topo da área de impressão (0.08 = um pouco abaixo)
 // ============================================================
-export const CHEST_PRESET = { cm: 10, centerX: 0.74, top: 0.08 };
+export const CHEST_PRESET = { cm: 10, centerX: 0.74, top: 0.12 };
 
 // ============================================================
 //  ATENDIMENTO (WhatsApp)
