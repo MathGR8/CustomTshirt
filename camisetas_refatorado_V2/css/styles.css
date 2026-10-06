@@ -1128,3 +1128,265 @@ kbd {
 }
 /* Item do pedido focado pelo teclado (Delete remove, Enter edita) */
 .orderCard:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* =============================================
+   CARREGAMENTO "GERANDO SEU PDF" — Kombi acelerando
+   ============================================= */
+body.semRolagem { overflow: hidden; }
+.kombiLoader {
+  position: fixed; inset: 0; z-index: 3000;
+  display: none; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(30,10,16,0.82) 0%, rgba(5,5,8,0.92) 70%);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.kombiLoader.aberto { display: flex; animation: klFadeIn .25s ease both; }
+.kombiLoader.saindo { animation: klFadeOut .38s ease both; }
+@keyframes klFadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes klFadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+.klBox { text-align: center; color: #fff; font-family: var(--font-base); padding: 0 20px; }
+.klScene {
+  position: relative;
+  width: min(360px, 86vw); height: 170px;
+  margin: 0 auto 18px;
+  overflow: hidden;
+}
+/* Kombi: balança na estrada e "empina" um pouco ao acelerar */
+.klKombi {
+  position: absolute; left: 50%; bottom: 18px;
+  width: 230px; margin-left: -115px;
+  animation: klAcelera 1.8s ease-in-out infinite;
+  transform-origin: 30% 90%;
+}
+.klBody { animation: klBalanca .28s ease-in-out infinite alternate; }
+.klShadow { fill: rgba(0,0,0,0.45); }
+@keyframes klAcelera {
+  0%   { transform: translateX(-26px) rotate(0deg); }
+  45%  { transform: translateX(14px)  rotate(-2.5deg); }
+  70%  { transform: translateX(10px)  rotate(-1deg); }
+  100% { transform: translateX(-26px) rotate(0deg); }
+}
+@keyframes klBalanca { from { transform: translateY(0); } to { transform: translateY(-2.5px); } }
+.klWheel { animation: klGira .35s linear infinite; }
+@keyframes klGira { to { transform: rotate(360deg); } }
+.kombiLoader.saindo .klKombi { animation: klSai .38s ease-in forwards; }
+@keyframes klSai { to { transform: translateX(320px) rotate(-3deg); } }
+
+/* Estrada com faixas passando */
+.klRoad {
+  position: absolute; left: 0; right: 0; bottom: 10px; height: 4px;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,0.85) 0 26px, transparent 26px 52px);
+  animation: klEstrada .3s linear infinite;
+  mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
+}
+@keyframes klEstrada { from { transform: translateX(0); } to { transform: translateX(-52px); } }
+
+/* Linhas de velocidade */
+.klLine {
+  position: absolute; right: -120px; top: var(--y);
+  width: var(--w); height: 3px; border-radius: 3px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.75));
+  animation: klVento var(--d) linear infinite;
+  animation-delay: var(--delay, 0s);
+}
+@keyframes klVento { from { transform: translateX(0); opacity: 0; } 20% { opacity: 1; } to { transform: translateX(-520px); opacity: 0; } }
+
+/* Fumacinha do escapamento (atrás da Kombi) */
+.klPuff {
+  position: absolute; left: calc(50% - 130px); bottom: 34px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: rgba(255,255,255,0.55);
+  animation: klFumaca .75s ease-out infinite;
+  animation-delay: var(--delay);
+}
+@keyframes klFumaca {
+  from { transform: translate(0,0) scale(.4); opacity: .8; }
+  to   { transform: translate(-60px,-14px) scale(1.6); opacity: 0; }
+}
+
+.klTitle { font-size: 22px; font-weight: 800; letter-spacing: .3px; }
+.klSub   { margin-top: 6px; font-size: 14px; color: rgba(255,255,255,0.75); }
+.klDots i { font-style: normal; animation: klPonto 1.2s infinite; opacity: 0; }
+.klDots i:nth-child(2) { animation-delay: .2s; }
+.klDots i:nth-child(3) { animation-delay: .4s; }
+@keyframes klPonto { 0%, 20% { opacity: 0; } 40%, 100% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .klKombi, .klBody, .klWheel, .klRoad, .klLine, .klPuff, .klDots i { animation: none !important; }
+  .klDots i { opacity: 1; }
+}
+
+/* =============================================
+   JANELA "SEU PROJETO ESTÁ PRONTO"
+   ============================================= */
+.contactDlg.ctDlg {
+  width: min(480px, 94vw);
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+  font-family: var(--font-base);
+  position: relative;
+}
+.ctDlg::backdrop { background: rgba(10, 6, 8, 0.65); backdrop-filter: blur(3px); }
+.ctDlg[open] { animation: ctEntra .35s cubic-bezier(.2,.9,.3,1.2) both; }
+@keyframes ctEntra { from { opacity: 0; transform: translateY(18px) scale(.96); } to { opacity: 1; transform: none; } }
+
+button.ctClose {
+  position: absolute; top: 12px; right: 12px; z-index: 2;
+  width: 34px; height: 34px; padding: 0; border-radius: 50%;
+  background: rgba(255,255,255,0.18); color: #fff; border: 1px solid rgba(255,255,255,0.35);
+  font-size: 15px;
+}
+button.ctClose:hover { background: rgba(255,255,255,0.3); filter: none; }
+
+/* Topo colorido com check animado e confete */
+.ctHero {
+  position: relative; overflow: hidden;
+  padding: 30px 26px 48px;
+  text-align: center; color: #fff;
+  background: linear-gradient(135deg, #ED3051 0%, #a3163a 55%, #1a0a10 100%);
+}
+.ctHero h2 { font-size: 23px; font-weight: 900; letter-spacing: .2px; margin-top: 12px; }
+.ctHero p  { font-size: 14px; line-height: 1.5; color: rgba(255,255,255,0.88); margin-top: 6px; }
+.ctCheck { width: 64px; height: 64px; margin: 0 auto; position: relative; z-index: 1; }
+.ctCheck svg { width: 100%; height: 100%; }
+.ctCheck circle { fill: #fff; }
+.ctCheck path {
+  fill: none; stroke: #1fb36a; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 40; stroke-dashoffset: 0;
+}
+.ctAnim .ctCheck { animation: ctPop .5s cubic-bezier(.2,1.4,.4,1) .1s both; }
+.ctAnim .ctCheck path { animation: ctTraco .45s ease-out .45s both; }
+@keyframes ctPop   { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes ctTraco { from { stroke-dashoffset: 40; } to { stroke-dashoffset: 0; } }
+
+.ctConfetti i {
+  position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px;
+  opacity: 0;
+}
+.ctAnim .ctConfetti i { animation: ctCai 1.6s ease-in both; }
+.ctConfetti i:nth-child(4n+1) { background: #ffd54a; }
+.ctConfetti i:nth-child(4n+2) { background: #ffffff; }
+.ctConfetti i:nth-child(4n+3) { background: #25D366; }
+.ctConfetti i:nth-child(4n+4) { background: #8fd0ec; }
+.ctConfetti i:nth-child(1)  { left: 6%;  animation-delay: .05s; }
+.ctConfetti i:nth-child(2)  { left: 13%; animation-delay: .25s; }
+.ctConfetti i:nth-child(3)  { left: 20%; animation-delay: .1s; }
+.ctConfetti i:nth-child(4)  { left: 28%; animation-delay: .35s; }
+.ctConfetti i:nth-child(5)  { left: 35%; animation-delay: .15s; }
+.ctConfetti i:nth-child(6)  { left: 43%; animation-delay: .4s; }
+.ctConfetti i:nth-child(7)  { left: 50%; animation-delay: .2s; }
+.ctConfetti i:nth-child(8)  { left: 57%; animation-delay: .3s; }
+.ctConfetti i:nth-child(9)  { left: 64%; animation-delay: .05s; }
+.ctConfetti i:nth-child(10) { left: 71%; animation-delay: .45s; }
+.ctConfetti i:nth-child(11) { left: 78%; animation-delay: .12s; }
+.ctConfetti i:nth-child(12) { left: 85%; animation-delay: .32s; }
+.ctConfetti i:nth-child(13) { left: 91%; animation-delay: .22s; }
+.ctConfetti i:nth-child(14) { left: 96%; animation-delay: .38s; }
+@keyframes ctCai {
+  0%   { opacity: 1; transform: translateY(0) rotate(0deg); }
+  100% { opacity: 0; transform: translateY(210px) rotate(540deg); }
+}
+
+/* Corpo */
+.ctBody { padding: 18px 22px 6px; display: flex; flex-direction: column; gap: 12px; overflow: auto; }
+.ctStats {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  margin-top: -36px; position: relative; z-index: 1;
+  background: #fff; border-radius: 14px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.12);
+}
+.ctStats div { padding: 12px 6px; text-align: center; display: flex; flex-direction: column; }
+.ctStats div + div { border-left: 1px solid #f0f0f0; }
+.ctStats b    { font-size: 22px; font-weight: 900; color: #ED3051; line-height: 1.1; }
+.ctStats span { font-size: 11px; font-weight: 600; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: .4px; }
+
+.ctFiles { display: flex; flex-wrap: wrap; gap: 6px; }
+.ctChip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px 4px 4px; border-radius: 99px;
+  background: #f5f5f7; font-size: 12px; font-weight: 600; color: var(--color-text);
+}
+.ctChip i {
+  font-style: normal; font-size: 10px; font-weight: 800; color: #fff;
+  background: #ED3051; border-radius: 99px; padding: 2px 7px;
+}
+.ctChip i:empty { display: none; }
+.ctChipWait { padding: 4px 10px; color: var(--color-text-muted); }
+
+.ctLabel { font-size: 13px; font-weight: 700; }
+.ctLabel span {
+  font-weight: 600; font-size: 10px; color: #1a7f4b; background: #e6f7ee;
+  padding: 2px 7px; border-radius: 99px; margin-left: 4px; text-transform: uppercase; letter-spacing: .3px;
+}
+/* Mensagem com cara de balão do WhatsApp */
+.ctBubble {
+  background: #efeae2;
+  background-image: radial-gradient(rgba(0,0,0,0.035) 1px, transparent 1px);
+  background-size: 12px 12px;
+  border-radius: 12px; padding: 12px;
+}
+.ctBubble textarea {
+  display: block; width: 100%; min-height: 64px; resize: vertical;
+  border: none; border-radius: 10px 10px 2px 10px;
+  background: #d9fdd3; color: #111b21;
+  padding: 10px 12px; font: 500 14px/1.45 var(--font-base);
+  box-shadow: 0 1px 1px rgba(0,0,0,0.12);
+}
+.ctBubble textarea:focus { outline: 2px solid #25D366; }
+
+/* Passos depois de abrir o WhatsApp */
+.ctSteps { list-style: none; counter-reset: passo; display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; }
+.ctSteps li {
+  counter-increment: passo;
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 13px; line-height: 1.45;
+  animation: ctEntra .3s ease both;
+}
+.ctSteps li:nth-child(2) { animation-delay: .1s; }
+.ctSteps li:nth-child(3) { animation-delay: .2s; }
+.ctSteps li::before {
+  content: counter(passo);
+  flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #ED3051; color: #fff; font-weight: 800; font-size: 12px;
+}
+.ctSteps li.ok::before { content: '✓'; background: #1fb36a; }
+
+/* Rodapé */
+.ctFoot { display: flex; flex-direction: column; gap: 8px; padding: 14px 22px 20px; }
+button.ctWa {
+  width: 100%; padding: 14px 18px; gap: 10px;
+  border-radius: 14px; font-size: 16px; font-weight: 800; letter-spacing: .2px;
+  background: linear-gradient(135deg, #25D366, #128C7E); color: #fff;
+  box-shadow: 0 8px 20px rgba(18,140,126,0.35);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+button.ctWa svg { width: 22px; height: 22px; }
+button.ctWa:hover:not(:disabled) { filter: none; transform: translateY(-1px); box-shadow: 0 12px 24px rgba(18,140,126,0.42); }
+button.ctShare {
+  width: 100%; padding: 12px; border-radius: 14px; font-size: 14px; font-weight: 700;
+  background: #fff; color: #128C7E; border: 2px solid #25D366;
+}
+button.ctLink {
+  background: none; color: var(--color-text-muted); padding: 6px; font-size: 12px; font-weight: 600;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+button.ctLink:hover { color: var(--color-text); filter: none; }
+
+@media (max-width: 700px) {
+  .contactDlg.ctDlg { width: 100vw; max-width: 100vw; border-radius: 20px 20px 0 0; margin: auto auto 0; max-height: 94dvh; }
+  .ctHero { padding: 26px 20px 40px; }
+  .ctFoot { padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ctDlg[open], .ctAnim .ctCheck, .ctAnim .ctCheck path, .ctAnim .ctConfetti i, .ctSteps li { animation: none !important; }
+}
+
+/* O atributo hidden sempre esconde (o display dos botões não pode vencê-lo) */
+[hidden] { display: none !important; }
+/* A janela inteira rola (e não só o corpo), para o resumo poder sobrepor o topo */
+.contactDlg.ctDlg { overflow-y: auto; overflow-x: hidden; }
+.ctDlg .ctBody { overflow: visible; }

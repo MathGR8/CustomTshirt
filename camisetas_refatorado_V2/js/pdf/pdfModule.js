@@ -32,6 +32,7 @@ import { NoticeModule } from '../ui/noticeModule.js';
 import { DragModule } from '../events/dragModule.js';
 import { UIModule } from '../ui/uiModule.js';
 import { ContactModule } from '../ui/contactModule.js';
+import { LoadingModule } from '../ui/loadingModule.js';
 
 export const PDFModule = {
 
@@ -716,6 +717,10 @@ export const PDFModule = {
     Logger.info('PDF', 'Gerando PDF do pedido...');
     const btnPdf = document.getElementById('btnGerarPdf');
     if (btnPdf) { btnPdf.disabled = true; btnPdf.textContent = '⏳ Gerando...'; }
+    // Kombi acelerando no centro da tela enquanto o PDF é montado
+    LoadingModule.show('Gerando seu PDF');
+    // Dá um quadro para a animação aparecer antes do trabalho pesado
+    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 30)));
     let pdfBlob = null;
     try {
       pdfBlob = await this.buildPDF({ returnBlob: true });
@@ -725,6 +730,7 @@ export const PDFModule = {
       Logger.error('PDF', 'Erro ao gerar PDF: ' + e.message, e);
       NoticeModule.show('error', 'Erro ao gerar o PDF: ' + e.message);
     } finally {
+      await LoadingModule.hide();
       if (btnPdf) {
         btnPdf.disabled = false;
         btnPdf.innerHTML = '📄 Gerar PDF do Pedido';

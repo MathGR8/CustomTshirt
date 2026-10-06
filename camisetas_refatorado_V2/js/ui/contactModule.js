@@ -14,9 +14,10 @@
  *   1. "Enviar pelo WhatsApp" baixa as artes (artes-pedido.zip; o PDF já foi
  *      baixado) e abre a conversa com o atendimento com a mensagem pronta.
  *      O cliente anexa os arquivos baixados pelo clipe (📎).
- *   2. Em celulares (e navegadores) que permitem, "Compartilhar arquivos"
- *      abre o menu de compartilhar do aparelho já com o PDF e as artes;
- *      o cliente escolhe o WhatsApp e a conversa do atendimento.
+ *   2. SÓ NO CELULAR, "Enviar arquivos direto" abre o menu de compartilhar do
+ *      aparelho já com o PDF e as artes; o cliente escolhe o WhatsApp e a
+ *      conversa. No computador esse menu do sistema raramente oferece o
+ *      WhatsApp, por isso o botão não aparece lá.
  *  Envio 100% automático exige um servidor com a API do WhatsApp Business.
  *
  * Dependências: appState.js, constants.js, logger.js, noticeModule.js.
@@ -31,20 +32,33 @@ import { NoticeModule } from './noticeModule.js';
 const PDF_NAME = 'pedido-artrock.pdf';
 const ZIP_NAME = 'artes-pedido.zip';
 
+const WA_ICON = `<svg viewBox="0 0 32 32" aria-hidden="true"><path fill="currentColor" d="M16 3C8.8 3 3 8.7 3 15.8c0 2.5.7 4.9 2 7L3 29l6.4-2c2 1.1 4.3 1.7 6.6 1.7 7.2 0 13-5.7 13-12.8S23.2 3 16 3zm0 23.4c-2.1 0-4.1-.6-5.9-1.7l-.4-.3-3.8 1.2 1.2-3.7-.3-.4c-1.2-1.8-1.9-3.9-1.9-6 0-5.9 4.9-10.6 11-10.6s11 4.8 11 10.6-4.9 10.9-10.9 10.9zm6-7.9c-.3-.2-1.9-1-2.2-1.1-.3-.1-.5-.2-.7.2-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-.3-.2-1.4-.5-2.6-1.6-1-.9-1.6-1.9-1.8-2.2-.2-.3 0-.5.1-.7l.5-.6c.2-.2.2-.4.3-.6.1-.2 0-.4 0-.6l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.1-1.2 2.7s1.2 3.2 1.4 3.4c.2.2 2.4 3.6 5.8 5 .8.3 1.4.5 1.9.7.8.3 1.5.2 2.1.1.6-.1 1.9-.8 2.2-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.3-.6-.4z"/></svg>`;
+
 const HTML = `
-<div class="dlgHead"><strong>🎉 Seu projeto está pronto!</strong>
-  <button type="button" class="dlgClose" data-act="fechar" aria-label="Fechar" title="Fechar">✕</button></div>
-<div class="dlgBody">
-  <p>O PDF do seu pedido foi baixado. Gostaria de entrar em contato com nosso atendimento para fazer a cotação?</p>
-  <label for="waMsg" class="dlgLabel">Mensagem para o atendimento <span>(você pode alterar)</span></label>
-  <textarea id="waMsg" rows="3"></textarea>
-  <p class="dlgHint" id="waFiles"></p>
-  <div class="dlgSteps" id="waSteps" hidden></div>
+<button type="button" class="ctClose" data-act="fechar" aria-label="Fechar" title="Fechar">✕</button>
+<div class="ctHero">
+  <div class="ctConfetti" aria-hidden="true">${'<i></i>'.repeat(14)}</div>
+  <div class="ctCheck" aria-hidden="true">
+    <svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M15 27 L23 35 L38 18"/></svg>
+  </div>
+  <h2>Seu projeto está pronto!</h2>
+  <p>O PDF do pedido já foi baixado. Agora é só falar com a gente para receber a sua cotação.</p>
 </div>
-<div class="dlgFoot">
-  <button type="button" class="btn-outline" data-act="baixar">⬇ Baixar arquivos</button>
-  <button type="button" class="btn-dark" data-act="share" hidden>📎 Compartilhar arquivos</button>
-  <button type="button" class="btn-whatsapp" data-act="wa">Enviar pelo WhatsApp</button>
+<div class="ctBody">
+  <div class="ctStats">
+    <div><b id="ctItens">0</b><span>modelo(s)</span></div>
+    <div><b id="ctPecas">0</b><span>peça(s)</span></div>
+    <div><b id="ctArtes">–</b><span>arte(s)</span></div>
+  </div>
+  <div class="ctFiles" id="waFiles"></div>
+  <label for="waMsg" class="ctLabel">💬 Sua mensagem para o atendimento <span>pode editar</span></label>
+  <div class="ctBubble"><textarea id="waMsg" rows="3"></textarea></div>
+  <ol class="ctSteps" id="waSteps" hidden></ol>
+</div>
+<div class="ctFoot">
+  <button type="button" class="ctWa" data-act="wa">${WA_ICON}<span>Falar no WhatsApp</span></button>
+  <button type="button" class="ctShare" data-act="share" hidden>📲 Enviar arquivos direto pelo celular</button>
+  <button type="button" class="ctLink" data-act="baixar">⬇ Baixar os arquivos novamente</button>
 </div>`;
 
 /** Estado da janela aberta. */
@@ -127,7 +141,7 @@ async function coletarArtes() {
 function montar() {
   if (st.dlg) return st.dlg;
   const dlg = document.createElement('dialog');
-  dlg.className = 'contactDlg';
+  dlg.className = 'contactDlg ctDlg';
   dlg.innerHTML = HTML;
   document.body.appendChild(dlg);
   dlg.addEventListener('click', e => {
@@ -156,11 +170,18 @@ export const ContactModule = {
 
     $('waMsg').value = WHATSAPP.message;
     $('waSteps').hidden = true;
-    $('waFiles').textContent = 'Preparando os arquivos do pedido…';
+    $('waFiles').innerHTML = '<span class="ctChip ctChipWait">Preparando os arquivos…</span>';
+    // Resumo do pedido
+    $('ctItens').textContent = AppState.orderItems.length;
+    $('ctPecas').textContent = AppState.orderItems.reduce((t, it) =>
+      t + Object.values(it.quantities || {}).reduce((a, n) => a + (parseInt(n, 10) || 0), 0), 0);
+    $('ctArtes').textContent = '–';
     const btnWa = dlg.querySelector('[data-act="wa"]');
     const btnShare = dlg.querySelector('[data-act="share"]');
     btnWa.disabled = true;
     btnShare.hidden = true;
+    // Reinicia as animações (confete e check) a cada abertura
+    dlg.classList.remove('ctAnim'); void dlg.offsetWidth; dlg.classList.add('ctAnim');
     if (!dlg.open) dlg.showModal();
 
     try {
@@ -175,15 +196,18 @@ export const ContactModule = {
     }
 
     const n = st.artes.length;
-    $('waFiles').textContent = n
-      ? `Arquivos do pedido: ${PDF_NAME} e ${n} arte(s)${st.zip ? ` (em ${ZIP_NAME})` : ''}.`
-      : `Arquivo do pedido: ${PDF_NAME}.`;
+    $('ctArtes').textContent = n;
+    $('waFiles').innerHTML =
+      `<span class="ctChip"><i>PDF</i>${PDF_NAME}</span>` +
+      (n ? `<span class="ctChip"><i>${st.zip ? 'ZIP' : 'IMG'}</i>${st.zip ? ZIP_NAME : n + ' arte(s)'}</span>` : '');
     btnWa.disabled = false;
 
-    // Compartilhar arquivos direto (celulares e alguns navegadores)
+    // "Enviar arquivos direto" só no celular: no computador o menu de
+    // compartilhar do sistema quase nunca oferece o WhatsApp
+    const celular = matchMedia('(pointer: coarse)').matches;
     const arquivos = [st.pdf, ...st.artes];
     try {
-      btnShare.hidden = !(navigator.canShare && navigator.canShare({ files: arquivos }));
+      btnShare.hidden = !(celular && navigator.canShare && navigator.canShare({ files: arquivos }));
     } catch { btnShare.hidden = true; }
   },
 
@@ -199,8 +223,10 @@ export const ContactModule = {
 
     const anexos = st.artes.length ? `<b>${PDF_NAME}</b> e <b>${st.zip ? ZIP_NAME : 'as artes'}</b>` : `<b>${PDF_NAME}</b>`;
     const steps = $('waSteps');
-    steps.innerHTML = `✅ A conversa com o atendimento foi aberta com a sua mensagem.<br>
-      Agora toque no clipe <b>📎</b> da conversa e anexe ${anexos}, que foram baixados para o seu aparelho.`;
+    steps.innerHTML = `
+      <li class="ok"><span>Conversa aberta com a sua mensagem</span></li>
+      <li><span>Toque no clipe 📎 e anexe ${anexos} (estão nos seus downloads)</span></li>
+      <li><span>Envie e aguarde nosso retorno com a cotação 🚀</span></li>`;
     steps.hidden = false;
     Logger.info('UI', 'Conversa do WhatsApp aberta para o atendimento.');
   },
