@@ -14,6 +14,7 @@
  *         brilho / contraste / saturação
  *  - Com uma área selecionada, fundo, varinha e cores valem só dentro dela
  *  - Desfazer, restaurar o original, cancelar e salvar
+ *  - Fechar com alterações não salvas (✕ ou Esc) pede confirmação
  *
  * Como funciona: a imagem é desenhada num <canvas>; cada ferramenta cria um
  * novo canvas e o anterior vai para a pilha de "desfazer". Ao salvar, a imagem
@@ -23,6 +24,12 @@
  * Ao salvar, a largura em cm da estampa é recalculada na mesma proporção
  * (px por cm constante), então a arte mantém o tamanho real na camiseta e
  * não "encolhe" a cada giro. O centro da estampa também é preservado.
+ *
+ * Alta qualidade: cada edição também é guardada como um "passo" com
+ * coordenadas relativas (0–1) em stamp.edicoes. Ao enviar as artes, o arquivo
+ * original (PDF/SVG) é renderizado de novo em alta resolução (~300 DPI no
+ * tamanho real da estampa) e os mesmos passos são refeitos nele
+ * (exportarAltaQualidade → PNG com DPI gravado + PDF no tamanho real).
  *
  * Dependências: logger.js, noticeModule.js, helpers.js. A estampa é achada
  * pelo id em AppState; StampModule vem de window._modules (evita circular).
@@ -270,6 +277,91 @@ const Ops = {
   }
 };
 
+// ---------- Passos (para refazer a edição em alta qualidade) ----------
+
+/** Retângulo em px → relativo (0–1) ao canvas c, e o inverso. */
+const relRet = (r, c) => r && { x: r.x / c.width, y: r.y / c.height, w: r.w / c.width, h: r.h / c.height };
+const pxRet  = (r, c) => r && { x: r.x * c.width, y: r.y * c.height, w: r.w * c.width, h: r.h * c.height };
+
+/**
+ * Acha, perto de (px, py), um pixel com a cor `cor` (a mesma arte em outra
+ * resolução pode ter a borda deslocada 1 ou 2 px). null se não achar.
+ */
+function acharCor(c, px, py, cor, tol, raio) {
+  const x0 = lim(Math.floor(px) - raio, 0, c.width - 1), y0 = lim(Math.floor(py) - raio, 0, c.height - 1);
+  const x1 = lim(Math.floor(px) + raio, 0, c.width - 1), y1 = lim(Math.floor(py) + raio, 0, c.height - 1);
+  const w = x1 - x0 + 1, p = c.getContext('2d').getImageData(x0, y0, w, y1 - y0 + 1).data;
+  let melhor = null, menor = Infinity;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const i = ((y - y0) * w + (x - x0)) * 4;
+    if (p[i + 3] < 16) continue;
+    const d = distCor(p, i, cor) * 4 + Math.hypot(x - px, y - py); // cor primeiro, depois distância
+    if (distCor(p, i, cor) <= tol && d < menor) { menor = d; melhor = { x: x + 0.5, y: y + 0.5 }; }
+  }
+  return melhor;
+}
+
+/** Refaz um passo gravado num canvas de qualquer resolução. */
+function refazerPasso(c, p) {
+  const r = pxRet(p.r, c);
+  switch (p.op) {
+    case 'girar':      return p.a ? Ops.girar(c, p.a) : c;
+    case 'espelhar':   return Ops.espelhar(c, p.h);
+    case 'recortar':   return Ops.recortar(c, r);
+    case 'aparar':     return Ops.aparar(c);
+    case 'apagarArea': return Ops.apagarArea(c, r);
+    case 'apagarFora': return Ops.apagarFora(c, r);
+    case 'fundo': {
+      const x = Ops.removerFundo(c, p.tol, p.ligados, r), o = x ? x.canvas : c;
+      return p.aparar ? Ops.aparar(o) : o;
+    }
+    case 'varinha': {
+      const raio = Math.ceil(c.width / p.w) + 2;
+      const pt = acharCor(c, p.fx * c.width, p.fy * c.height, p.cor, p.tol, raio);
+      const x = pt && Ops.varinha(c, pt.x, pt.y, p.tol, p.ligados, r);
+      return x ? x.canvas : c;
+    }
+    case 'pb':  return Ops.pretoBranco(c, r);
+    case 'inv': return Ops.inverter(c, r);
+    case 'pin': return Ops.pintar(c, p.hex, r);
+    case 'aj':  return Ops.ajustar(c, p.br, p.ct, p.sat, r);
+  }
+  return c;
+}
+
+/** CRC-32 (para gravar o DPI dentro do PNG). */
+const CRC_TAB = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (const b of bytes) c = CRC_TAB[(c ^ b) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+/**
+ * Grava o DPI no PNG (bloco pHYs, logo depois do IHDR): assim Photoshop,
+ * Corel etc. abrem a arte já no tamanho real em cm.
+ */
+async function pngComDpi(blob, dpi) {
+  const png = new Uint8Array(await blob.arrayBuffer());
+  const ppm = Math.round(dpi / 0.0254);
+  const bloco = new Uint8Array(21), v = new DataView(bloco.buffer);
+  v.setUint32(0, 9);
+  bloco.set([0x70, 0x48, 0x59, 0x73], 4);           // "pHYs"
+  v.setUint32(8, ppm); v.setUint32(12, ppm); bloco[16] = 1; // px por metro
+  v.setUint32(17, crc32(bloco.subarray(4, 17)));
+  const out = new Uint8Array(png.length + 21);
+  out.set(png.subarray(0, 33)); out.set(bloco, 33); out.set(png.subarray(33), 54);
+  return new Blob([out], { type: 'image/png' });
+}
+
+const DPI_ALVO = 300;
+// Área máxima (px) da arte renderizada: celulares (Safari) não aceitam canvas maiores que ~16 Mpx
+const AREA_MAX = () => (matchMedia('(pointer: coarse)').matches ? 12e6 : 36e6);
+
 // ---------- Interface ----------
 
 const HTML = `
@@ -320,6 +412,18 @@ const HTML = `
   <button type="button" data-op="orig" class="btn-outline">Restaurar original</button>
   <span style="flex:1"></span>
   <button type="button" data-op="save" class="btn-dark">Salvar</button>
+</div>
+<div class="editConfirm" id="editConfirm" hidden>
+  <div class="editConfirmBox" role="alertdialog" aria-modal="true" aria-labelledby="editConfirmTit" aria-describedby="editConfirmTxt">
+    <div class="editConfirmIco" aria-hidden="true">!</div>
+    <strong id="editConfirmTit">Fechar o editor?</strong>
+    <p id="editConfirmTxt">Você tem alterações que ainda não foram salvas. Se fechar agora, elas serão perdidas.</p>
+    <div class="editConfirmBtns">
+      <button type="button" data-op="conf-salvar" class="btn-dark">Salvar e fechar</button>
+      <button type="button" data-op="conf-descartar" class="editDanger">Fechar sem salvar</button>
+      <button type="button" data-op="conf-voltar" class="btn-outline">Continuar editando</button>
+    </div>
+  </div>
 </div>`;
 
 /** Atalho para achar elementos da janela. */
@@ -334,10 +438,20 @@ function montar() {
   document.body.appendChild(dlg);
 
   dlg.addEventListener('click', e => {
+    if (e.target.id === 'editConfirm') return EditModule._acao('conf-voltar'); // clique fora do balão
     const op = e.target.closest('[data-op]')?.dataset.op;
     if (op) EditModule._acao(op);
   });
-  dlg.addEventListener('cancel', () => { ed.stamp = null; });
+  // Esc: com o balão aberto, volta a editar; senão, fecha (pedindo confirmação se houver alterações)
+  dlg.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    EditModule._acao(confirmando() ? 'conf-voltar' : 'cancel');
+  });
+  dlg.addEventListener('cancel', e => {
+    if (ed?.stamp && alterado()) { e.preventDefault(); mostrarConfirmacao(); }
+    else if (ed) ed.stamp = null;
+  });
 
   // Prévia ao vivo dos ajustes (filtro CSS; o cálculo real só ocorre em "Aplicar")
   const prev = () => {
@@ -450,11 +564,15 @@ function desenhar() {
  * A seleção continua quando o tamanho da imagem não muda (dá para apagar e
  * depois pintar a mesma área).
  */
-function aplicar(novo, manterGiro = false) {
+function aplicar(novo, manterGiro = false, passo = null, substituir = false) {
   const mesmoTamanho = novo.width === ed.work.width && novo.height === ed.work.height;
-  ed.undo.push(ed.work);
+  ed.undo.push({ work: ed.work, passos: ed.passos });
   if (ed.undo.length > MAX_UNDO) ed.undo.shift();
   ed.work = novo;
+  // Passos para a alta qualidade (null = histórico desconhecido)
+  if (passo === 'inicio') ed.passos = [];
+  else if (ed.passos && passo) ed.passos = substituir ? [...ed.passos.slice(0, -1), passo] : [...ed.passos, passo];
+  else ed.passos = null;
   if (!mesmoTamanho || manterGiro) ed.crop = null;
   if (!manterGiro) ed.giro = null; // outra ferramenta: o próximo giro parte da imagem atual
   desenhar();
@@ -473,9 +591,12 @@ function alternarVarinha(liga = !ed.varinha) {
 
 /** Apaga a cor do ponto clicado (respeitando a seleção, se houver). */
 function usarVarinha(p) {
-  const r = Ops.varinha(ed.work, p.x, p.y, tolerancia(), $('editLigados').checked, ed.crop);
+  const w = ed.work, tol = tolerancia(), ligados = $('editLigados').checked;
+  const r = Ops.varinha(w, p.x, p.y, tol, ligados, ed.crop);
   if (!r) return NoticeModule.show('info', ed.crop ? 'Clique numa cor dentro da área selecionada.' : 'Esse ponto já está transparente.');
-  aplicar(r.canvas);
+  const px = w.getContext('2d').getImageData(Math.floor(p.x), Math.floor(p.y), 1, 1).data;
+  aplicar(r.canvas, false, { op: 'varinha', fx: p.x / w.width, fy: p.y / w.height, w: w.width,
+                             cor: [px[0], px[1], px[2]], tol, ligados, r: relRet(ed.crop, w) });
 }
 
 /**
@@ -484,11 +605,26 @@ function usarVarinha(p) {
  * sem acumular bordas transparentes (que fariam a arte encolher).
  */
 function girar(graus) {
+  // Giros seguidos viram um passo só (o último giro substitui o anterior)
+  const continua = !!ed.giro && ed.passos?.at(-1)?.op === 'girar';
   if (!ed.giro) ed.giro = { base: ed.work, angulo: 0 };
   ed.giro.angulo = ((ed.giro.angulo + graus) % 360 + 360) % 360;
   const a = ed.giro.angulo;
   // Múltiplos de 90° (ou 0°) não precisam de margem extra
-  aplicar(a === 0 ? clonar(ed.giro.base) : Ops.girar(ed.giro.base, a), true);
+  aplicar(a === 0 ? clonar(ed.giro.base) : Ops.girar(ed.giro.base, a), true, { op: 'girar', a }, continua);
+}
+
+/** Há alterações ainda não salvas? */
+const alterado = () => ed.undo.length > 0;
+/** O balão "Fechar o editor?" está aberto? */
+const confirmando = () => !$('editConfirm').hidden;
+
+function mostrarConfirmacao() {
+  $('editConfirm').hidden = false;
+  $('editConfirm').querySelector('[data-op="conf-voltar"]').focus();
+}
+function esconderConfirmacao() {
+  $('editConfirm').hidden = true;
 }
 
 /** Carrega uma imagem (URL) num canvas, limitando o lado maior a MAX_SIDE. */
@@ -513,7 +649,9 @@ export const EditModule = {
       const work = await carregarCanvas(stamp.pdfRenderDataURL || stamp.dataURL);
       // larguraInicial: referência para manter a escala (px por cm) ao salvar
       ed = { ...(ed || {}), dlg, stamp, work, undo: [], crop: null, ini: null, giro: null,
-             larguraInicial: work.width, alturaInicial: work.height };
+             larguraInicial: work.width, alturaInicial: work.height,
+             // Passos já salvos antes (estampa editada) ou nenhum (arte original)
+             passos: stamp.original ? (stamp.edicoes ? [...stamp.edicoes] : null) : [] };
       // Se a última edição salva foi um giro, continua a partir da imagem sem giro
       // (girar 15° hoje e 15° amanhã = um giro de 30°, sem bordas extras acumuladas)
       const r = stamp.rotacao;
@@ -521,6 +659,7 @@ export const EditModule = {
         ed.giro = { base: await carregarCanvas(r.base), angulo: r.angulo };
       }
       alternarVarinha(false);
+      esconderConfirmacao();
       desenhar();
       if (!dlg.open) dlg.showModal();
     } catch (err) {
@@ -532,39 +671,61 @@ export const EditModule = {
   /** Trata o clique de cada botão da janela. @private */
   async _acao(op) {
     if (!ed || !ed.stamp) return;
-    const w = ed.work;
+    const w = ed.work, r = relRet(ed.crop, w);
+    // Com o balão "Fechar o editor?" aberto, só os botões dele funcionam
+    if (confirmando() && !op.startsWith('conf-')) return;
     switch (op) {
+      case 'conf-voltar':    return esconderConfirmacao();
+      case 'conf-descartar': esconderConfirmacao(); ed.stamp = null; return ed.dlg.close();
+      case 'conf-salvar':    esconderConfirmacao(); return this._salvar();
       case 'g-90': return girar(-90);
       case 'g90':  return girar(90);
       case 'gl':   return girar(lim(parseFloat($('editAngulo').value) || 0, -360, 360));
-      case 'eh':   return aplicar(Ops.espelhar(w, true));
-      case 'ev':   return aplicar(Ops.espelhar(w, false));
+      case 'eh':   return aplicar(Ops.espelhar(w, true), false, { op: 'espelhar', h: true });
+      case 'ev':   return aplicar(Ops.espelhar(w, false), false, { op: 'espelhar', h: false });
       case 'rec':
       case 'apag':
       case 'fora':
         if (!ed.crop) return NoticeModule.show('info', 'Primeiro arraste sobre a imagem para selecionar a área.');
-        return aplicar(op === 'rec' ? Ops.recortar(w, ed.crop) : op === 'apag' ? Ops.apagarArea(w, ed.crop) : Ops.apagarFora(w, ed.crop));
+        if (op === 'rec')  return aplicar(Ops.recortar(w, ed.crop), false, { op: 'recortar', r });
+        if (op === 'apag') return aplicar(Ops.apagarArea(w, ed.crop), false, { op: 'apagarArea', r });
+        return aplicar(Ops.apagarFora(w, ed.crop), false, { op: 'apagarFora', r });
       case 'dessel': ed.crop = null; return mostrarSelecao();
-      case 'apar': return aplicar(Ops.aparar(w));
+      case 'apar': return aplicar(Ops.aparar(w), false, { op: 'aparar' });
       case 'fundo': {
-        const r = Ops.removerFundo(w, tolerancia(), $('editLigados').checked, ed.crop);
-        if (!r) return NoticeModule.show('info', 'O fundo já está transparente. Para apagar uma cor da arte, use a 🪄 varinha.');
-        if (!r.n) return NoticeModule.show('info', 'Nenhum fundo encontrado. Tente aumentar a tolerância.');
-        return aplicar($('editAparar').checked && !ed.crop ? Ops.aparar(r.canvas) : r.canvas);
+        const tol = tolerancia(), ligados = $('editLigados').checked;
+        const res = Ops.removerFundo(w, tol, ligados, ed.crop);
+        if (!res) return NoticeModule.show('info', 'O fundo já está transparente. Para apagar uma cor da arte, use a 🪄 varinha.');
+        if (!res.n) return NoticeModule.show('info', 'Nenhum fundo encontrado. Tente aumentar a tolerância.');
+        const aparar = $('editAparar').checked && !ed.crop;
+        return aplicar(aparar ? Ops.aparar(res.canvas) : res.canvas, false, { op: 'fundo', tol, ligados, r, aparar });
       }
       case 'varinha': return alternarVarinha();
-      case 'pb':   return aplicar(Ops.pretoBranco(w, ed.crop));
-      case 'inv':  return aplicar(Ops.inverter(w, ed.crop));
-      case 'pin':  return aplicar(Ops.pintar(w, $('editCor').value, ed.crop));
-      case 'aj':   return aplicar(Ops.ajustar(w, +$('editBr').value, +$('editCt').value, +$('editSa').value, ed.crop));
-      case 'undo': if (ed.undo.length) { ed.work = ed.undo.pop(); ed.crop = null; ed.giro = null; desenhar(); } return;
+      case 'pb':   return aplicar(Ops.pretoBranco(w, ed.crop), false, { op: 'pb', r });
+      case 'inv':  return aplicar(Ops.inverter(w, ed.crop), false, { op: 'inv', r });
+      case 'pin': {
+        const hex = $('editCor').value;
+        return aplicar(Ops.pintar(w, hex, ed.crop), false, { op: 'pin', hex, r });
+      }
+      case 'aj': {
+        const br = +$('editBr').value, ct = +$('editCt').value, sat = +$('editSa').value;
+        return aplicar(Ops.ajustar(w, br, ct, sat, ed.crop), false, { op: 'aj', br, ct, sat, r });
+      }
+      case 'undo':
+        if (ed.undo.length) {
+          const u = ed.undo.pop();
+          ed.work = u.work; ed.passos = u.passos; ed.crop = null; ed.giro = null; desenhar();
+        }
+        return;
       case 'orig': {
         // Volta à imagem original (a de antes da primeira edição salva)
         const o = ed.stamp.original;
         const url = o ? o.pdfRenderDataURL : ed.stamp.pdfRenderDataURL;
-        return aplicar(await carregarCanvas(url || ed.stamp.dataURL));
+        return aplicar(await carregarCanvas(url || ed.stamp.dataURL), false, 'inicio');
       }
-      case 'cancel': ed.stamp = null; return ed.dlg.close();
+      case 'cancel':
+        if (alterado()) return mostrarConfirmacao();
+        ed.stamp = null; return ed.dlg.close();
       case 'save':   return this._salvar();
     }
   },
@@ -577,6 +738,7 @@ export const EditModule = {
     if (!s.original) s.original = { dataURL: s.dataURL, previewDataURL: s.previewDataURL, pdfRenderDataURL: s.pdfRenderDataURL };
     s.dataURL = s.previewDataURL = s.pdfRenderDataURL = url;
     s.width = ed.work.width; s.height = ed.work.height;
+    s.edicoes = ed.passos; // para refazer em alta qualidade no envio
     // Lembra a imagem de antes do giro para a próxima edição continuar o mesmo giro
     s.rotacao = ed.giro && ed.giro.angulo
       ? { base: ed.giro.base.toDataURL('image/png'), angulo: ed.giro.angulo, resultado: url }
@@ -630,5 +792,67 @@ export const EditModule = {
       NoticeModule.show('success', 'Estampa editada com sucesso.');
     }
     Logger.info('IMAGE', `Estampa editada: ${s.name} (${s.width}×${s.height}px, ${cmAntes} → ${s.cm} cm)`);
+  },
+
+  /**
+   * Arte editada em alta qualidade para enviar à produção.
+   * PDF/SVG: renderiza o arquivo original de novo em ~300 DPI (no tamanho
+   * real em cm) e refaz os passos da edição. PNG/JPG: refaz na resolução
+   * original do arquivo (sem "inventar" pixels).
+   * @param {Object} s - Estampa (de AppState ou de um item do pedido).
+   * @returns {Promise<{png: Blob, pdf: Blob|null, dpi: number, larguraPx: number}>}
+   */
+  async exportarAltaQualidade(s) {
+    const { PDFModule } = window._modules || {};
+    const cm = s.cm ?? 20;
+    let c = null;
+
+    if (s.file && s.edicoes && PDFModule) {
+      try {
+        const tipo = PDFModule.detectFileType(s.file);
+        // Arte de partida = a mesma que o editor abriu na 1ª edição
+        const base = await carregarCanvas(s.original?.pdfRenderDataURL || s.original?.dataURL || s.dataURL);
+        let fonte = null;
+        if (tipo === 'pdf' || tipo === 'svg') {
+          // Quanto ampliar para a arte final ficar com ~300 DPI, sem passar do limite de memória
+          let k = (cm / 2.54 * DPI_ALVO) / (s.width || base.width);
+          k = Math.min(k, Math.sqrt(AREA_MAX() / (base.width * base.height)));
+          if (k > 1.05) {
+            const r = tipo === 'pdf'
+              ? await PDFModule.convertPdfToImageDataURL(s.file, { scale: 3 * k, transparent: true, asCanvas: true })
+              : await PDFModule.rasterizeSvgFile(s.file, { scale: 2 * k, asCanvas: true });
+            fonte = r.canvas;
+          }
+        } else {
+          // Imagem: usa a resolução original do arquivo, se for maior que a do editor
+          const img = await Utils.loadImage(s.original?.dataURL || s.dataURL);
+          if (img.naturalWidth > base.width * 1.05) {
+            fonte = novoCanvas(img.naturalWidth, img.naturalHeight);
+            fonte.getContext('2d').drawImage(img, 0, 0);
+          }
+        }
+        if (fonte) c = s.edicoes.reduce(refazerPasso, fonte);
+      } catch (err) {
+        Logger.warn('IMAGE', 'Alta qualidade indisponível, usando a imagem do editor: ' + err.message);
+        c = null;
+      }
+    }
+    if (!c) c = await carregarCanvas(s.dataURL); // mesma arte do editor
+
+    const dpi = c.width / (cm / 2.54);
+    const blob = await new Promise(ok => c.toBlob(ok, 'image/png'));
+    const png = await pngComDpi(blob, dpi);
+
+    // PDF no tamanho real da estampa (transparência preservada)
+    let pdf = null;
+    const jsPDF = window.jspdf?.jsPDF;
+    if (jsPDF) {
+      const w = cm, h = cm * c.height / c.width;
+      const doc = new jsPDF({ unit: 'cm', format: [w, h], orientation: w > h ? 'l' : 'p' });
+      doc.addImage(new Uint8Array(await png.arrayBuffer()), 'PNG', 0, 0, w, h, undefined, 'FAST');
+      pdf = doc.output('blob');
+    }
+    Logger.info('IMAGE', `Arte em alta: ${s.name} ${c.width}×${c.height}px (${Math.round(dpi)} DPI em ${cm} cm)`);
+    return { png, pdf, dpi, larguraPx: c.width };
   }
 };
