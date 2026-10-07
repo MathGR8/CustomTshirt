@@ -2,10 +2,13 @@
  * @module artPickerModule
  * @description Janela "Escolha a arte" para PDFs com mais de uma arte.
  *
- * Quando o cliente envia um PDF com várias páginas, ou com várias artes
- * separadas na mesma página (ex.: logo da frente e arte das costas lado a
- * lado), o site encontra cada arte e pergunta quais usar. Cada arte escolhida
- * vira uma estampa, já recortada.
+ * Quando o cliente envia um PDF com várias páginas (o mais comum: uma arte
+ * por página, ex.: frente na 1ª e costas na 2ª), ou com várias artes
+ * separadas numa página só, o site encontra cada arte e pergunta quais usar.
+ * Cada arte escolhida vira uma estampa, já recortada.
+ *  - Várias páginas: cada página é UMA arte (tudo o que está desenhado nela),
+ *    todas já vêm marcadas e a opção "1ª na Frente, 2ª nas Costas" vem ligada.
+ *  - Uma página só: as partes separadas viram artes diferentes.
  *
  * Como as artes são achadas: a página é reduzida, o fundo (transparente ou a
  * cor das bordas, ex.: branco) é ignorado e as partes desenhadas que ficam
@@ -140,6 +143,10 @@ function montar() {
     <div class="dlgBody">
       <p class="pickIntro" id="pickIntro"></p>
       <div class="pickGrid" id="pickGrid" role="group" aria-label="Artes encontradas"></div>
+      <label class="pickLados" id="pickLadosBox" hidden>
+        <input type="checkbox" id="pickLados" checked>
+        <span>Colocar a 1ª arte na <b>Frente</b> e a 2ª nas <b>Costas</b></span>
+      </label>
     </div>
     <div class="dlgFoot pickFoot">
       <button type="button" class="btn-outline" data-pick="inteiro" id="pickInteiro">Usar a página inteira</button>
@@ -155,7 +162,8 @@ export const ArtPickerModule = {
   /**
    * Se o PDF tiver mais de uma arte, pergunta quais usar.
    * @param {File} file - PDF enviado.
-   * @returns {Promise<null | 'cancelar' | Array<{pagina, recorte, canvas, nome}>>}
+   * @returns {Promise<null | 'cancelar' | Array<{pagina, recorte, canvas, nome, lado}>>}
+   *   lado = 'Frente' / 'Costas' quando o cliente pediu "1ª na Frente e 2ª nas Costas".
    *   null = só uma arte (segue o fluxo normal, página inteira);
    *   'cancelar' = o cliente fechou a janela; lista = artes escolhidas.
    */
@@ -166,7 +174,13 @@ export const ArtPickerModule = {
 
     const opcoes = [];
     paginas.forEach((pg, i) => {
-      const artes = acharArtes(pg);
+      let artes = acharArtes(pg);
+      // Várias páginas: a página inteira é uma arte (recortada em volta do desenho)
+      if (paginas.length > 1 && artes.length > 1) {
+        const x0 = Math.min(...artes.map(r => r.x)), y0 = Math.min(...artes.map(r => r.y));
+        const x1 = Math.max(...artes.map(r => r.x + r.w)), y1 = Math.max(...artes.map(r => r.y + r.h));
+        artes = [{ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }];
+      }
       artes.forEach((r, j) => opcoes.push({
         pagina: i + 1, recorte: r, pg,
         rotulo: paginas.length > 1
@@ -176,10 +190,12 @@ export const ArtPickerModule = {
     });
     if (opcoes.length <= 1) return null;
 
-    const escolhidas = await this._janela(file, opcoes, total);
-    if (!Array.isArray(escolhidas)) return escolhidas;
-    return escolhidas.map(o => ({
-      pagina: o.pagina, recorte: o.recorte, canvas: recortar(o.pg, o.recorte),
+    const res = await this._janela(file, opcoes, total);
+    if (!res || res === 'cancelar') return res;
+    // "1ª na Frente e 2ª nas Costas": só com exatamente duas artes escolhidas
+    const lados = res.frenteCostas && res.escolhidas.length === 2 ? ['Frente', 'Costas'] : [];
+    return res.escolhidas.map((o, i) => ({
+      pagina: o.pagina, recorte: o.recorte, canvas: recortar(o.pg, o.recorte), lado: lados[i] || null,
       nome: file.name.replace(/\.pdf$/i, '') + ` (${o.rotulo.toLowerCase()})`
     }));
   },
@@ -196,10 +212,14 @@ export const ArtPickerModule = {
     d.querySelector('#pickInteiro').textContent = varias ? 'Usar a página 1 inteira' : 'Usar a página inteira';
 
     grid.innerHTML = '';
-    const marcadas = new Set();
+    // Várias páginas: normalmente o cliente quer todas (ex.: frente e costas)
+    const marcadas = new Set(varias ? opcoes.map((_, i) => i) : []);
+    const ladosBox = d.querySelector('#pickLadosBox'), lados = d.querySelector('#pickLados');
+    lados.checked = true;
     const atualizar = () => {
       ok.disabled = !marcadas.size;
       ok.textContent = marcadas.size > 1 ? `Adicionar ${marcadas.size} artes` : 'Adicionar arte';
+      ladosBox.hidden = marcadas.size !== 2; // só faz sentido com duas artes
       grid.querySelectorAll('.pickCard').forEach((b, i) => b.setAttribute('aria-pressed', String(marcadas.has(i))));
     };
     opcoes.forEach((o, i) => {
@@ -224,7 +244,9 @@ export const ArtPickerModule = {
         if (act === 'cancelar') fim('cancelar');
         else if (act === 'inteiro') fim(null);
         else if (act === 'todas') { opcoes.forEach((_, i) => marcadas.add(i)); atualizar(); }
-        else if (act === 'ok' && marcadas.size) fim([...marcadas].sort((a, b) => a - b).map(i => opcoes[i]));
+        else if (act === 'ok' && marcadas.size) {
+          fim({ escolhidas: [...marcadas].sort((a, b) => a - b).map(i => opcoes[i]), frenteCostas: lados.checked });
+        }
       };
       d.oncancel = e => { e.preventDefault(); fim('cancelar'); };
       d.showModal();

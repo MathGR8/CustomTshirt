@@ -89,16 +89,19 @@ export const StampModule = {
           const url = o.canvas.toDataURL('image/png');
           const normalized = { name: o.nome, sourceType: 'pdf', dataURL: url, previewDataURL: url,
                                pdfRenderDataURL: url, width: o.canvas.width, height: o.canvas.height };
-          const stamp = await PDFModule.createStampFromFile(file, { side, cm, name: o.nome, normalized });
+          const stamp = await PDFModule.createStampFromFile(file, { side: o.lado || side, cm, name: o.nome, normalized });
           // Página e pedaço do PDF (para a versão em alta qualidade)
           stamp.pagina = o.pagina;
           stamp.recorteInicial = o.recorte;
           await this._colocarNova(stamp, file);
         }
         input.value = '';
-        NoticeModule.show('success', escolhas.length > 1
-          ? `${escolhas.length} artes adicionadas. Elas ficam uma sobre a outra: arraste cada uma para o lugar ou mude o lado.`
-          : `Arte "${escolhas[0].nome}" adicionada com sucesso.`);
+        const frenteCostas = escolhas.some(o => o.lado === 'Costas');
+        NoticeModule.show('success', frenteCostas
+          ? 'Artes adicionadas: a 1ª na Frente e a 2ª nas Costas (toque em "Frente / Costas" para ver).'
+          : escolhas.length > 1
+            ? `${escolhas.length} artes adicionadas. Elas ficam uma sobre a outra: arraste cada uma para o lugar ou mude o lado.`
+            : `Arte "${escolhas[0].nome}" adicionada com sucesso.`);
         return;
       }
 
@@ -132,6 +135,13 @@ export const StampModule = {
       this.centerNodeInsideShirtBox(stamp.node);
       this.applySubLocationPreset(stamp, document.getElementById('subLocation')?.value);
       this.updateStampRel(stamp);
+    } else {
+      // Lado que não está na tela (ex.: arte das costas): fica centralizada na
+      // área de impressão e é posicionada quando esse lado for exibido
+      const a = PreviewGeom.area(), p = PreviewGeom.proporcao(stamp) || 1;
+      const rw = Math.min(1, stamp.cm / a.w), rh = Math.min(1, stamp.cm * p / a.h);
+      stamp.rel = { rx: (1 - rw) / 2, ry: (1 - rh) / 2, rw, rh };
+      stamp.pendingRel = { ...stamp.rel };
     }
 
     AppState.stamps.push(stamp);

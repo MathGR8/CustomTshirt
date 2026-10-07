@@ -1578,6 +1578,10 @@ button.pickCard[aria-pressed="true"] { border-color: var(--color-primary); box-s
 }
 button.pickCard[aria-pressed="true"] .pickCheck { opacity: 1; transform: none; }
 .pickFoot { flex-wrap: wrap; }
+.pickLados { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 13px; cursor: pointer;
+  background: #f4f8ff; border: 1px solid #cfe0ff; border-radius: 8px; padding: 8px 10px; }
+.pickLados[hidden] { display: none; }
+.pickLados input { width: 18px; height: 18px; flex-shrink: 0; }
 @media (max-width: 700px) {
   .pickGrid { grid-template-columns: repeat(2, 1fr); }
   .pickThumb { height: 110px; }
