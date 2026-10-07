@@ -4,10 +4,15 @@
  *
  * Ferramentas:
  *  - Girar 90° (esq./dir.), girar em ângulo livre e espelhar (horizontal/vertical)
- *  - Recortar (arrastando sobre a imagem; a seleção pode ser movida e
- *    redimensionada pelas bordas e cantos) e aparar bordas transparentes
+ *  - Fundo: "Remover fundo" apaga a cor das bordas (ex.: o fundo branco de
+ *    um PDF) e a "Varinha" apaga a cor clicada; ambos com tolerância e a opção
+ *    de apagar só a parte ligada (sem furar o branco de dentro da arte)
+ *  - Área selecionada (arrastando sobre a imagem; a seleção pode ser movida e
+ *    redimensionada pelas bordas e cantos): recortar, apagar a área, apagar
+ *    tudo fora dela; e aparar bordas transparentes
  *  - Cor: preto e branco, inverter, pintar com uma cor única,
  *         brilho / contraste / saturação
+ *  - Com uma área selecionada, fundo, varinha e cores valem só dentro dela
  *  - Desfazer, restaurar o original, cancelar e salvar
  *
  * Como funciona: a imagem é desenhada num <canvas>; cada ferramenta cria um
@@ -55,13 +60,106 @@ function clonar(src) {
 /** Limita um número entre a e b. */
 const lim = (v, a, b) => Math.max(a, Math.min(b, v));
 
-/** Aplica uma função a cada pixel visível (alpha > 0), devolvendo um novo canvas. */
-function porPixel(src, fn) {
+/** Converte uma seleção (px fracionários) num retângulo inteiro dentro do canvas. */
+function retInteiro(r, W, H) {
+  if (!r) return { x: 0, y: 0, w: W, h: H };
+  const x = lim(Math.floor(r.x), 0, W - 1), y = lim(Math.floor(r.y), 0, H - 1);
+  return { x, y, w: lim(Math.ceil(r.x + r.w) - x, 1, W - x), h: lim(Math.ceil(r.y + r.h) - y, 1, H - y) };
+}
+
+/**
+ * Aplica uma função a cada pixel visível (alpha > 0), devolvendo um novo canvas.
+ * Com `area`, só os pixels dentro dela mudam.
+ */
+function porPixel(src, fn, area) {
   const c = clonar(src), x = c.getContext('2d');
-  const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+  const a = retInteiro(area, c.width, c.height);
+  const d = x.getImageData(a.x, a.y, a.w, a.h), p = d.data;
   for (let i = 0; i < p.length; i += 4) if (p[i + 3] !== 0) fn(p, i);
-  x.putImageData(d, 0, 0);
+  x.putImageData(d, a.x, a.y);
   return c;
+}
+
+/** Distância entre a cor do pixel i e a cor c = [r, g, b] (0 a ~441). */
+function distCor(p, i, c) {
+  const r = p[i] - c[0], g = p[i + 1] - c[1], b = p[i + 2] - c[2];
+  return Math.sqrt(r * r + g * g + b * b);
+}
+
+/**
+ * "Cor para transparência" num pixel de borda: descobre quanto dele é a cor
+ * do fundo misturada (antialiasing) e tira essa parte, deixando a borda lisa
+ * e sem o "halo" claro em camisetas escuras.
+ */
+function tirarCorDaBorda(p, i, bg) {
+  let al = 0;
+  for (let k = 0; k < 3; k++) {
+    const v = p[i + k], b = bg[k];
+    const r = v > b ? (v - b) / (255 - b || 1) : v < b ? (b - v) / (b || 1) : 0;
+    if (r > al) al = r;
+  }
+  if (al >= 0.98) return;
+  if (al <= 0.02) { p[i + 3] = 0; return; }
+  for (let k = 0; k < 3; k++) p[i + k] = lim(Math.round((p[i + k] - bg[k]) / al + bg[k]), 0, 255);
+  p[i + 3] = Math.round(p[i + 3] * al);
+}
+
+/**
+ * Deixa transparentes os pixels parecidos com a cor `cor` (distância ≤ tol).
+ * @param {number[]} sementes - índices (na área) de onde a "mancha" começa
+ *                              quando `ligados` é true (preenchimento por vizinhos)
+ * @param {boolean} ligados   - true: só a região ligada às sementes;
+ *                              false: todos os pixels dessa cor na área
+ * @param {boolean} [passaTransparente] - a mancha atravessa pixels já
+ *                              transparentes (fundo com margem transparente)
+ * @returns {{canvas: HTMLCanvasElement, n: number}} n = pixels apagados
+ */
+function apagarParecidos(src, cor, sementes, tol, ligados, area, passaTransparente = false) {
+  const c = clonar(src), x = c.getContext('2d');
+  const a = retInteiro(area, c.width, c.height), w = a.w, h = a.h;
+  const d = x.getImageData(a.x, a.y, w, h), p = d.data;
+  const parece = k => p[k * 4 + 3] < 16 ? passaTransparente : distCor(p, k * 4, cor) <= tol;
+  const tirar = new Uint8Array(w * h);
+
+  if (ligados) {
+    const pilha = new Int32Array(w * h);
+    let topo = 0;
+    for (const k of sementes) if (!tirar[k] && parece(k)) { tirar[k] = 1; pilha[topo++] = k; }
+    while (topo) {
+      const k = pilha[--topo], px = k % w;
+      const viz = [px > 0 ? k - 1 : -1, px < w - 1 ? k + 1 : -1, k - w, k + w];
+      for (const v of viz) if (v >= 0 && v < w * h && !tirar[v] && parece(v)) { tirar[v] = 1; pilha[topo++] = v; }
+    }
+  } else {
+    for (let k = 0; k < w * h; k++) if (parece(k)) tirar[k] = 1;
+  }
+
+  // Apagados agora (o que já era transparente não conta)
+  const apagou = new Uint8Array(w * h);
+  let n = 0;
+  for (let k = 0; k < w * h; k++) if (tirar[k] && p[k * 4 + 3]) { p[k * 4 + 3] = 0; apagou[k] = 1; n++; }
+
+  // Suaviza 2 px de contorno em volta do que foi apagado
+  const feito = tirar;
+  let frente = apagou;
+  for (let volta = 0; volta < 2 && n; volta++) {
+    const prox = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) for (let x0 = 0; x0 < w; x0++) {
+      const k = y * w + x0;
+      if (feito[k] || !p[k * 4 + 3]) continue;
+      let perto = false;
+      for (let dy = -1; dy <= 1 && !perto; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const yy = y + dy, xx = x0 + dx;
+        if (yy >= 0 && yy < h && xx >= 0 && xx < w && frente[yy * w + xx]) { perto = true; break; }
+      }
+      if (perto) { prox[k] = 1; tirarCorDaBorda(p, k * 4, cor); }
+    }
+    for (let k = 0; k < w * h; k++) if (prox[k]) feito[k] = 1;
+    frente = prox;
+  }
+
+  x.putImageData(d, a.x, a.y);
+  return { canvas: c, n };
 }
 
 /** Operações de edição: cada uma recebe um canvas e devolve outro. */
@@ -103,24 +201,72 @@ const Ops = {
     }
     return x1 < 0 ? src : Ops.recortar(src, { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 });
   },
-  pretoBranco: src => porPixel(src, (p, i) => {
+  // Deixa transparente a área r
+  apagarArea(src, r) {
+    const c = clonar(src), a = retInteiro(r, c.width, c.height);
+    c.getContext('2d').clearRect(a.x, a.y, a.w, a.h);
+    return c;
+  },
+  // Mantém só a área r (o resto fica transparente; o tamanho não muda)
+  apagarFora(src, r) {
+    const c = novoCanvas(src.width, src.height), a = retInteiro(r, c.width, c.height);
+    c.getContext('2d').drawImage(src, a.x, a.y, a.w, a.h, a.x, a.y, a.w, a.h);
+    return c;
+  },
+  /**
+   * Remove o fundo: a cor mais comum nas bordas (da imagem ou da área).
+   * @returns {{canvas, n}|null} null quando as bordas já são transparentes
+   */
+  removerFundo(src, tol, ligados, area) {
+    const a = retInteiro(area, src.width, src.height), w = a.w, h = a.h;
+    const p = src.getContext('2d').getImageData(a.x, a.y, w, h).data;
+    const borda = [];
+    for (let x = 0; x < w; x++) borda.push(x, (h - 1) * w + x);
+    for (let y = 1; y < h - 1; y++) borda.push(y * w, y * w + w - 1);
+    // Cor do fundo: a mais frequente entre os pixels opacos da borda
+    const grupos = new Map();
+    let opacos = 0;
+    for (const k of borda) {
+      const i = k * 4;
+      if (p[i + 3] < 200) continue;
+      opacos++;
+      const chave = (p[i] >> 4) << 8 | (p[i + 1] >> 4) << 4 | (p[i + 2] >> 4);
+      const g = grupos.get(chave) || { n: 0, r: 0, g: 0, b: 0 };
+      g.n++; g.r += p[i]; g.g += p[i + 1]; g.b += p[i + 2];
+      grupos.set(chave, g);
+    }
+    if (opacos < borda.length / 2) return null;
+    const m = [...grupos.values()].reduce((x, y) => (y.n > x.n ? y : x));
+    const cor = [m.r / m.n, m.g / m.n, m.b / m.n];
+    return apagarParecidos(src, cor, borda, tol, ligados, area, true);
+  },
+  /** Varinha: apaga a cor do ponto (px, py). null se o ponto já é transparente. */
+  varinha(src, px, py, tol, ligados, area) {
+    const a = retInteiro(area, src.width, src.height);
+    const x = Math.floor(px), y = Math.floor(py);
+    if (x < a.x || y < a.y || x >= a.x + a.w || y >= a.y + a.h) return null;
+    const i = src.getContext('2d').getImageData(x, y, 1, 1).data;
+    if (i[3] < 16) return null;
+    return apagarParecidos(src, [i[0], i[1], i[2]], [(y - a.y) * a.w + (x - a.x)], tol, ligados, area);
+  },
+  pretoBranco: (src, area) => porPixel(src, (p, i) => {
     p[i] = p[i + 1] = p[i + 2] = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2];
-  }),
-  inverter: src => porPixel(src, (p, i) => {
+  }, area),
+  inverter: (src, area) => porPixel(src, (p, i) => {
     p[i] = 255 - p[i]; p[i + 1] = 255 - p[i + 1]; p[i + 2] = 255 - p[i + 2];
-  }),
+  }, area),
   // Pinta todos os pixels visíveis com uma cor, mantendo a transparência
-  pintar(src, hex) {
+  pintar(src, hex, area) {
     const { r, g, b } = Utils.hexToRgb(hex);
-    return porPixel(src, (p, i) => { p[i] = r; p[i + 1] = g; p[i + 2] = b; });
+    return porPixel(src, (p, i) => { p[i] = r; p[i + 1] = g; p[i + 2] = b; }, area);
   },
   // Brilho, contraste e saturação (1 = sem alteração), mesma ordem do filtro CSS da prévia
-  ajustar(src, br, ct, sat) {
+  ajustar(src, br, ct, sat, area) {
     return porPixel(src, (p, i) => {
       const v = [0, 1, 2].map(k => lim(((p[i + k] * br) - 128) * ct + 128, 0, 255));
       const g = 0.299 * v[0] + 0.587 * v[1] + 0.114 * v[2];
       for (let k = 0; k < 3; k++) p[i + k] = lim(g + (v[k] - g) * sat, 0, 255);
-    });
+    }, area);
   }
 };
 
@@ -132,6 +278,15 @@ const HTML = `
 <div class="editBody">
   <div class="editStage"><div class="editWrap" id="editWrap"><canvas id="editCanvas"></canvas><div id="editSel"><i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i><i data-h="e"></i><i data-h="se"></i><i data-h="s"></i><i data-h="sw"></i><i data-h="w"></i></div></div></div>
   <div class="editTools">
+    <fieldset><legend>Fundo</legend>
+      <div class="editRow"><button type="button" data-op="fundo" class="editMain">✨ Remover fundo</button>
+        <button type="button" data-op="varinha" id="editVarinha" aria-pressed="false" title="Ligue e clique numa cor da imagem para apagá-la (W)">🪄 Varinha</button></div>
+      <p class="editHint" id="editVarinhaDica" hidden>Varinha ligada: clique na cor que quer apagar. Clique de novo no botão para desligar.</p>
+      <label class="editSlide">Tolerância <input type="range" id="editTol" min="0" max="100" step="1" value="25"><output id="editTolV">25</output></label>
+      <label class="editCheck"><input type="checkbox" id="editLigados" checked> Só a parte ligada (não apaga o branco de dentro da arte)</label>
+      <label class="editCheck"><input type="checkbox" id="editAparar" checked> Aparar as sobras depois de remover o fundo</label>
+      <p class="editHint">"Remover fundo" apaga a cor das bordas (ex.: o branco de um PDF). Sobrou algo? Aumente a tolerância ou use a varinha.</p>
+    </fieldset>
     <fieldset><legend>Girar e espelhar</legend>
       <div class="editRow">
         <button type="button" data-op="g-90">⟲ 90°</button><button type="button" data-op="g90">⟳ 90°</button>
@@ -140,10 +295,13 @@ const HTML = `
       <div class="editRow"><label>Ângulo <input type="number" id="editAngulo" value="15" min="-360" max="360"> °</label>
         <button type="button" data-op="gl">Girar</button></div>
     </fieldset>
-    <fieldset><legend>Recorte</legend>
-      <p class="editHint">Arraste sobre a imagem para escolher a área. Depois, arraste as bordas ou cantos para ajustar, ou o meio para mover.</p>
-      <div class="editRow"><button type="button" data-op="rec">Aplicar corte</button>
-        <button type="button" data-op="apar">Aparar transparência</button></div>
+    <fieldset><legend>Área selecionada</legend>
+      <p class="editHint">Arraste sobre a imagem para selecionar uma área. Arraste as bordas ou cantos para ajustar, ou o meio para mover. Fundo, varinha e cores passam a valer só dentro dela.</p>
+      <div class="editRow"><button type="button" data-op="rec">✂ Recortar</button>
+        <button type="button" data-op="apag" title="Delete">Apagar área</button>
+        <button type="button" data-op="fora">Apagar fora</button></div>
+      <div class="editRow"><button type="button" data-op="apar">Aparar transparência</button>
+        <button type="button" data-op="dessel">Tirar seleção</button></div>
     </fieldset>
     <fieldset><legend>Cor</legend>
       <div class="editRow"><button type="button" data-op="pb">Preto e branco</button>
@@ -188,9 +346,12 @@ function montar() {
   };
   ['editBr', 'editCt', 'editSa'].forEach(id => $(id).addEventListener('input', prev));
 
-  // Seleção do recorte (mouse ou toque):
+  $('editTol').addEventListener('input', () => { $('editTolV').value = $('editTol').value; });
+
+  // Seleção da área (mouse ou toque):
   //  - arrastar fora da seleção cria uma nova
   //  - arrastar uma borda/canto redimensiona; arrastar o meio move
+  //  - com a varinha ligada, o clique apaga a cor do ponto
   const wrap = $('editWrap'), cv = $('editCanvas');
   const pt = e => {
     const r = cv.getBoundingClientRect();
@@ -199,6 +360,7 @@ function montar() {
   };
   wrap.addEventListener('pointerdown', e => {
     const p = pt(e);
+    if (ed.varinha) { e.preventDefault(); return usarVarinha(p); }
     const modo = ed.crop ? alvoSelecao(p) : null;
     ed.ini = { p, modo: modo || 'novo', crop: ed.crop ? { ...ed.crop } : null };
     if (!modo) ed.crop = null;
@@ -207,6 +369,7 @@ function montar() {
   });
   wrap.addEventListener('pointermove', e => {
     const p = pt(e);
+    if (ed.varinha) { wrap.style.cursor = 'cell'; return; }
     if (!ed.ini) { wrap.style.cursor = CURSORES[ed.crop ? alvoSelecao(p) : ''] || 'crosshair'; return; }
     const { p: p0, modo, crop: c0 } = ed.ini;
     if (modo === 'novo') {
@@ -282,14 +445,37 @@ function desenhar() {
   mostrarSelecao();
 }
 
-/** Guarda o canvas atual para "desfazer" e passa a trabalhar no novo. */
+/**
+ * Guarda o canvas atual para "desfazer" e passa a trabalhar no novo.
+ * A seleção continua quando o tamanho da imagem não muda (dá para apagar e
+ * depois pintar a mesma área).
+ */
 function aplicar(novo, manterGiro = false) {
+  const mesmoTamanho = novo.width === ed.work.width && novo.height === ed.work.height;
   ed.undo.push(ed.work);
   if (ed.undo.length > MAX_UNDO) ed.undo.shift();
   ed.work = novo;
-  ed.crop = null;
+  if (!mesmoTamanho || manterGiro) ed.crop = null;
   if (!manterGiro) ed.giro = null; // outra ferramenta: o próximo giro parte da imagem atual
   desenhar();
+}
+
+/** Tolerância da tela (0–100) em distância de cor. */
+const tolerancia = () => +$('editTol').value * 2.2;
+
+/** Liga/desliga a varinha. */
+function alternarVarinha(liga = !ed.varinha) {
+  ed.varinha = liga;
+  $('editVarinha').setAttribute('aria-pressed', String(liga));
+  $('editVarinhaDica').hidden = !liga;
+  $('editWrap').style.cursor = liga ? 'cell' : 'crosshair';
+}
+
+/** Apaga a cor do ponto clicado (respeitando a seleção, se houver). */
+function usarVarinha(p) {
+  const r = Ops.varinha(ed.work, p.x, p.y, tolerancia(), $('editLigados').checked, ed.crop);
+  if (!r) return NoticeModule.show('info', ed.crop ? 'Clique numa cor dentro da área selecionada.' : 'Esse ponto já está transparente.');
+  aplicar(r.canvas);
 }
 
 /**
@@ -334,6 +520,7 @@ export const EditModule = {
       if (r && r.resultado === (stamp.pdfRenderDataURL || stamp.dataURL)) {
         ed.giro = { base: await carregarCanvas(r.base), angulo: r.angulo };
       }
+      alternarVarinha(false);
       desenhar();
       if (!dlg.open) dlg.showModal();
     } catch (err) {
@@ -353,13 +540,23 @@ export const EditModule = {
       case 'eh':   return aplicar(Ops.espelhar(w, true));
       case 'ev':   return aplicar(Ops.espelhar(w, false));
       case 'rec':
-        if (!ed.crop) return NoticeModule.show('info', 'Arraste sobre a imagem para escolher a área do corte.');
-        return aplicar(Ops.recortar(w, ed.crop));
+      case 'apag':
+      case 'fora':
+        if (!ed.crop) return NoticeModule.show('info', 'Primeiro arraste sobre a imagem para selecionar a área.');
+        return aplicar(op === 'rec' ? Ops.recortar(w, ed.crop) : op === 'apag' ? Ops.apagarArea(w, ed.crop) : Ops.apagarFora(w, ed.crop));
+      case 'dessel': ed.crop = null; return mostrarSelecao();
       case 'apar': return aplicar(Ops.aparar(w));
-      case 'pb':   return aplicar(Ops.pretoBranco(w));
-      case 'inv':  return aplicar(Ops.inverter(w));
-      case 'pin':  return aplicar(Ops.pintar(w, $('editCor').value));
-      case 'aj':   return aplicar(Ops.ajustar(w, +$('editBr').value, +$('editCt').value, +$('editSa').value));
+      case 'fundo': {
+        const r = Ops.removerFundo(w, tolerancia(), $('editLigados').checked, ed.crop);
+        if (!r) return NoticeModule.show('info', 'O fundo já está transparente. Para apagar uma cor da arte, use a 🪄 varinha.');
+        if (!r.n) return NoticeModule.show('info', 'Nenhum fundo encontrado. Tente aumentar a tolerância.');
+        return aplicar($('editAparar').checked && !ed.crop ? Ops.aparar(r.canvas) : r.canvas);
+      }
+      case 'varinha': return alternarVarinha();
+      case 'pb':   return aplicar(Ops.pretoBranco(w, ed.crop));
+      case 'inv':  return aplicar(Ops.inverter(w, ed.crop));
+      case 'pin':  return aplicar(Ops.pintar(w, $('editCor').value, ed.crop));
+      case 'aj':   return aplicar(Ops.ajustar(w, +$('editBr').value, +$('editCt').value, +$('editSa').value, ed.crop));
       case 'undo': if (ed.undo.length) { ed.work = ed.undo.pop(); ed.crop = null; ed.giro = null; desenhar(); } return;
       case 'orig': {
         // Volta à imagem original (a de antes da primeira edição salva)

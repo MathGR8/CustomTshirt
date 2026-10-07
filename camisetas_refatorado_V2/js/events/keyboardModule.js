@@ -17,6 +17,7 @@
  *   ?                                 → mostra esta lista
  * Editor de imagem:
  *   Ctrl+Z → desfaz a última edição   Ctrl+S ou Ctrl+Enter → salvar   Esc → fechar
+ *   Delete → apaga a área selecionada  W → liga/desliga a varinha
  *
  * No Mac, Cmd funciona no lugar de Ctrl. Desfazer remover mostra o aviso
  * "Ctrl+Z desfaz", por isso o Delete do teclado não pede confirmação.
@@ -42,6 +43,8 @@ const ATALHOS = [
   ['?', 'Mostrar esta lista'],
   ['', 'No editor de imagem'],
   ['Ctrl + Z', 'Desfazer a última edição da imagem'],
+  ['Delete', 'Apagar a área selecionada'],
+  ['W', 'Ligar / desligar a varinha (apaga a cor clicada)'],
   ['Ctrl + S  ou  Ctrl + Enter', 'Salvar a imagem editada'],
   ['Esc', 'Fechar o editor sem salvar']
 ];
@@ -100,6 +103,10 @@ export const KeyboardModule = {
     if (document.querySelector('.editDlg[open]')) {
       if (mod && kl === 'z' && !e.shiftKey) { e.preventDefault(); m.EditModule?._acao('undo'); }
       else if (mod && (kl === 's' || k === 'Enter')) { e.preventDefault(); m.EditModule?._acao('save'); }
+      else if (!mod && !e.altKey && !digitando(document.activeElement)) {
+        if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); m.EditModule?._acao('apag'); }
+        else if (kl === 'w') { e.preventDefault(); m.EditModule?._acao('varinha'); }
+      }
       return;
     }
     // Outras janelas abertas (WhatsApp, atalhos): só o Esc nativo
