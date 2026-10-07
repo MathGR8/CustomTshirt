@@ -190,7 +190,10 @@ export const PDFModule = {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
+    // background: o PDF.js pinta a página de BRANCO por padrão (mesmo com o canvas
+    // limpo); transparente = só o que está desenhado no PDF vira estampa
     await page.render({ canvasContext: ctx, viewport,
+                        background: transparent ? 'rgba(0,0,0,0)' : undefined,
                         transform: [1, 0, 0, 1, -r.x * viewport.width, -r.y * viewport.height] }).promise;
     // Libera a memória do documento PDF.js
     try { await pdfDoc.destroy(); } catch (_) { /* sem problema se falhar */ }
@@ -219,7 +222,8 @@ export const PDFModule = {
         const viewport = page.getViewport({ scale });
         const canvas = document.createElement('canvas');
         canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height);
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise; // fundo transparente
+        // fundo transparente (sem isso o PDF.js pinta a página de branco)
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport, background: 'rgba(0,0,0,0)' }).promise;
         paginas.push(canvas);
       }
       return { total: pdfDoc.numPages, paginas };
