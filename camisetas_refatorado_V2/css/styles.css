@@ -461,6 +461,17 @@ input[type="range"]::-webkit-slider-thumb {
   display: none;
   z-index: 5;
 }
+/* Etiqueta da área máxima, logo abaixo da área tracejada (fora dela, para a arte não cobrir) */
+.shirtBoxLabel {
+  position: absolute; left: 50%; top: calc(100% + 4px); transform: translateX(-50%);
+  width: max-content; max-width: calc(100% + 40px); text-align: center;
+  font-size: 10px; font-weight: 600; line-height: 1.3;
+  color: #fff; background: rgba(0, 0, 0, 0.45); padding: 1px 6px; border-radius: 8px;
+}
+/* Medidas da estampa na lista (largura × altura, infantil) */
+.stampSizeInfo { font-size: 11px; line-height: 1.5; color: var(--color-text); margin: 2px 0 6px; }
+.stampSizeInfo span { color: var(--color-text-muted); }
+.sizeGroup { font-size: 10px; color: var(--color-text-muted); font-weight: 400; }
 
 img#baseShirtImg {
   width: 100%;
@@ -844,14 +855,28 @@ button.editClose:hover, button.dlgClose:hover { background: #f1f1f1; border-colo
 .editHead span { color: var(--color-text-muted); font-size: 12px; }
 .editBody { display: flex; gap: 14px; padding: 14px 16px; overflow: auto; flex: 1; min-height: 0; }
 /* Área da imagem (fundo xadrez mostra as partes transparentes) */
+.editStageBox { position: relative; flex: 1; min-width: 0; }
 .editStage {
-  flex: 1; min-width: 0;
-  display: flex; align-items: center; justify-content: center;
+  height: 62vh; overflow: auto; overscroll-behavior: contain;
+  display: flex; /* com margin:auto no filho: centraliza sem cortar quando há zoom */
   background: repeating-conic-gradient(#e6e6e6 0 25%, #fff 0 50%) 0 0 / 16px 16px;
   border: 1px solid var(--color-border); border-radius: 6px; padding: 8px;
 }
-.editWrap { position: relative; display: inline-block; touch-action: none; cursor: crosshair; }
-#editCanvas { display: block; max-width: 100%; max-height: 60vh; }
+.editWrap { position: relative; display: inline-block; margin: auto; flex-shrink: 0; touch-action: none; cursor: crosshair; }
+#editCanvas { display: block; }
+#editCanvas.pixelado { image-rendering: pixelated; }
+/* Controles de zoom (sobre a imagem, no canto) */
+.editZoom {
+  position: absolute; right: 10px; bottom: 10px; z-index: 8;
+  display: flex; align-items: center; background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--color-border); border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); overflow: hidden;
+}
+.editZoom button {
+  background: transparent; color: var(--color-text); border: none; border-radius: 0;
+  min-width: 36px; height: 34px; padding: 0 8px; font-size: 18px; font-weight: 700; line-height: 1;
+}
+.editZoom button#editZoomV { font-size: 12px; min-width: 62px; border-left: 1px solid var(--color-border); border-right: 1px solid var(--color-border); }
+.editZoom button:hover { background: #f1f1f1; filter: none; }
 #editSel { display: none; position: absolute; border: 2px dashed var(--color-primary); background: rgba(237, 48, 81, 0.12); pointer-events: none; }
 /* Alças de redimensionamento da seleção (só visuais: o clique é tratado no editWrap) */
 #editSel i {
@@ -884,7 +909,7 @@ button.editClose:hover, button.dlgClose:hover { background: #f1f1f1; border-colo
 .editRow button[aria-pressed="true"] { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
 .editFoot { display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--color-border); }
 /* No computador a imagem fica parada enquanto as ferramentas rolam ao lado */
-@media (min-width: 701px) { .editStage { position: sticky; top: 0; align-self: flex-start; min-height: 300px; } }
+@media (min-width: 701px) { .editStageBox { position: sticky; top: 0; align-self: flex-start; } }
 @media (max-width: 700px) { .editBody { flex-direction: column; } .editTools { width: auto; } }
 
 /* =============================================
@@ -937,7 +962,7 @@ button.btn-whatsapp:hover { background: #188a4a; filter: none; }
    ============================================= */
 @media (max-width: 700px) {
   .editDlg { width: 100vw; max-width: 100vw; max-height: 100dvh; height: 100dvh; border-radius: 0; }
-  #editCanvas { max-height: 38vh; }
+  .editStage { height: 42vh; height: 42dvh; }
   .editBody { padding: 10px; }
   .editFoot { flex-wrap: wrap; }
   .contactDlg { width: 100vw; max-width: 100vw; border-radius: 12px 12px 0 0; margin: auto auto 0; }
@@ -1121,7 +1146,7 @@ button#orderSummaryBadge:hover { background: rgba(255,255,255,0.3); filter: none
   /* Lista de estampas compacta: miniatura à esquerda, campos à direita */
   .stampItem { display: grid; grid-template-columns: 72px 1fr; align-items: start; gap: 8px 12px; }
   .stampItem .stampThumb { width: 72px; height: 72px; align-self: center; }
-  .stampItem .stampRowBtns { grid-column: 1 / -1; }
+  .stampItem .stampRowBtns, .stampItem .stampSizeInfo { grid-column: 1 / -1; }
   .stampMeta { grid-template-columns: 1fr; gap: 6px; }
   .stampMeta .labelWrap { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
   .stampMeta .labelWrap select { flex: 1; max-width: 150px; }
@@ -1524,3 +1549,38 @@ button.ctInline {
   text-decoration: underline; text-underline-offset: 2px;
 }
 button.ctInline:hover { filter: none; color: #0b6b60; }
+
+/* =============================================
+   JANELA "ESCOLHA A ARTE" (PDF com várias artes)
+   ============================================= */
+.contactDlg.pickDlg { width: min(720px, 96vw); }
+.pickIntro { font-size: 13px; color: var(--color-text-muted); line-height: 1.45; }
+.pickIntro b { color: var(--color-text); }
+.pickGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 2px; }
+button.pickCard {
+  position: relative; display: flex; flex-direction: column; gap: 6px; padding: 8px;
+  background: #fff; color: var(--color-text); border: 2px solid var(--color-border); border-radius: 10px;
+  font-weight: 600; font-size: 12px; white-space: normal; cursor: pointer; text-align: center;
+}
+button.pickCard:hover { border-color: #999; filter: none; }
+button.pickCard:focus { outline: none; }
+button.pickCard:focus-visible { outline: 2px dashed #1565c0; outline-offset: 2px; }
+button.pickCard[aria-pressed="true"] { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(237, 48, 81, 0.18); }
+.pickThumb {
+  display: flex; align-items: center; justify-content: center; height: 130px; border-radius: 6px;
+  background: repeating-conic-gradient(#e6e6e6 0 25%, #fff 0 50%) 0 0 / 14px 14px;
+}
+.pickThumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.pickCheck {
+  position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 14px; color: #fff;
+  background: var(--color-primary); opacity: 0; transform: scale(.6); transition: opacity .15s, transform .15s;
+}
+button.pickCard[aria-pressed="true"] .pickCheck { opacity: 1; transform: none; }
+.pickFoot { flex-wrap: wrap; }
+@media (max-width: 700px) {
+  .pickGrid { grid-template-columns: repeat(2, 1fr); }
+  .pickThumb { height: 110px; }
+  .pickFoot button { flex: 1 1 auto; }
+  .pickFoot span { display: none; }
+}

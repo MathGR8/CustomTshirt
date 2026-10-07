@@ -170,12 +170,13 @@ export const UIModule = {
     const s     = AppState.getActiveStamp();
     const input = document.getElementById("stampSize");
     if (!input) return;
-    const cm = Utils.clampCm(parseFloat(input.value || "20"));
+    const max = s ? PreviewGeom.maxCm(s) : PreviewGeom.area().w;
+    const cm = Utils.clampCm(parseFloat(input.value || "20"), max);
     const labelEl = document.getElementById("stampSizeValue");
     if (labelEl) labelEl.textContent = cm.toFixed(0) + " cm";
     if (s && s.side === AppState.currentView && StampModule) {
       s.cm = cm;
-      StampModule.applyStampCmToNode(s);
+      StampModule.applyStampCmToNode(s, { manterCentro: true });
       // Mantém o campo "Largura (cm)" da lista igual ao slider
       const campo = document.querySelector('#stampsList .stampItem.active input[type="number"]');
       if (campo) campo.value = cm;
@@ -264,6 +265,12 @@ export const UIModule = {
     el.style.width   = rect.width  + "px";
     el.style.height  = rect.height + "px";
     el.style.display = "block";
+    // Etiqueta com a área máxima (Infantil/Juvenil: as duas medidas)
+    const a = PreviewGeom.area();
+    const txt = a.infantil
+      ? `Máx. ${a.nome} ${a.w}×${a.h} cm · ${a.infantil.nome} ${a.infantil.w}×${a.infantil.h} cm`
+      : `Área máx. ${a.w} × ${a.h} cm`;
+    if (el.dataset.txt !== txt) { el.dataset.txt = txt; el.innerHTML = `<span class="shirtBoxLabel">${txt}</span>`; }
   },
 
   /**

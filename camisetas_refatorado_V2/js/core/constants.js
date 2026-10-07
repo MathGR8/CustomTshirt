@@ -59,10 +59,30 @@ export const SHIRT_PRINT_BOX = {
 };
 
 // ============================================================
+//  ÁREA MÁXIMA DE IMPRESSÃO POR TIPO DE CAMISETA (em cm)
+//  >>> AQUI você ajusta o tamanho máximo da estampa <<<
+//  w = largura máxima, h = altura máxima. A estampa nunca passa disso.
+//
+//  No preview, a largura da área tracejada (SHIRT_PRINT_BOX) vale "w" cm e a
+//  altura dela é calculada pela proporção w × h.
+//
+//  Infantil/Juvenil usam a mesma camiseta no preview: a estampa é montada no
+//  tamanho JUVENIL e, nas peças infantis, é impressa na mesma posição e
+//  proporção, só que reduzida pelo fator "escala" (calculado sozinho para a
+//  arte caber em 20 × 24 cm: menor entre 20/30 e 24/35 = 0,667).
+// ============================================================
+export const AREA_IMPRESSAO = {
+  'Masculina':        { w: 38, h: 42, nome: 'Masculina' },
+  'Feminina':         { w: 30, h: 35, nome: 'Feminina' },
+  'Infantil/Juvenil': { w: 30, h: 35, nome: 'Juvenil', tamanhos: ['08', '10', '12', '14'],
+                        infantil: { w: 20, h: 24, nome: 'Infantil', tamanhos: ['01', '02', '04', '06'] } }
+};
+
+// ============================================================
 //  LIMITES DE NEGÓCIO
 // ============================================================
 
-/** Largura máxima de impressão em centímetros. */
+/** Maior largura de impressão entre todas as camisetas (cm). */
 export const MAX_PRINT_WIDTH_CM = 38;
 
 /** Tamanho máximo de arquivo de estampa em megabytes. */

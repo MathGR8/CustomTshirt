@@ -51,12 +51,13 @@ export const Utils = {
   },
 
   /**
-   * Limita o valor de largura da estampa entre 5 cm e MAX_PRINT_WIDTH_CM.
+   * Limita o valor de largura da estampa entre 5 cm e o máximo.
    * @param {number} v - Valor de largura em centímetros.
+   * @param {number} [max=MAX_PRINT_WIDTH_CM] - Largura máxima (ex.: PreviewGeom.maxCm).
    * @returns {number} Valor limitado ao intervalo permitido.
    */
-  clampCm(v) {
-    return Math.max(5, Math.min(v || 20, MAX_PRINT_WIDTH_CM));
+  clampCm(v, max = MAX_PRINT_WIDTH_CM) {
+    return Math.max(Math.min(5, max), Math.min(v || 20, max));
   },
 
   /**

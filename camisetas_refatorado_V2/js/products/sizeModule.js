@@ -14,6 +14,7 @@
  */
 
 import { AppState } from '../core/appState.js';
+import { AREA_IMPRESSAO } from '../core/constants.js';
 import { Logger } from '../core/logger.js';
 import { UIModule } from '../ui/uiModule.js';
 import { Utils } from '../utils/helpers.js';
@@ -51,6 +52,12 @@ export const SizeModule = {
       const tr  = document.createElement("tr");
       const td1 = document.createElement("td");
       td1.textContent = sz;
+      // Infantil/Juvenil: mostra a qual grupo o tamanho pertence (a estampa muda de tamanho)
+      const area = AREA_IMPRESSAO[category];
+      if (area?.infantil) {
+        const grupo = area.infantil.tamanhos.includes(sz) ? area.infantil.nome : area.nome;
+        td1.insertAdjacentHTML('beforeend', ` <small class="sizeGroup">${grupo.toLowerCase()}</small>`);
+      }
 
       const td2 = document.createElement("td");
       td2.className = "quantityControl";
