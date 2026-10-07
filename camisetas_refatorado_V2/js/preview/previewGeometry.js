@@ -18,9 +18,55 @@
  */
 
 import { AppState } from '../core/appState.js';
-import { SHIRT_PRINT_BOX, MAX_PRINT_WIDTH_CM } from '../core/constants.js';
+import { SHIRT_PRINT_BOX, AREA_IMPRESSAO } from '../core/constants.js';
+
+/** Arredonda para 1 casa decimal. */
+const um = v => Math.round(v * 10) / 10;
 
 export const PreviewGeom = {
+  /**
+   * Área máxima de impressão (cm) da categoria (padrão: a selecionada na tela).
+   * @returns {{w:number, h:number, nome:string, infantil?:{w,h,nome,escala}}}
+   */
+  area(categoria) {
+    const cat = categoria || document.getElementById('category')?.value || 'Masculina';
+    const a = AREA_IMPRESSAO[cat] || AREA_IMPRESSAO.Masculina;
+    if (!a.infantil) return a;
+    // Fator para reduzir a arte juvenil até caber na área infantil
+    const escala = Math.min(a.infantil.w / a.w, a.infantil.h / a.h);
+    return { ...a, infantil: { ...a.infantil, escala } };
+  },
+
+  /** Proporção altura/largura da arte da estampa (null se ainda não dá para saber). */
+  proporcao(s) {
+    if (s?.width && s?.height) return s.height / s.width;
+    const n = s?.node;
+    return n?.naturalWidth ? n.naturalHeight / n.naturalWidth : null;
+  },
+
+  /**
+   * Maior largura (cm) que a estampa pode ter sem passar da largura nem da
+   * altura máxima da área de impressão.
+   * @param {Object|number} s - Estampa, ou direto a proporção altura/largura.
+   */
+  maxCm(s, categoria) {
+    const a = this.area(categoria);
+    const p = typeof s === 'number' ? s : this.proporcao(s);
+    return Math.floor(Math.min(a.w, p ? a.h / p : a.w) * 10) / 10;
+  },
+
+  /**
+   * Medidas da estampa para mostrar (largura × altura em cm). Em
+   * Infantil/Juvenil traz também a medida reduzida das peças infantis.
+   * @returns {{w, h, infantil?: {w, h}}}
+   */
+  medidas(s, categoria) {
+    const w = s.cm ?? 20, h = w * (this.proporcao(s) || 1), a = this.area(categoria);
+    const m = { w: um(w), h: um(h) };
+    if (a.infantil) m.infantil = { w: um(w * a.infantil.escala), h: um(h * a.infantil.escala) };
+    return m;
+  },
+
   /**
    * Calcula o retângulo da imagem base da camiseta como renderizada no preview.
    * Leva em conta o padding CSS e o aspect ratio da imagem (object-fit: contain).
@@ -72,11 +118,13 @@ export const PreviewGeom = {
     if (!baseRect) return null;
     const view = AppState.currentView || "Frente";
     const box  = SHIRT_PRINT_BOX[view] || { x: 0, y: 0, w: 1, h: 1 };
+    const a    = this.area();
+    const width = box.w * baseRect.width;
     return {
       left:   baseRect.left + box.x * baseRect.width,
       top:    baseRect.top  + box.y * baseRect.height,
-      width:  box.w * baseRect.width,
-      height: box.h * baseRect.height
+      width,
+      height: width * a.h / a.w // altura na proporção da área máxima (ex.: 38 × 42 cm)
     };
   },
 
@@ -88,7 +136,7 @@ export const PreviewGeom = {
   getPxPerCmPreview() {
     const rect = this.getRenderedShirtRect();
     if (!rect || rect.width <= 0) return null;
-    return rect.width / MAX_PRINT_WIDTH_CM;
+    return rect.width / this.area().w;
   },
 
   /**

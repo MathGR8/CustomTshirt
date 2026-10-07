@@ -33,6 +33,7 @@ import { DragModule } from '../events/dragModule.js';
 import { UIModule } from '../ui/uiModule.js';
 import { ContactModule } from '../ui/contactModule.js';
 import { LoadingModule } from '../ui/loadingModule.js';
+import { PreviewGeom } from '../preview/previewGeometry.js';
 
 export const PDFModule = {
 
@@ -152,6 +153,8 @@ export const PDFModule = {
    * @param {{ scale?: number, transparent?: boolean }} [options={}] - Opções de renderização.
    * @param {number} [options.scale=3] - Fator de escala para a renderização.
    * @param {boolean} [options.transparent=false] - Se true, usa fundo transparente.
+   * @param {number}  [options.page=1] - Página a renderizar.
+   * @param {{x,y,w,h}} [options.recorte] - Só este pedaço da página (frações 0–1).
    * @param {boolean} [options.asCanvas] - Devolve { canvas } em vez do dataURL.
    * @returns {Promise<{ dataURL: string, width: number, height: number }>}
    */
@@ -167,12 +170,14 @@ export const PDFModule = {
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
     const pdfDoc      = await loadingTask.promise;
-    const page        = await pdfDoc.getPage(1);
+    const page        = await pdfDoc.getPage(Math.min(options.page || 1, pdfDoc.numPages));
     const viewport    = page.getViewport({ scale });
+    // recorte = {x, y, w, h} em frações da página: renderiza só esse pedaço
+    const r = options.recorte || { x: 0, y: 0, w: 1, h: 1 };
 
     const canvas  = document.createElement("canvas");
-    canvas.width  = Math.round(viewport.width);
-    canvas.height = Math.round(viewport.height);
+    canvas.width  = Math.max(1, Math.round(viewport.width  * r.w));
+    canvas.height = Math.max(1, Math.round(viewport.height * r.h));
     const ctx     = canvas.getContext("2d");
 
     if (!transparent) {
@@ -185,12 +190,42 @@ export const PDFModule = {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
-    await page.render({ canvasContext: ctx, viewport }).promise;
+    await page.render({ canvasContext: ctx, viewport,
+                        transform: [1, 0, 0, 1, -r.x * viewport.width, -r.y * viewport.height] }).promise;
     // Libera a memória do documento PDF.js
     try { await pdfDoc.destroy(); } catch (_) { /* sem problema se falhar */ }
 
     if (options.asCanvas) return { canvas, width: canvas.width, height: canvas.height }; // sem gerar PNG (arte em alta)
     return { dataURL: canvas.toDataURL("image/png"), width: canvas.width, height: canvas.height };
+  },
+
+  // ----------------------------------------------------------
+  //  renderizarPaginas(file, options)
+  //  Renderiza as primeiras páginas de um PDF (para escolher a arte)
+  // ----------------------------------------------------------
+  /**
+   * @param {File} file - Arquivo PDF.
+   * @param {{ scale?: number, max?: number }} [options]
+   * @returns {Promise<{ total: number, paginas: HTMLCanvasElement[] }>}
+   */
+  async renderizarPaginas(file, options = {}) {
+    if (!window.pdfjsLib) throw new Error('pdfjsLib não está disponível.');
+    const scale = options.scale || 3, max = options.max || 10;
+    const pdfDoc = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    const paginas = [];
+    try {
+      for (let n = 1; n <= Math.min(pdfDoc.numPages, max); n++) {
+        const page = await pdfDoc.getPage(n);
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height);
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise; // fundo transparente
+        paginas.push(canvas);
+      }
+      return { total: pdfDoc.numPages, paginas };
+    } finally {
+      try { await pdfDoc.destroy(); } catch (_) { /* sem problema */ }
+    }
   },
 
   // ----------------------------------------------------------
@@ -253,7 +288,8 @@ export const PDFModule = {
    * @returns {Promise<Object>} Objeto de estampa com id, dataURL, node, side, name, cm, hidden, rel.
    */
   async createStampFromFile(file, extra = {}) {
-    const normalized = await this.normalizeStampFile(file);
+    // extra.normalized: imagem já pronta (ex.: uma das artes escolhidas de um PDF)
+    const normalized = extra.normalized || await this.normalizeStampFile(file);
 
     // ID único com Date.now + random (mantém compatibilidade com o original)
     const id    = 'st' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -357,14 +393,16 @@ export const PDFModule = {
    * @param {'Frente'|'Costas'} view - Lado da camiseta.
    * @returns {{ x: number, y: number, w: number, h: number }} Retângulo em mm.
    */
-  getPdfShirtRect(ox, oy, drawW, drawH, view) {
+  getPdfShirtRect(ox, oy, drawW, drawH, view, categoria) {
     const side = (view === 'Costas') ? 'Costas' : 'Frente';
     const b    = SHIRT_PRINT_BOX[side];
+    const a    = PreviewGeom.area(categoria);
+    // Mesma regra do preview: altura na proporção da área máxima da categoria
     return {
       x: ox + b.x * drawW,
       y: oy + b.y * drawH,
       w: b.w * drawW,
-      h: b.h * drawH
+      h: b.w * drawW * a.h / a.w
     };
   },
 
@@ -458,7 +496,7 @@ export const PDFModule = {
     pdf.addImage(tinted, 'PNG', ox, oy, drawW, drawH);
 
     // Estampas visíveis deste lado, posicionadas pela posição relativa (rel)
-    const pdfRect = this.getPdfShirtRect(ox, oy, drawW, drawH, side);
+    const pdfRect = this.getPdfShirtRect(ox, oy, drawW, drawH, side, orderData.category);
     for (const s of orderData.stamps.filter(x => !x.hidden && x.side === side)) {
       if (!s.rel) continue;
       const src = s.pdfRenderDataURL || s.previewDataURL || s.dataURL;
@@ -695,13 +733,22 @@ export const PDFModule = {
     const finalY2  = pdf.lastAutoTable ? pdf.lastAutoTable.finalY : 18;
     let afterMeta  = Math.max(finalY1, finalY2) + 10;
 
-    const stampRows = allVisible.map(s => [s.name || '(sem nome)', s.side, (s.cm || 0).toFixed(0) + ' cm']);
+    // Tamanho final (largura × altura); no Infantil/Juvenil também a medida infantil
+    const f = v => String(v).replace('.', ',');
+    const areaMax = PreviewGeom.area(orderData.category);
+    const stampRows = allVisible.map(s => {
+      const m = PreviewGeom.medidas(s, orderData.category);
+      const tam = m.infantil
+        ? `${areaMax.nome}: ${f(m.w)} x ${f(m.h)} cm\n${areaMax.infantil.nome}: ${f(m.infantil.w)} x ${f(m.infantil.h)} cm`
+        : `${f(m.w)} x ${f(m.h)} cm`;
+      return [s.name || '(sem nome)', s.side, tam];
+    });
     pdf.setFontSize(10);
     pdf.setTextColor(0, 0, 0);
     pdf.text('ESTAMPAS', 10, afterMeta - 2);
     pdf.autoTable({
       startY: afterMeta,
-      head: [['ESTAMPA', 'LADO', 'LARGURA']],
+      head: [['ESTAMPA', 'LADO', 'TAMANHO (L x A)']],
       body: stampRows.length ? stampRows : [['—', '—', '—']],
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [60, 60, 60], textColor: [255, 255, 255] },

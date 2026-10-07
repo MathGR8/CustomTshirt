@@ -27,6 +27,7 @@ import { UIModule }        from './ui/uiModule.js';
 import { NoticeModule }    from './ui/noticeModule.js';
 import { StampModule }     from './image/stampModule.js';
 import { EditModule }      from './image/editModule.js';
+import { ArtPickerModule } from './image/artPickerModule.js';
 import { ContactModule }   from './ui/contactModule.js';
 import { LoadingModule }   from './ui/loadingModule.js';
 import { HistoryModule }   from './core/historyModule.js';
@@ -49,6 +50,7 @@ window._modules = {
   NoticeModule,
   StampModule,
   EditModule,
+  ArtPickerModule,
   ContactModule,
   LoadingModule,
   HistoryModule,

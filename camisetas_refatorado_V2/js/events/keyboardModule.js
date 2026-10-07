@@ -45,6 +45,7 @@ const ATALHOS = [
   ['Ctrl + Z', 'Desfazer a última edição da imagem'],
   ['Delete', 'Apagar a área selecionada'],
   ['W', 'Ligar / desligar a varinha (apaga a cor clicada)'],
+  ['+ / − / 0', 'Zoom: aumentar / diminuir / ajustar à tela (ou Ctrl + rodinha do mouse)'],
   ['Ctrl + S  ou  Ctrl + Enter', 'Salvar a imagem editada'],
   ['Esc', 'Fechar o editor (pede confirmação se houver alterações)']
 ];
@@ -106,6 +107,9 @@ export const KeyboardModule = {
       else if (!mod && !e.altKey && !digitando(document.activeElement)) {
         if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); m.EditModule?._acao('apag'); }
         else if (kl === 'w') { e.preventDefault(); m.EditModule?._acao('varinha'); }
+        else if (k === '+' || k === '=') { e.preventDefault(); m.EditModule?._acao('zoom+'); }
+        else if (k === '-' || k === '_') { e.preventDefault(); m.EditModule?._acao('zoom-'); }
+        else if (k === '0') { e.preventDefault(); m.EditModule?._acao('zoom0'); }
       }
       return;
     }
@@ -185,8 +189,8 @@ export const KeyboardModule = {
       case '+': case '=': case '-': case '_': {
         e.preventDefault();
         const passo = (k === '+' || k === '=') ? 1 : -1;
-        s.cm = Math.max(5, Math.min(38, Math.round((s.cm ?? 20) + passo * (e.shiftKey ? 5 : 1))));
-        if (s.side === AppState.currentView) m.StampModule?.applyStampCmToNode(s);
+        s.cm = Math.max(5, Math.min(m.PreviewGeom?.maxCm(s) ?? 38, Math.round((s.cm ?? 20) + passo * (e.shiftKey ? 5 : 1))));
+        if (s.side === AppState.currentView) m.StampModule?.applyStampCmToNode(s, { manterCentro: true });
         const campo = document.querySelector('#stampsList .stampItem.active input[type="number"]');
         if (campo) campo.value = s.cm;
         m.HistoryModule?.commit('cm-' + s.id);

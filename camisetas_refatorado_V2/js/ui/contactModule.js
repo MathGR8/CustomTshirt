@@ -6,7 +6,8 @@
  *  - Oferecer o contato com o atendimento pelo WhatsApp (número e mensagem
  *    padrão em WHATSAPP, constants.js). O cliente pode editar a mensagem.
  *  - Juntar os arquivos do pedido: o PDF gerado e as artes enviadas
- *    (arquivo original e, se editada, a versão editada em alta: PNG + PDF).
+ *    (arquivo original e, se editada ou escolhida num PDF com várias artes,
+ *    essa versão em alta: PNG + PDF).
  *
  * Como os arquivos chegam ao atendimento:
  *  O link do WhatsApp (wa.me) só leva TEXTO — o navegador não consegue anexar
@@ -128,18 +129,18 @@ async function coletarArtes() {
 
       // Versão editada no site (girada, recortada, sem fundo…) em alta qualidade:
       // PNG com DPI gravado + PDF no tamanho real da estampa
-      if (s.original && !vistos.has(s.dataURL)) {
+      if ((s.original || s.recorteInicial) && !vistos.has(s.dataURL)) {
         vistos.add(s.dataURL);
         const alta = await window._modules?.EditModule?.exportarAltaQualidade(s).catch(e => {
           Logger.warn('UI', 'Arte editada em alta falhou: ' + e.message);
           return null;
         });
         if (alta) {
-          arquivos.push(new File([alta.png], nomeUnico(`${prefixo}${base}-editada.png`), { type: 'image/png' }));
-          if (alta.pdf) arquivos.push(new File([alta.pdf], nomeUnico(`${prefixo}${base}-editada.pdf`), { type: 'application/pdf' }));
+          arquivos.push(new File([alta.png], nomeUnico(`${prefixo}${base}${s.original ? '-editada' : ''}.png`), { type: 'image/png' }));
+          if (alta.pdf) arquivos.push(new File([alta.pdf], nomeUnico(`${prefixo}${base}${s.original ? '-editada' : ''}.pdf`), { type: 'application/pdf' }));
         } else {
           const blob = await dataUrlParaBlob(s.dataURL);
-          arquivos.push(new File([blob], nomeUnico(`${prefixo}${base}-editada.png`), { type: 'image/png' }));
+          arquivos.push(new File([blob], nomeUnico(`${prefixo}${base}${s.original ? '-editada' : ''}.png`), { type: 'image/png' }));
         }
       }
     }

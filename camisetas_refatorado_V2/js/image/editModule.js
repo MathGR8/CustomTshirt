@@ -15,6 +15,8 @@
  *  - Com uma área selecionada, fundo, varinha e cores valem só dentro dela
  *  - Desfazer, restaurar o original, cancelar e salvar
  *  - Fechar com alterações não salvas (✕ ou Esc) pede confirmação
+ *  - Zoom: botões − / + / Ajustar, Ctrl + rodinha do mouse, teclas + − 0 e
+ *    "pinça" com dois dedos no celular (dois dedos também arrastam a imagem)
  *
  * Como funciona: a imagem é desenhada num <canvas>; cada ferramenta cria um
  * novo canvas e o anterior vai para a pilha de "desfazer". Ao salvar, a imagem
@@ -368,7 +370,14 @@ const HTML = `
 <div class="editHead"><div><strong>Editar estampa</strong><span id="editInfo"></span></div>
   <button type="button" data-op="cancel" class="editClose" aria-label="Fechar sem salvar" title="Fechar sem salvar">✕</button></div>
 <div class="editBody">
-  <div class="editStage"><div class="editWrap" id="editWrap"><canvas id="editCanvas"></canvas><div id="editSel"><i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i><i data-h="e"></i><i data-h="se"></i><i data-h="s"></i><i data-h="sw"></i><i data-h="w"></i></div></div></div>
+  <div class="editStageBox">
+    <div class="editStage" id="editStage"><div class="editWrap" id="editWrap"><canvas id="editCanvas"></canvas><div id="editSel"><i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i><i data-h="e"></i><i data-h="se"></i><i data-h="s"></i><i data-h="sw"></i><i data-h="w"></i></div></div></div>
+    <div class="editZoom" role="group" aria-label="Zoom">
+      <button type="button" data-op="zoom-" title="Diminuir zoom (−)" aria-label="Diminuir zoom">−</button>
+      <button type="button" data-op="zoom0" id="editZoomV" title="Ajustar à tela (0)">100%</button>
+      <button type="button" data-op="zoom+" title="Aumentar zoom (+)" aria-label="Aumentar zoom">+</button>
+    </div>
+  </div>
   <div class="editTools">
     <fieldset><legend>Fundo</legend>
       <div class="editRow"><button type="button" data-op="fundo" class="editMain">✨ Remover fundo</button>
@@ -472,16 +481,41 @@ function montar() {
     return { x: lim((e.clientX - r.left) * cv.width / r.width, 0, cv.width),
              y: lim((e.clientY - r.top) * cv.height / r.height, 0, cv.height) };
   };
+  // Dedos/ponteiros na tela (dois dedos = zoom e arrastar a imagem)
+  const dedos = new Map();
+  let pinca = null;
+  const meio = () => { const [a, b] = [...dedos.values()]; return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) }; };
   wrap.addEventListener('pointerdown', e => {
+    dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try { wrap.setPointerCapture(e.pointerId); } catch { /* ponteiro já liberado */ }
+    e.preventDefault();
+    if (dedos.size === 2) {
+      // Começou uma pinça: desfaz o que o primeiro dedo começou (seleção/varinha)
+      if (ed.ini) { ed.crop = ed.ini.crop; ed.ini = null; mostrarSelecao(); }
+      ed.varinhaEm = null;
+      const m = meio();
+      pinca = { d0: m.d || 1, z0: ed.zoom, ult: m };
+      return;
+    }
+    if (dedos.size > 2 || pinca) return;
     const p = pt(e);
-    if (ed.varinha) { e.preventDefault(); return usarVarinha(p); }
+    // Varinha: aplica ao soltar (se não virou pinça nem arrasto)
+    if (ed.varinha) { ed.varinhaEm = { p, x: e.clientX, y: e.clientY }; return; }
     const modo = ed.crop ? alvoSelecao(p) : null;
     ed.ini = { p, modo: modo || 'novo', crop: ed.crop ? { ...ed.crop } : null };
     if (!modo) ed.crop = null;
-    wrap.setPointerCapture(e.pointerId);
-    e.preventDefault();
   });
   wrap.addEventListener('pointermove', e => {
+    if (dedos.has(e.pointerId)) dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinca) {
+      if (dedos.size < 2) return;
+      const m = meio(), st = $('editStage');
+      st.scrollLeft -= m.x - pinca.ult.x; // arrasta com os dois dedos
+      st.scrollTop  -= m.y - pinca.ult.y;
+      pinca.ult = m;
+      zoomPara(pinca.z0 * m.d / pinca.d0, m.x, m.y);
+      return;
+    }
     const p = pt(e);
     if (ed.varinha) { wrap.style.cursor = 'cell'; return; }
     if (!ed.ini) { wrap.style.cursor = CURSORES[ed.crop ? alvoSelecao(p) : ''] || 'crosshair'; return; }
@@ -505,10 +539,22 @@ function montar() {
     }
     mostrarSelecao();
   });
-  const soltar = () => {
+  const soltar = e => {
+    dedos.delete(e.pointerId);
+    if (pinca) { if (!dedos.size) pinca = null; return; }
+    const v = ed.varinhaEm;
+    ed.varinhaEm = null;
+    if (v && e.type === 'pointerup' && Math.hypot(e.clientX - v.x, e.clientY - v.y) < 10) usarVarinha(v.p);
     ed.ini = null;
     if (ed.crop && (ed.crop.w < 4 || ed.crop.h < 4)) { ed.crop = null; mostrarSelecao(); }
   };
+  // Ctrl + rodinha (ou pinça no touchpad) = zoom no ponto do mouse
+  $('editStage').addEventListener('wheel', e => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    zoomPara(ed.zoom * Math.pow(1.0015, -e.deltaY), e.clientX, e.clientY);
+  }, { passive: false });
+  window.addEventListener('resize', () => { if (ed?.dlg?.open) ajustarZoom(); });
   wrap.addEventListener('pointerup', soltar);
   wrap.addEventListener('pointercancel', soltar);
   return dlg;
@@ -556,7 +602,53 @@ function desenhar() {
   cv.style.filter = '';
   $('editBr').value = $('editCt').value = $('editSa').value = 1;
   $('editInfo').textContent = ` — ${w.width} × ${w.height} px`;
+  ajustarZoom();
+}
+
+// ---------- Zoom ----------
+const ZOOM_MAX = 16; // até 16× o tamanho "ajustado à tela"
+
+/** Escala em que a imagem inteira cabe na área (zoom 1 = ajustada). */
+function escalaAjuste() {
+  const st = $('editStage'), cv = $('editCanvas');
+  const cs = getComputedStyle(st);
+  // offsetWidth (com borda, sem descontar barras de rolagem): o ajuste não muda quando elas aparecem
+  const w = st.offsetWidth  - 3 - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const h = st.offsetHeight - 3 - parseFloat(cs.paddingTop)  - parseFloat(cs.paddingBottom);
+  return Math.max(0.01, Math.min(w / cv.width, h / cv.height));
+}
+
+/** Aplica o zoom atual ao tamanho do canvas na tela. */
+function ajustarZoom() {
+  const cv = $('editCanvas');
+  ed.zoom = lim(ed.zoom || 1, 1, ZOOM_MAX);
+  const k = escalaAjuste() * ed.zoom;
+  cv.style.width  = cv.width  * k + 'px';
+  cv.style.height = cv.height * k + 'px';
+  $('editZoomV').textContent = ed.zoom === 1 ? 'Ajustar' : Math.round(k * 100) + '%';
+  $('editZoomV').title = ed.zoom === 1 ? 'Tamanho ajustado à tela' : 'Voltar a ajustar à tela (0)';
+  $('editStage').classList.toggle('comZoom', ed.zoom > 1);
+  cv.classList.toggle('pixelado', k >= 3); // zoom alto: mostra os pixels de verdade (bom para a varinha)
   mostrarSelecao();
+}
+
+/**
+ * Muda o zoom mantendo parado o ponto da imagem sob (cx, cy) (coordenadas
+ * da tela); sem ponto, usa o centro da área visível.
+ */
+function zoomPara(z, cx, cy) {
+  const st = $('editStage'), cv = $('editCanvas');
+  z = lim(z, 1, ZOOM_MAX);
+  if (Math.abs(z - ed.zoom) < 0.001) return;
+  const rs = st.getBoundingClientRect();
+  if (cx == null) { cx = rs.left + rs.width / 2; cy = rs.top + rs.height / 2; }
+  const r0 = cv.getBoundingClientRect();
+  const fx = (cx - r0.left) / r0.width, fy = (cy - r0.top) / r0.height; // ponto na imagem (0–1)
+  ed.zoom = z;
+  ajustarZoom();
+  const r1 = cv.getBoundingClientRect();
+  st.scrollLeft += (r1.left + fx * r1.width) - cx;
+  st.scrollTop  += (r1.top  + fy * r1.height) - cy;
 }
 
 /**
@@ -660,8 +752,9 @@ export const EditModule = {
       }
       alternarVarinha(false);
       esconderConfirmacao();
+      ed.zoom = 1;
+      if (!dlg.open) dlg.showModal(); // antes de desenhar: o ajuste precisa do tamanho da tela
       desenhar();
-      if (!dlg.open) dlg.showModal();
     } catch (err) {
       Logger.error('IMAGE', 'Não foi possível abrir o editor: ' + err.message, err);
       NoticeModule.show('error', 'Não foi possível abrir a imagem para edição.');
@@ -701,6 +794,9 @@ export const EditModule = {
         return aplicar(aparar ? Ops.aparar(res.canvas) : res.canvas, false, { op: 'fundo', tol, ligados, r, aparar });
       }
       case 'varinha': return alternarVarinha();
+      case 'zoom+': return zoomPara(ed.zoom * 1.5);
+      case 'zoom-': return zoomPara(ed.zoom / 1.5);
+      case 'zoom0': ed.zoom = 1; return ajustarZoom();
       case 'pb':   return aplicar(Ops.pretoBranco(w, ed.crop), false, { op: 'pb', r });
       case 'inv':  return aplicar(Ops.inverter(w, ed.crop), false, { op: 'inv', r });
       case 'pin': {
@@ -750,7 +846,8 @@ export const EditModule = {
     const fy = ed.work.height / ed.alturaInicial;
     const cmAntes = s.cm ?? 20;
     const cmIdeal = cmAntes * fx;
-    s.cm = Math.round(Utils.clampCm(cmIdeal) * 10) / 10;
+    // Limite da área de impressão da camiseta (largura e altura) para a nova proporção
+    s.cm = Math.round(Utils.clampCm(cmIdeal, PreviewGeom.maxCm(ed.work.height / ed.work.width)) * 10) / 10;
     const limitada = cmIdeal > s.cm + 0.5;
     const k = s.cm / cmIdeal; // < 1 só quando a largura foi limitada
 
@@ -807,7 +904,9 @@ export const EditModule = {
     const cm = s.cm ?? 20;
     let c = null;
 
-    if (s.file && s.edicoes && PDFModule) {
+    // Passos a refazer: os da edição ou nenhum (arte só recortada de um PDF com várias)
+    const passos = s.edicoes || (!s.original && s.recorteInicial ? [] : null);
+    if (s.file && passos && PDFModule) {
       try {
         const tipo = PDFModule.detectFileType(s.file);
         // Arte de partida = a mesma que o editor abriu na 1ª edição
@@ -817,9 +916,11 @@ export const EditModule = {
           // Quanto ampliar para a arte final ficar com ~300 DPI, sem passar do limite de memória
           let k = (cm / 2.54 * DPI_ALVO) / (s.width || base.width);
           k = Math.min(k, Math.sqrt(AREA_MAX() / (base.width * base.height)));
-          if (k > 1.05) {
+          // Arte recortada de um PDF com várias: renderiza só a página e o pedaço dela
+          if (k > 1.05 || (tipo === 'pdf' && s.recorteInicial)) {
             const r = tipo === 'pdf'
-              ? await PDFModule.convertPdfToImageDataURL(s.file, { scale: 3 * k, transparent: true, asCanvas: true })
+              ? await PDFModule.convertPdfToImageDataURL(s.file, { scale: 3 * Math.max(1, k), transparent: true, asCanvas: true,
+                                                                   page: s.pagina || 1, recorte: s.recorteInicial })
               : await PDFModule.rasterizeSvgFile(s.file, { scale: 2 * k, asCanvas: true });
             fonte = r.canvas;
           }
@@ -831,7 +932,7 @@ export const EditModule = {
             fonte.getContext('2d').drawImage(img, 0, 0);
           }
         }
-        if (fonte) c = s.edicoes.reduce(refazerPasso, fonte);
+        if (fonte) c = passos.reduce(refazerPasso, fonte);
       } catch (err) {
         Logger.warn('IMAGE', 'Alta qualidade indisponível, usando a imagem do editor: ' + err.message);
         c = null;

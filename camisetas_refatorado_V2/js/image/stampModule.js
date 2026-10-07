@@ -19,7 +19,7 @@
  */
 
 import { AppState } from '../core/appState.js';
-import { MAX_PRINT_WIDTH_CM, MAX_FILE_SIZE_MB, CHEST_PRESET } from '../core/constants.js';
+import { MAX_FILE_SIZE_MB, CHEST_PRESET } from '../core/constants.js';
 import { Logger } from '../core/logger.js';
 import { Utils } from '../utils/helpers.js';
 import { NoticeModule } from '../ui/noticeModule.js';
@@ -72,33 +72,72 @@ export const StampModule = {
       const side = document.getElementById('stampLocation')?.value || 'Frente';
       const cm   = Utils.clampCm(parseFloat(document.getElementById('stampSize')?.value || '20'));
 
-      const stamp = await PDFModule.createStampFromFile(file, { side, cm, name: file.name });
-      // Arquivo original enviado pelo cliente (só em memória): vai junto no envio ao atendimento
-      stamp.file = file;
-      // Espera a imagem decodificar: sem isso a altura é 0 ao centralizar
-      await stamp.node.decode().catch(() => {});
-
-      if (stamp.side === AppState.currentView) {
-        document.getElementById("preview")?.appendChild(stamp.node);
-        this.applyStampCmToNode(stamp);
-        this.centerNodeInsideShirtBox(stamp.node);
-        this.applySubLocationPreset(stamp, document.getElementById('subLocation')?.value);
-        this.updateStampRel(stamp);
+      // PDF com várias páginas ou várias artes: o cliente escolhe quais usar
+      let escolhas = null;
+      const { ArtPickerModule } = window._modules || {};
+      if (ext === 'pdf' && ArtPickerModule) {
+        try {
+          escolhas = await ArtPickerModule.talvezEscolher(file);
+        } catch (e) {
+          Logger.warn('IMAGE', 'Não foi possível procurar várias artes no PDF: ' + e.message);
+        }
+        if (escolhas === 'cancelar') { input.value = ''; return; }
       }
 
-      AppState.stamps.push(stamp);
-      this.setActiveStamp(stamp.id);
-      UIModule.syncUiState();
-      if (input) input.value = "";
-      window._modules?.HistoryModule?.commit('add-' + stamp.id);
+      if (escolhas) {
+        for (const o of escolhas) {
+          const url = o.canvas.toDataURL('image/png');
+          const normalized = { name: o.nome, sourceType: 'pdf', dataURL: url, previewDataURL: url,
+                               pdfRenderDataURL: url, width: o.canvas.width, height: o.canvas.height };
+          const stamp = await PDFModule.createStampFromFile(file, { side, cm, name: o.nome, normalized });
+          // Página e pedaço do PDF (para a versão em alta qualidade)
+          stamp.pagina = o.pagina;
+          stamp.recorteInicial = o.recorte;
+          await this._colocarNova(stamp, file);
+        }
+        input.value = '';
+        NoticeModule.show('success', escolhas.length > 1
+          ? `${escolhas.length} artes adicionadas. Elas ficam uma sobre a outra: arraste cada uma para o lugar ou mude o lado.`
+          : `Arte "${escolhas[0].nome}" adicionada com sucesso.`);
+        return;
+      }
+
+      const stamp = await PDFModule.createStampFromFile(file, { side, cm, name: file.name });
+      await this._colocarNova(stamp, file);
+      input.value = '';
 
       NoticeModule.show('success', `Estampa "${file.name}" adicionada com sucesso.`);
-      Logger.info('IMAGE', `Estampa adicionada: ${file.name} (${cm} cm, lado: ${side})`);
+      Logger.info('IMAGE', `Estampa adicionada: ${file.name} (${stamp.cm} cm, lado: ${side})`);
 
     } catch (err) {
       Logger.error('IMAGE', 'Erro ao importar estampa: ' + err.message, err);
       NoticeModule.show('error', 'Erro ao importar a estampa: ' + err.message);
     }
+  },
+
+  /**
+   * Coloca no preview uma estampa recém-criada a partir de um arquivo.
+   * @private
+   */
+  async _colocarNova(stamp, file) {
+    stamp.cm = Utils.clampCm(stamp.cm, PreviewGeom.maxCm(stamp)); // dentro da área máxima
+    // Arquivo original enviado pelo cliente (só em memória): vai junto no envio ao atendimento
+    stamp.file = file;
+    // Espera a imagem decodificar: sem isso a altura é 0 ao centralizar
+    await stamp.node.decode().catch(() => {});
+
+    if (stamp.side === AppState.currentView) {
+      document.getElementById("preview")?.appendChild(stamp.node);
+      this.applyStampCmToNode(stamp);
+      this.centerNodeInsideShirtBox(stamp.node);
+      this.applySubLocationPreset(stamp, document.getElementById('subLocation')?.value);
+      this.updateStampRel(stamp);
+    }
+
+    AppState.stamps.push(stamp);
+    this.setActiveStamp(stamp.id);
+    UIModule.syncUiState();
+    window._modules?.HistoryModule?.commit('add-' + stamp.id);
   },
 
   /**
@@ -179,13 +218,33 @@ export const StampModule = {
    * Aplica a largura em centímetros ao nó DOM da estampa, convertendo para pixels.
    * Se houver posição pendente (estampa restaurada de um item), posiciona por ela.
    * @param {Object} s - Objeto da estampa.
+   * @param {{manterCentro?: boolean}} [opc] - manterCentro: o cliente mudou o
+   *   tamanho; a estampa cresce/diminui a partir do centro e continua dentro
+   *   da área de impressão (antes crescia para a direita e para baixo).
    */
-  applyStampCmToNode(s) {
+  applyStampCmToNode(s, opc = {}) {
     const pxPerCm = PreviewGeom.getPxPerCmPreview();
     if (!pxPerCm || !s.node) return;
-    const cm = Utils.clampCm(s.cm ?? 20);
-    s.node.style.width  = (cm * pxPerCm) + 'px';
-    s.node.style.height = 'auto';
+    const n = s.node;
+    const pronta = opc.manterCentro && !s.pendingRel && n.parentNode && n.complete && n.naturalWidth && n.offsetWidth && n.style.left;
+    const antes = pronta && { cx: parseFloat(n.style.left) + n.offsetWidth / 2, cy: parseFloat(n.style.top) + n.offsetHeight / 2 };
+    // Nunca passa da área máxima da camiseta (largura e altura)
+    const cm = s.cm = Utils.clampCm(s.cm ?? 20, PreviewGeom.maxCm(s));
+    n.style.width  = (cm * pxPerCm) + 'px';
+    const info = document.querySelector(`#stampsList .stampItem[data-id="${s.id}"] .stampSizeInfo`);
+    if (info) info.innerHTML = _textoMedidas(s);
+    n.style.height = 'auto';
+    if (antes) {
+      const shirt = PreviewGeom.getRenderedShirtRect();
+      const prev  = document.getElementById('preview')?.getBoundingClientRect();
+      if (shirt && prev) {
+        const bx = shirt.left - prev.left, by = shirt.top - prev.top;
+        const w = n.offsetWidth, h = n.offsetHeight;
+        const caber = (v, a, b) => (b < a ? a : Math.max(a, Math.min(b, v)));
+        n.style.left = caber(antes.cx - w / 2, bx, bx + shirt.width  - w) + 'px';
+        n.style.top  = caber(antes.cy - h / 2, by, by + shirt.height - h) + 'px';
+      }
+    }
     if (s.pendingRel) {
       // Ainda não dá para posicionar (lado oculto ou imagem carregando): mantém o rel salvo
       if (!this._placeFromRel(s, s.pendingRel)) return;
@@ -211,9 +270,26 @@ export const StampModule = {
   },
 
   /**
-   * Centraliza um nó DOM dentro da área de impressão da camiseta.
-   * @param {HTMLElement} node - Elemento DOM da estampa.
+   * Reduz as estampas que passaram da área máxima (ex.: trocou de Masculina
+   * 38 × 42 cm para Feminina 30 × 35 cm) e avisa o cliente.
    */
+  limitarEstampas() {
+    const a = PreviewGeom.area();
+    const reduzidas = [];
+    AppState.stamps.forEach(s => {
+      const max = PreviewGeom.maxCm(s);
+      if ((s.cm ?? 20) > max) {
+        s.cm = max;
+        reduzidas.push(s.name || 'Estampa');
+        if (s.side === AppState.currentView) this.applyStampCmToNode(s, { manterCentro: true });
+      }
+    });
+    this.renderStampsList();
+    if (reduzidas.length) {
+      NoticeModule.show('info', `${reduzidas.length > 1 ? 'Estampas reduzidas' : `Estampa "${reduzidas[0]}" reduzida`} para caber na área máxima da camiseta ${a.nome} (${a.w} × ${a.h} cm).`);
+    }
+  },
+
   /**
    * Aplica o pré-posicionamento escolhido em "Tamanho rápido".
    * Peito: 10 cm, no lado direito da visualização e um pouco abaixo do topo
@@ -231,6 +307,10 @@ export const StampModule = {
     DragModule.updateStampPosition(s, CHEST_PRESET.centerX * shirt.width - w / 2, CHEST_PRESET.top * shirt.height);
   },
 
+  /**
+   * Centraliza um nó DOM dentro da área de impressão da camiseta.
+   * @param {HTMLElement} node - Elemento DOM da estampa.
+   */
   centerNodeInsideShirtBox(node) {
     const shirtRect  = PreviewGeom.getRenderedShirtRect();
     const previewBox = document.getElementById("preview")?.getBoundingClientRect();
@@ -289,6 +369,8 @@ export const StampModule = {
     const copia = AppState.stamps[AppState.stamps.length - 1];
     if (copia) {
       copia.file = s.file; copia.original = s.original; copia.edicoes = s.edicoes;
+      copia.pagina = s.pagina; copia.recorteInicial = s.recorteInicial;
+      copia.width = s.width; copia.height = s.height;
       window._modules?.HistoryModule?.commit('add-' + copia.id); // mesma chave: junta com o passo da cópia
     }
   },
@@ -380,6 +462,7 @@ export const StampModule = {
     AppState.stamps.forEach(s => {
       const item = document.createElement('div');
       item.className = 'stampItem' + (s.id === AppState.activeStampId ? ' active' : '');
+      item.dataset.id = s.id;
 
       const thumb = document.createElement('img');
       thumb.className = 'stampThumb';
@@ -402,18 +485,32 @@ export const StampModule = {
         window._modules?.HistoryModule?.commit('side-' + s.id);
       };
 
+      const maxCm = PreviewGeom.maxCm(s);
       const cmInput = document.createElement('input');
       cmInput.type  = 'number';
       cmInput.min   = 5;
-      cmInput.max   = MAX_PRINT_WIDTH_CM;
+      cmInput.max   = maxCm;
       cmInput.step  = 1;
       cmInput.value = (s.cm ?? 20);
       cmInput.inputMode = 'decimal';
       cmInput.onchange = () => {
-        s.cm = Utils.clampCm(parseFloat(cmInput.value || '20'));
-        if (s.side === AppState.currentView) this.applyStampCmToNode(s);
+        const pedido = parseFloat(cmInput.value || '20');
+        const max = PreviewGeom.maxCm(s);
+        s.cm = Utils.clampCm(pedido, max);
+        if (pedido > max) {
+          const a = PreviewGeom.area();
+          NoticeModule.show('info', `O máximo para esta arte é ${String(max).replace('.', ',')} cm de largura (área da camiseta ${a.nome}: ${a.w} × ${a.h} cm).`);
+        }
+        cmInput.value = s.cm;
+        if (s.side === AppState.currentView) this.applyStampCmToNode(s, { manterCentro: true });
+        medidas.innerHTML = _textoMedidas(s);
         window._modules?.HistoryModule?.commit('cm-' + s.id);
       };
+
+      // Tamanho final (largura × altura) e, no Infantil/Juvenil, a medida infantil
+      const medidas = document.createElement('div');
+      medidas.className = 'stampSizeInfo';
+      medidas.innerHTML = _textoMedidas(s);
 
       const visToggle = document.createElement('input');
       visToggle.type    = 'checkbox';
@@ -442,7 +539,7 @@ export const StampModule = {
       delBtn.classList.add('btn-danger');
       btns.append(dupBtn, editBtn, delBtn);
 
-      item.append(thumb, meta, btns);
+      item.append(thumb, meta, medidas, btns);
       item.onclick = e => {
         if (
           e.target.tagName !== 'BUTTON' &&
@@ -543,4 +640,14 @@ function _mkBtn(t, fn) {
   b.textContent = t;
   b.onclick = e => { e.stopPropagation(); fn(); };
   return b;
+}
+
+/** Texto das medidas da estampa: "25 × 28,6 cm" (+ infantil, quando houver). */
+function _textoMedidas(s) {
+  const m = PreviewGeom.medidas(s), a = PreviewGeom.area();
+  const f = v => String(v).replace('.', ',');
+  const max = `máx. ${a.w} × ${a.h} cm`;
+  if (!m.infantil) return `📐 ${f(m.w)} × ${f(m.h)} cm <span>(${max})</span>`;
+  return `📐 <b>${a.nome}:</b> ${f(m.w)} × ${f(m.h)} cm <span>(${max})</span><br>` +
+         `📐 <b>${a.infantil.nome}:</b> ${f(m.infantil.w)} × ${f(m.infantil.h)} cm <span>(reduzida automaticamente)</span>`;
 }
