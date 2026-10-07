@@ -849,7 +849,14 @@ button.editClose:hover, button.dlgClose:hover { background: #f1f1f1; border-colo
 .editHint { font-size: 11px; color: var(--color-text-muted); margin: 2px 0; }
 .editSlide { display: flex; align-items: center; justify-content: space-between; font-size: 12px; gap: 8px; }
 .editSlide input { flex: 1; }
+.editSlide output { min-width: 24px; text-align: right; color: var(--color-text-muted); }
+.editCheck { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; margin: 4px 0; line-height: 1.3; cursor: pointer; }
+.editCheck input { margin-top: 1px; }
+.editRow button.editMain { font-weight: 600; }
+.editRow button[aria-pressed="true"] { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
 .editFoot { display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--color-border); }
+/* No computador a imagem fica parada enquanto as ferramentas rolam ao lado */
+@media (min-width: 701px) { .editStage { position: sticky; top: 0; align-self: flex-start; min-height: 300px; } }
 @media (max-width: 700px) { .editBody { flex-direction: column; } .editTools { width: auto; } }
 
 /* =============================================
