@@ -87,6 +87,7 @@ export const PDFModule = {
    * @param {File} file - Arquivo SVG.
    * @param {{ scale?: number }} [options={}] - Opções de rasterização.
    * @param {number} [options.scale=2] - Fator de escala para a rasterização.
+   * @param {boolean} [options.asCanvas] - Devolve { canvas } em vez do dataURL.
    * @returns {Promise<{ dataURL: string, width: number, height: number }>}
    */
   async rasterizeSvgFile(file, options = {}) {
@@ -134,6 +135,7 @@ export const PDFModule = {
     ctx.clearRect(0, 0, canvasW, canvasH);
     ctx.drawImage(img, 0, 0, canvasW, canvasH);
 
+    if (options.asCanvas) return { canvas, width: canvasW, height: canvasH }; // sem gerar PNG (arte em alta)
     return { dataURL: canvas.toDataURL('image/png'), width: canvasW, height: canvasH };
   },
 
@@ -150,6 +152,7 @@ export const PDFModule = {
    * @param {{ scale?: number, transparent?: boolean }} [options={}] - Opções de renderização.
    * @param {number} [options.scale=3] - Fator de escala para a renderização.
    * @param {boolean} [options.transparent=false] - Se true, usa fundo transparente.
+   * @param {boolean} [options.asCanvas] - Devolve { canvas } em vez do dataURL.
    * @returns {Promise<{ dataURL: string, width: number, height: number }>}
    */
   async convertPdfToImageDataURL(file, options = {}) {
@@ -186,6 +189,7 @@ export const PDFModule = {
     // Libera a memória do documento PDF.js
     try { await pdfDoc.destroy(); } catch (_) { /* sem problema se falhar */ }
 
+    if (options.asCanvas) return { canvas, width: canvas.width, height: canvas.height }; // sem gerar PNG (arte em alta)
     return { dataURL: canvas.toDataURL("image/png"), width: canvas.width, height: canvas.height };
   },
 

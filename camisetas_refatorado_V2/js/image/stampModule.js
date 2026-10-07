@@ -288,7 +288,7 @@ export const StampModule = {
     // A cópia usa a mesma arte: mantém a referência ao arquivo original
     const copia = AppState.stamps[AppState.stamps.length - 1];
     if (copia) {
-      copia.file = s.file; copia.original = s.original;
+      copia.file = s.file; copia.original = s.original; copia.edicoes = s.edicoes;
       window._modules?.HistoryModule?.commit('add-' + copia.id); // mesma chave: junta com o passo da cópia
     }
   },

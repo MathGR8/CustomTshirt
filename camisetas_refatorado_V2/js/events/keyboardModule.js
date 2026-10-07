@@ -16,7 +16,7 @@
  *   Ctrl+S                            → salva o item no pedido
  *   ?                                 → mostra esta lista
  * Editor de imagem:
- *   Ctrl+Z → desfaz a última edição   Ctrl+S ou Ctrl+Enter → salvar   Esc → fechar
+ *   Ctrl+Z → desfaz a última edição   Ctrl+S ou Ctrl+Enter → salvar   Esc → fechar (confirma se houver alterações)
  *   Delete → apaga a área selecionada  W → liga/desliga a varinha
  *
  * No Mac, Cmd funciona no lugar de Ctrl. Desfazer remover mostra o aviso
@@ -46,7 +46,7 @@ const ATALHOS = [
   ['Delete', 'Apagar a área selecionada'],
   ['W', 'Ligar / desligar a varinha (apaga a cor clicada)'],
   ['Ctrl + S  ou  Ctrl + Enter', 'Salvar a imagem editada'],
-  ['Esc', 'Fechar o editor sem salvar']
+  ['Esc', 'Fechar o editor (pede confirmação se houver alterações)']
 ];
 
 /** O foco está num campo onde as teclas devem ser digitadas normalmente? */
