@@ -1,0 +1,11 @@
+// Configuração do Cloudflare (Workers com arquivos estáticos).
+// O Cloudflare roda "npx wrangler deploy", que publica a pasta abaixo como site.
+// O "name" precisa ser IGUAL ao nome do projeto/Worker criado no painel do Cloudflare.
+{
+  "name": "artrock-personalize",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    // Só a pasta do configurador vai para o ar (o resto do repositório não é publicado)
+    "directory": "./camisetas_refatorado_V2"
+  }
+}
