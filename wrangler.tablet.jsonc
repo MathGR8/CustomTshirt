@@ -1,0 +1,12 @@
+// Configuração do Cloudflare para o APP DO TABLET (pasta camisetas_tablet).
+// É um segundo site, separado do configurador original (wrangler.jsonc).
+// No Cloudflare, crie outro Worker a partir deste mesmo repositório e use como
+// comando de deploy:  npx wrangler deploy --config wrangler.tablet.jsonc
+// O "name" precisa ser IGUAL ao nome do Worker criado no painel.
+{
+  "name": "camisetas-tablet",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./camisetas_tablet"
+  }
+}
