@@ -1,13 +1,15 @@
 /**
  * Service worker: guarda o app e as bibliotecas para funcionar sem internet.
+ * As fontes do Google (textos na camiseta) também ficam guardadas.
  * As artes ficam no IndexedDB do tablet (não passam por aqui).
  * Ao publicar uma versão nova, troque VERSAO para os tablets baixarem os arquivos novos.
  */
-const VERSAO = 'camisetas-tablet-v3';
+const VERSAO = 'camisetas-tablet-v4';
 const APP = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/admin.js', 'js/catalog.js', 'js/config.js', 'js/db.js',
   'js/icons.js', 'js/order.js', 'js/shirt.js', 'js/ui.js', 'js/fontes.js',
+  'js/medidas.js', 'js/texto.js',
   'icons/icone-192.png', 'icons/icone-512.png'
 ];
 const LIBS = [
@@ -48,7 +50,7 @@ self.addEventListener('fetch', e => {
       caches.open(VERSAO).then(c => c.put(req, copia));
       return r;
     }).catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match('index.html'))));
-  } else if (url.hostname === 'cdnjs.cloudflare.com') {
+  } else if (url.hostname === 'cdnjs.cloudflare.com' || url.hostname === 'fonts.gstatic.com' || url.hostname === 'fonts.googleapis.com') {
     e.respondWith(caches.match(req).then(r => r || fetch(req).then(resp => {
       const copia = resp.clone();
       caches.open(VERSAO).then(c => c.put(req, copia));
