@@ -1,0 +1,319 @@
+/**
+ * @module admin
+ * @description Área do administrador (protegida por senha):
+ *  - Artes: importar arquivos/pasta/.zip, organizar temas, renomear, ocultar, apagar,
+ *           exportar e importar uma cópia do catálogo (para outro tablet)
+ *  - Pedidos: ver, baixar o PDF, apagar
+ *  - Configurações: nome da loja, frase, WhatsApp, senha, tempo de inatividade
+ *  - Ajuda: como preparar as artes do Corel, instalar o app e travar o tablet
+ */
+
+import { PADRAO } from './config.js';
+import { DB } from './db.js';
+import { icone } from './icons.js';
+import { $, $$, esc, aviso, janela, confirmar, pedirSenha, progressoJanela } from './ui.js';
+import { importar, urlDa, limparUrls, exportarCatalogo, importarCatalogo } from './catalog.js';
+import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo } from './order.js';
+import { modelo } from './shirt.js';
+
+let App = null;
+
+export async function abrirAdmin(app) {
+  App = app;
+  if (document.querySelector('.janelaAdmin')) return;
+  const senha = await pedirSenha();
+  if (senha == null) return;
+  if (senha !== String(App.S.cfg.senha)) { aviso('Senha incorreta.', 'erro'); return; }
+  const j = janela({ titulo: `${icone('engrenagem')} Administrador`, classe: 'janelaAdmin', html: `
+    <nav class="abas" role="tablist">
+      <button type="button" data-aba="artes" aria-selected="true">${icone('arte', 20)} Artes</button>
+      <button type="button" data-aba="pedidos" aria-selected="false">${icone('lista', 20)} Pedidos</button>
+      <button type="button" data-aba="config" aria-selected="false">${icone('engrenagem', 20)} Configurações</button>
+      <button type="button" data-aba="ajuda" aria-selected="false">${icone('ajuda', 20)} Ajuda</button>
+    </nav>
+    <div class="abaConteudo" id="abaConteudo"></div>` });
+  const ir = aba => {
+    $$('[data-aba]', j.el).forEach(b => b.setAttribute('aria-selected', String(b.dataset.aba === aba)));
+    ABAS[aba]($('#abaConteudo', j.el));
+  };
+  $$('[data-aba]', j.el).forEach(b => (b.onclick = () => ir(b.dataset.aba)));
+  ir('artes');
+  if (String(App.S.cfg.senha) === PADRAO.senha) aviso('Dica: troque a senha padrão (1234) em Configurações.');
+  await j.aoFechar;
+  await App.recarregarCatalogo();
+  if (App.S.tela === 'artes' || App.S.tela === 'inicio') App.irPara(App.S.tela);
+}
+
+const ABAS = {};
+
+// ---------- Artes ----------
+
+ABAS.artes = async el => {
+  const lista = await DB.artesResumo();
+  const temas = [...new Set(lista.map(a => a.tema))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const espaco = await DB.espaco();
+  const mb = b => (b / 1048576).toFixed(0) + ' MB';
+  const pasta = 'webkitdirectory' in document.createElement('input');
+  el.innerHTML = `
+    <div class="adminCaixa">
+      <h3>${icone('upload', 22)} Importar artes</h3>
+      <p class="textoAjuda">Aceita <b>PDF</b>, <b>CorelDRAW (.cdr)</b>, PNG, JPG, SVG e <b>.ZIP</b> com pastas. O tema de cada arte vem do nome da pasta (ex.: <i>Rock/banda.pdf</i> → tema <b>Rock</b>). Arquivos soltos usam o tema abaixo.</p>
+      <div class="formLinha">
+        <label class="campoPeq"><span>Tema dos arquivos soltos</span>
+          <input id="temaPadrao" list="listaTemas" placeholder="Ex.: Rock, Futebol, Religioso…" value="${esc(temas[0] || '')}"></label>
+        <datalist id="listaTemas">${temas.map(t => `<option value="${esc(t)}">`).join('')}</datalist>
+      </div>
+      <label class="checkLinha"><input type="checkbox" id="optFundo" checked> Remover fundo branco/de cor única (JPG e prévias do Corel)</label>
+      <label class="checkLinha"><input type="checkbox" id="optSeparar"> Separar artes que estão lado a lado na mesma página</label>
+      <div class="linhaBotoes">
+        <label class="btn btnEscuro btnGrande">${icone('upload')} Escolher arquivos<input type="file" id="inArquivos" multiple hidden></label>
+        ${pasta ? `<label class="btn btnClaro btnGrande">${icone('pasta')} Escolher uma pasta<input type="file" id="inPasta" webkitdirectory multiple hidden></label>` : ''}
+      </div>
+    </div>
+    <div class="adminCaixa">
+      <div class="caixaTopo">
+        <h3>${icone('arte', 22)} Catálogo <small>${lista.length} arte${lista.length === 1 ? '' : 's'} em ${temas.length} tema${temas.length === 1 ? '' : 's'}${espaco ? ` · ${mb(espaco.usage)} usados` : ''}</small></h3>
+        <div class="linhaBotoes">
+          <button type="button" class="btn btnClaro" id="exportar" ${lista.length ? '' : 'disabled'}>${icone('baixar', 20)} Exportar cópia</button>
+          <label class="btn btnClaro">${icone('upload', 20)} Importar cópia<input type="file" id="inCopia" accept=".zip,application/zip" hidden></label>
+        </div>
+      </div>
+      ${temas.length ? temas.map(t => {
+        const doTema = lista.filter(a => a.tema === t).sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+        return `<details class="temaAdmin" open>
+          <summary><strong>${esc(t)}</strong> <small>${doTema.length}</small>
+            <span class="summaryAcoes"><button type="button" class="btnIcone" data-renomear-tema="${esc(t)}" aria-label="Renomear tema">${icone('editar', 20)}</button>
+            <button type="button" class="btnIcone" data-apagar-tema="${esc(t)}" aria-label="Apagar tema">${icone('lixo', 20)}</button></span></summary>
+          <div class="gradeAdmin">${doTema.map(a => `
+            <button type="button" class="miniAdmin ${a.oculto ? 'oculta' : ''}" data-arte="${esc(a.id)}">
+              <span class="miniImg"><img data-id="${esc(a.id)}" alt=""></span>
+              <span class="miniNome">${esc(a.nome)}</span>
+              ${a.baixaRes ? '<span class="seloAviso">baixa resolução</span>' : ''}
+              ${a.oculto ? '<span class="seloAviso">oculta</span>' : ''}
+            </button>`).join('')}</div>
+        </details>`;
+      }).join('') : `<div class="vazio">${icone('pasta', 48)}<p>Nenhuma arte ainda. Use <b>Escolher arquivos</b> acima.</p></div>`}
+    </div>`;
+
+  // Miniaturas sob demanda
+  const obs = new IntersectionObserver(es => es.forEach(async e => {
+    if (!e.isIntersecting) return;
+    obs.unobserve(e.target);
+    const u = await urlDa(e.target.dataset.id);
+    if (u) e.target.src = u;
+  }), { rootMargin: '300px' });
+  $$('img[data-id]', el).forEach(i => obs.observe(i));
+
+  const rodarImportacao = async (files, comPasta) => {
+    if (!files.length) return;
+    const itens = [...files].map(f => ({ file: f, caminho: (comPasta && f.webkitRelativePath) || f.name }));
+    const p = progressoJanela('Importando artes');
+    try {
+      const r = await importar(itens, {
+        temaPadrao: $('#temaPadrao', el).value.trim() || 'Diversos',
+        separar: $('#optSeparar', el).checked,
+        removerFundo: $('#optFundo', el).checked
+      }, ({ feitos, total, arquivo }) => p.atualizar(total ? feitos / total : 0, arquivo ? `${feitos + 1} de ${total}: ${arquivo}` : 'Concluído'), p.sinal);
+      p.fechar();
+      limparUrls();
+      await App.recarregarCatalogo();
+      const j = janela({ titulo: `${icone('check')} Importação concluída`, classe: 'janelaPequena', html: `
+        <p class="textoConfirmar"><b>${r.importadas}</b> arte${r.importadas === 1 ? '' : 's'} pronta${r.importadas === 1 ? '' : 's'} de ${r.total} arquivo${r.total === 1 ? '' : 's'}.</p>
+        ${r.avisos.length ? `<details class="avisosImport"><summary>${r.avisos.length} aviso${r.avisos.length > 1 ? 's' : ''}</summary><ul>${r.avisos.map(a => `<li>${esc(a)}</li>`).join('')}</ul></details>` : ''}
+        <button type="button" class="btn btnEscuro btnLargo" data-fechar>Ok</button>` });
+      await j.aoFechar;
+      ABAS.artes(el);
+    } catch (e) {
+      p.fechar();
+      aviso('Erro na importação: ' + e.message, 'erro');
+    }
+  };
+  $('#inArquivos', el).onchange = e => rodarImportacao(e.target.files, false);
+  $('#inPasta', el) && ($('#inPasta', el).onchange = e => rodarImportacao(e.target.files, true));
+
+  $('#exportar', el).onclick = async () => {
+    const p = progressoJanela('Gerando a cópia do catálogo');
+    try {
+      const blob = await exportarCatalogo(pct => p.atualizar(pct / 100, `${Math.round(pct)}%`));
+      p.fechar();
+      baixar(blob, `catalogo-artes-${new Date().toISOString().slice(0, 10)}.zip`);
+      aviso('Cópia salva em Downloads. Use "Importar cópia" no outro tablet.');
+    } catch (e) { p.fechar(); aviso('Não foi possível exportar: ' + e.message, 'erro'); }
+  };
+  $('#inCopia', el).onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    const p = progressoJanela('Importando a cópia do catálogo');
+    try {
+      const n = await importarCatalogo(f);
+      p.fechar(); aviso(`${n} artes importadas.`); ABAS.artes(el);
+    } catch (err) { p.fechar(); aviso(err.message, 'erro'); }
+  };
+
+  $$('[data-arte]', el).forEach(b => (b.onclick = () => editarArte(b.dataset.arte, temas, () => ABAS.artes(el))));
+  $$('[data-renomear-tema]', el).forEach(b => (b.onclick = async e => {
+    e.preventDefault();
+    const velho = b.dataset.renomearTema;
+    const novo = await perguntarTexto('Novo nome do tema', velho);
+    if (!novo || novo === velho) return;
+    const todas = (await DB.todos('artes')).filter(a => a.tema === velho);
+    todas.forEach(a => (a.tema = novo));
+    await DB.salvarVarios('artes', todas);
+    ABAS.artes(el);
+  }));
+  $$('[data-apagar-tema]', el).forEach(b => (b.onclick = async e => {
+    e.preventDefault();
+    const t = b.dataset.apagarTema;
+    const ids = lista.filter(a => a.tema === t).map(a => a.id);
+    if (!(await confirmar(`Apagar o tema "${t}" e suas ${ids.length} artes do tablet? (os arquivos originais não são apagados)`, { sim: 'Apagar', perigo: true }))) return;
+    for (const id of ids) await DB.apagar('artes', id);
+    limparUrls(); ABAS.artes(el);
+  }));
+};
+
+function perguntarTexto(titulo, valor = '') {
+  const j = janela({ titulo, classe: 'janelaPequena', html: `
+    <input class="inputGrande" id="txt" value="${esc(valor)}">
+    <div class="linhaBotoes"><button type="button" class="btn btnClaro" data-fechar>Cancelar</button>
+      <button type="button" class="btn btnEscuro" id="okTxt">Salvar</button></div>` });
+  const inp = $('#txt', j.el); setTimeout(() => inp.select(), 50);
+  $('#okTxt', j.el).onclick = () => j.fechar(inp.value.trim());
+  inp.onkeydown = e => { if (e.key === 'Enter') j.fechar(inp.value.trim()); };
+  return j.aoFechar;
+}
+
+async function editarArte(id, temas, depois) {
+  const a = await DB.pegar('artes', id);
+  if (!a) return;
+  const url = await urlDa(id, 'previa');
+  const j = janela({ titulo: 'Editar arte', classe: 'janelaMedia', html: `
+    <div class="editarArte">
+      <div class="editarImg"><img src="${url}" alt=""></div>
+      <div class="editarCampos">
+        <label class="campoPeq"><span>Nome que o cliente vê</span><input id="eNome" value="${esc(a.nome)}"></label>
+        <label class="campoPeq"><span>Tema</span><input id="eTema" list="eTemas" value="${esc(a.tema)}"></label>
+        <datalist id="eTemas">${temas.map(t => `<option value="${esc(t)}">`).join('')}</datalist>
+        <label class="checkLinha"><input type="checkbox" id="eOculta" ${a.oculto ? 'checked' : ''}> Ocultar dos clientes</label>
+        <p class="textoAjuda">Arquivo: ${esc(a.arquivo)}${a.pagina > 1 ? ` (página ${a.pagina})` : ''} · ${a.w}×${a.h} px${a.baixaRes ? ' · <b>prévia do Corel em baixa resolução</b> — exporte em PDF para melhorar' : ''}</p>
+        <div class="linhaBotoes">
+          <button type="button" class="btn btnClaro btnPerigoTexto" id="eApagar">${icone('lixo', 20)} Apagar</button>
+          <button type="button" class="btn btnEscuro" id="eSalvar">${icone('check', 20)} Salvar</button>
+        </div>
+      </div>
+    </div>` });
+  $('#eSalvar', j.el).onclick = async () => {
+    a.nome = $('#eNome', j.el).value.trim() || a.nome;
+    a.tema = $('#eTema', j.el).value.trim() || a.tema;
+    a.oculto = $('#eOculta', j.el).checked;
+    await DB.salvar('artes', a);
+    j.fechar(); depois();
+  };
+  $('#eApagar', j.el).onclick = async () => {
+    if (!(await confirmar(`Apagar "${a.nome}" do tablet?`, { sim: 'Apagar', perigo: true }))) return;
+    await DB.apagar('artes', id);
+    limparUrls(); j.fechar(); depois();
+  };
+}
+
+// ---------- Pedidos ----------
+
+ABAS.pedidos = async el => {
+  const lista = (await DB.todos('pedidos')).sort((a, b) => b.id - a.id);
+  el.innerHTML = `
+    <div class="adminCaixa">
+      <div class="caixaTopo"><h3>${icone('lista', 22)} Pedidos feitos neste tablet <small>${lista.length}</small></h3>
+        ${lista.length ? `<button type="button" class="btn btnClaro btnPerigoTexto" id="apagarTodos">${icone('lixo', 20)} Apagar todos</button>` : ''}</div>
+      ${lista.length ? `<div class="listaPedidos">${lista.map(p => {
+        const d = new Date(p.data), total = p.itens.reduce((s, it) => s + totalPecas(it), 0);
+        const img = Object.values(p.itens[0]?.imagens || {})[0];
+        return `<article class="pedidoAdmin">
+          ${img ? `<img src="${img}" alt="">` : ''}
+          <div class="pedidoInfo">
+            <strong>Nº ${numeroPedido(p.numero)} — ${esc(p.cliente?.nome || 'Sem nome')}</strong>
+            <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${p.cliente?.telefone ? ' · ' + esc(p.cliente.telefone) : ''}</small>
+            <small>${p.itens.map(it => modelo(it.modelo).nome).join(', ')} · ${total} peça${total === 1 ? '' : 's'}</small>
+          </div>
+          <div class="linhaBotoes">
+            <button type="button" class="btn btnEscuro" data-pdf="${p.id}">${icone('baixar', 20)} PDF</button>
+            <button type="button" class="btn btnClaro" data-copiar="${p.id}">${icone('lista', 20)} Copiar texto</button>
+            <button type="button" class="btnIcone" data-apagar="${p.id}" aria-label="Apagar pedido">${icone('lixo', 20)}</button>
+          </div>
+        </article>`;
+      }).join('')}</div>` : `<div class="vazio">${icone('lista', 48)}<p>Nenhum pedido ainda.</p></div>`}
+    </div>`;
+  const achar = id => lista.find(p => String(p.id) === String(id));
+  $$('[data-pdf]', el).forEach(b => (b.onclick = async () => {
+    b.disabled = true;
+    try { const p = achar(b.dataset.pdf); baixar(await pdfPedido(p, App.S.cfg.loja), `pedido-${numeroPedido(p.numero)}.pdf`); }
+    catch (e) { aviso('Não foi possível gerar o PDF: ' + e.message, 'erro'); }
+    b.disabled = false;
+  }));
+  $$('[data-copiar]', el).forEach(b => (b.onclick = async () => {
+    try { await navigator.clipboard.writeText(textoResumo(achar(b.dataset.copiar), App.S.cfg.loja)); aviso('Texto copiado.'); }
+    catch { aviso('Não foi possível copiar neste aparelho.', 'erro'); }
+  }));
+  $$('[data-apagar]', el).forEach(b => (b.onclick = async () => {
+    if (!(await confirmar('Apagar este pedido do tablet?', { sim: 'Apagar', perigo: true }))) return;
+    await DB.apagar('pedidos', +b.dataset.apagar); ABAS.pedidos(el);
+  }));
+  $('#apagarTodos', el) && ($('#apagarTodos', el).onclick = async () => {
+    if (!(await confirmar('Apagar TODOS os pedidos deste tablet?', { sim: 'Apagar todos', perigo: true }))) return;
+    await DB.limpar('pedidos'); ABAS.pedidos(el);
+  });
+};
+
+// ---------- Configurações ----------
+
+ABAS.config = el => {
+  const c = App.S.cfg;
+  el.innerHTML = `
+    <div class="adminCaixa formConfig">
+      <label class="campoPeq"><span>Nome da loja (aparece no topo e no PDF)</span><input id="cLoja" value="${esc(c.loja)}"></label>
+      <label class="campoPeq"><span>Frase da tela inicial</span><input id="cSlogan" value="${esc(c.slogan)}"></label>
+      <label class="campoPeq"><span>WhatsApp da loja (só números, com 55 e DDD). Vazio = sem botão de WhatsApp</span><input id="cZap" inputmode="numeric" value="${esc(c.whatsapp)}" placeholder="5512999999999"></label>
+      <label class="campoPeq"><span>Voltar ao início depois de quantos minutos parado</span><input id="cIdle" type="number" min="1" max="30" value="${c.inatividadeMin}"></label>
+      <label class="campoPeq"><span>Nova senha do administrador (deixe vazio para manter)</span><input id="cSenha" inputmode="numeric" maxlength="6" placeholder="4 a 6 números"></label>
+      <button type="button" class="btn btnEscuro btnGrande" id="cSalvar">${icone('check')} Salvar configurações</button>
+    </div>`;
+  $('#cSalvar', el).onclick = async () => {
+    const senha = $('#cSenha', el).value.trim();
+    if (senha && !/^\d{4,6}$/.test(senha)) return aviso('A senha deve ter de 4 a 6 números.', 'erro');
+    const nova = {
+      ...c,
+      loja: $('#cLoja', el).value.trim() || PADRAO.loja,
+      slogan: $('#cSlogan', el).value.trim() || PADRAO.slogan,
+      whatsapp: $('#cZap', el).value.replace(/\D/g, ''),
+      inatividadeMin: Math.max(1, Math.min(30, +$('#cIdle', el).value || 3)),
+      senha: senha || c.senha
+    };
+    await DB.salvarConfig(nova);
+    App.aplicarConfig(nova);
+    aviso('Configurações salvas.');
+    ABAS.config(el);
+  };
+};
+
+// ---------- Ajuda ----------
+
+ABAS.ajuda = el => {
+  el.innerHTML = `
+    <div class="adminCaixa textoLongo">
+      <h3>${icone('pasta', 22)} Como preparar as artes</h3>
+      <ol>
+        <li>Organize as artes em <b>pastas por tema</b> (ex.: <i>Rock</i>, <i>Futebol</i>, <i>Religioso</i>). O nome da pasta vira o tema no app.</li>
+        <li><b>Melhor formato: PDF.</b> No CorelDRAW: <i>Arquivo → Exportar</i> (ou <i>Publicar em PDF</i>) com fundo transparente. Cada página do PDF vira uma arte.</li>
+        <li>Arquivos <b>.cdr</b> também funcionam, mas o app usa a <b>prévia</b> que o Corel grava dentro do arquivo (resolução menor). Eles aparecem com o selo "baixa resolução" — exporte esses em PDF quando puder.</li>
+        <li>Para importar tudo de uma vez: compacte a pasta das artes em <b>.ZIP</b> no computador, copie para o tablet e escolha o .ZIP em <b>Escolher arquivos</b>.</li>
+        <li>Para usar o mesmo catálogo em outro tablet: <b>Exportar cópia</b> aqui e <b>Importar cópia</b> no outro.</li>
+      </ol>
+      <h3>${icone('camisa', 22)} Deixar o tablet como "totem"</h3>
+      <ol>
+        <li>Abra o site no Chrome (Android) ou Safari (iPad) e toque em <b>Adicionar à tela inicial</b>. O app abre em tela cheia, como um aplicativo.</li>
+        <li>Android: ative <b>Fixar app</b> (Configurações → Segurança → Fixar app). iPad: ative <b>Acesso Guiado</b> (Ajustes → Acessibilidade). Assim o cliente não sai do app.</li>
+        <li>Depois de aberto uma vez com internet, o app continua funcionando sem internet (as artes ficam no tablet).</li>
+      </ol>
+      <h3>${icone('cadeado', 22)} Acesso a esta área</h3>
+      <p>Toque <b>5 vezes</b> no nome da loja (canto superior esquerdo) ou segure o dedo nele por 2 segundos. Troque a senha em <b>Configurações</b>.</p>
+      <h3>${icone('lista', 22)} Pedidos</h3>
+      <p>Os pedidos ficam salvos neste tablet, na aba <b>Pedidos</b>, com o PDF para produção (imagens da frente/costas, tamanhos, nome do arquivo de cada arte e medidas em cm).</p>
+    </div>`;
+};
