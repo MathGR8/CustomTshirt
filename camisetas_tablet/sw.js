@@ -3,11 +3,11 @@
  * As artes ficam no IndexedDB do tablet (não passam por aqui).
  * Ao publicar uma versão nova, troque VERSAO para os tablets baixarem os arquivos novos.
  */
-const VERSAO = 'camisetas-tablet-v2';
+const VERSAO = 'camisetas-tablet-v3';
 const APP = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/admin.js', 'js/catalog.js', 'js/config.js', 'js/db.js',
-  'js/icons.js', 'js/order.js', 'js/shirt.js', 'js/ui.js',
+  'js/icons.js', 'js/order.js', 'js/shirt.js', 'js/ui.js', 'js/fontes.js',
   'icons/icone-192.png', 'icons/icone-512.png'
 ];
 const LIBS = [
@@ -41,6 +41,7 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  if (url.origin === location.origin && url.pathname.includes('/api/')) return; // busca/imagens: sempre da rede
   if (url.origin === location.origin) {
     e.respondWith(fetch(req).then(r => {
       const copia = r.clone();

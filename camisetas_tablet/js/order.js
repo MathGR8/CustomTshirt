@@ -8,6 +8,7 @@ import { modelo, areaImpressao, renderizar, carregarImagem } from './shirt.js';
 import { CORES } from './config.js';
 import { urlDa, lib } from './catalog.js';
 import { DB } from './db.js';
+import { qualidade, credito } from './fontes.js';
 
 const um = v => Math.round(v * 10) / 10;
 const f = v => String(um(v)).replace('.', ',');
@@ -88,7 +89,11 @@ export async function salvarPedido(itens, cliente) {
     for (const l of lados) imagens[l] = await imagemLado(it, l);
     pedido.itens.push({
       modelo: it.modelo, malha: it.malha, cor: it.cor, quantidades: { ...it.quantidades },
-      artes: it.artes.map(({ uid, ...a }) => ({ ...a, medidas: textoMedidas(it.modelo, a) })),
+      artes: it.artes.map(({ uid, url, ...a }) => ({
+        ...a, medidas: textoMedidas(it.modelo, a),
+        qualidade: qualidade(a)?.rotulo || null,
+        credito: a.fonte ? credito(a.fonte) : null
+      })),
       imagens
     });
   }
@@ -106,7 +111,7 @@ export function textoResumo(pedido, loja) {
     const cor = CORES[it.cor]?.nome || it.cor;
     const tam = Object.entries(it.quantidades).filter(([, n]) => n > 0).map(([t, n]) => `${t}×${n}`).join(', ');
     linhas.push('', `*${i + 1}) ${modelo(it.modelo).nome} · ${it.malha} · ${cor}*`, `Tamanhos: ${tam}`);
-    it.artes.forEach(a => linhas.push(`• ${a.lado}: ${a.nome} (${a.medidas})`));
+    it.artes.forEach(a => linhas.push(`• ${a.lado}: ${a.nome} (${a.medidas})${a.origem === 'cliente' ? ' — arte do cliente' : a.origem === 'internet' ? ' — imagem da internet' : ''}${a.qualidade ? ` · qualidade ${a.qualidade}` : ''}`));
   });
   const total = pedido.itens.reduce((s, it) => s + totalPecas(it), 0);
   linhas.push('', `Total: ${total} peça${total === 1 ? '' : 's'}`);
@@ -162,7 +167,11 @@ export async function pdfPedido(pedido, loja) {
     pdf.autoTable({
       startY: y, margin: { left: L / 2 + 2, right: M }, theme: 'grid',
       head: [['ARTE', 'LADO', 'TAMANHO (L × A)']],
-      body: it.artes.length ? it.artes.map(a => [`${a.nome}\n${a.tema} · ${a.arquivo}${a.pagina > 1 ? ' (pág. ' + a.pagina + ')' : ''}`, a.lado, a.medidas.replace(' · ', '\n')])
+      body: it.artes.length ? it.artes.map(a => [
+        a.origem === 'cliente' ? `${a.nome}\nARTE DO CLIENTE: ${a.arquivo}${a.qualidade ? '\nQualidade: ' + a.qualidade : ''}`
+          : a.origem === 'internet' ? `${a.nome}\nIMAGEM DA INTERNET${a.qualidade ? ' · ' + a.qualidade : ''}\n${a.credito || ''}`
+          : `${a.nome}\n${a.tema} · ${a.arquivo}${a.pagina > 1 ? ' (pág. ' + a.pagina + ')' : ''}`,
+        a.lado, a.medidas.replace(' · ', '\n')])
                             : [['Camiseta lisa (sem arte)', '—', '—']],
       styles: { fontSize: 8, cellPadding: 1.8 }, headStyles: { fillColor: [30, 30, 30] },
       columnStyles: { 0: { cellWidth: 40 } }

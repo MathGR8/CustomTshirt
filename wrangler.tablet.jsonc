@@ -6,7 +6,9 @@
 {
   "name": "camisetas-tablet",
   "compatibility_date": "2026-10-01",
+  "main": "./camisetas_tablet/worker/index.js",
   "assets": {
-    "directory": "./camisetas_tablet"
+    "directory": "./camisetas_tablet",
+    "binding": "ASSETS"
   }
 }

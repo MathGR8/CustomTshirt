@@ -116,9 +116,10 @@ button:disabled { cursor: default; opacity: .4; }
 @keyframes pulsar { 50% { box-shadow: 0 0 0 14px rgba(255,255,255,.08); } }
 
 /* ---------- Duas colunas (palco + painel) ---------- */
-.duasColunas { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(340px, 1fr); gap: 24px; padding: 20px 24px; min-height: 100%; }
+/* Camiseta grande; menu estreito ao lado */
+.duasColunas { display: grid; grid-template-columns: minmax(0, 1fr) clamp(300px, 29vw, 380px); gap: 16px; padding: 14px 16px; min-height: 100%; }
 .palco { position: relative; background: var(--palco); border-radius: var(--raio-g); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; min-height: 0; }
-.duasColunas .palco { position: sticky; top: 0; height: calc(100dvh - var(--topo) - var(--rodape) - 40px); }
+.duasColunas .palco { position: sticky; top: 0; height: calc(100dvh - var(--topo) - var(--rodape) - 28px); padding: 8px; }
 .palcoArea { flex: 1; width: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; }
 .palcoSvg { width: 100%; height: 100%; max-height: 100%; display: block; overflow: visible; }
 .palcoSvg image { cursor: grab; }
@@ -136,7 +137,7 @@ button:disabled { cursor: default; opacity: .4; }
 .segmento button[aria-pressed="true"] small { background: var(--branco); }
 .palcoCamiseta .segmento { margin-top: 10px; }
 .segmentoTopo { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 2; }
-.ajustar .palcoArea { padding-top: 60px; }
+.ajustar .palcoArea { padding-top: 54px; }
 
 /* Opções (cartões tocáveis) */
 .opcoes { display: grid; gap: 12px; }
@@ -382,7 +383,7 @@ input[type="range"]::-moz-range-thumb { width: 32px; height: 32px; border-radius
   .duasColunas { grid-template-columns: 1fr; gap: 16px; }
   /* A camiseta fica fixa no alto enquanto as opções rolam embaixo */
   .duasColunas { padding-top: 0; }
-  .duasColunas .palco { position: sticky; top: 0; z-index: 4; height: 44dvh; border-radius: 0 0 var(--raio-g) var(--raio-g); margin: 0 -24px; box-shadow: 0 8px 18px rgba(0,0,0,.08); }
+  .duasColunas .palco { position: sticky; top: 0; z-index: 4; height: 44dvh; border-radius: 0 0 var(--raio-g) var(--raio-g); margin: 0 -16px; box-shadow: 0 8px 18px rgba(0,0,0,.08); }
   .inicio { grid-template-columns: 1fr; grid-template-rows: 42% 1fr; }
   .inicioVitrine { order: -1; }
   .inicioTexto { padding: 30px 36px; gap: 20px; justify-content: flex-start; }
@@ -409,3 +410,112 @@ input[type="range"]::-moz-range-thumb { width: 32px; height: 32px; border-radius
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+
+/* =========================================================
+   Painel compacto (Camiseta e Ajustar): menos espaço, camiseta maior
+   ========================================================= */
+.duasColunas .painel { gap: 2px; padding: 2px 0 12px; }
+.duasColunas .tituloTela { font-size: 22px; }
+.duasColunas .subtitulo { margin: 14px 0 8px; font-size: 16px; }
+.duasColunas .bola { width: 26px; height: 26px; font-size: 13px; }
+.duasColunas .opcoes { gap: 8px; }
+.duasColunas .opcao { padding: 8px; border-radius: 14px; min-height: 52px; }
+.duasColunas .opcao strong { font-size: 15px; }
+.duasColunas .opcao small { font-size: 12px; }
+.duasColunas .opcaoCamisa { max-width: 72px; }
+.duasColunas .opcaoTexto { padding: 10px 12px; }
+.duasColunas .cores { gap: 10px 6px; }
+.duasColunas .cor { width: 74px; font-size: 13px; }
+.duasColunas .corBola { width: 56px; height: 56px; }
+.painelCompacto { gap: 8px !important; }
+.painelCompacto .arteAtual { padding: 8px; gap: 10px; }
+.painelCompacto .arteAtualImg { width: 56px; height: 56px; padding: 6px; border-radius: 12px; }
+.arteAtualNome { flex: 1; min-width: 0; }
+.arteAtualNome strong { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.painelCompacto .btnIcone { width: 46px; height: 46px; }
+.rotuloLinha { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 15px; }
+.rotuloLinha .medidas { margin: 0 0 0 auto; font-size: 15px; font-weight: 800; text-align: right; }
+.painelCompacto .tamanhoArte { gap: 8px; }
+.painelCompacto .tamanhoArte input[type="range"] { height: 48px; }
+.painelCompacto .btnRedondo { width: 50px; height: 50px; }
+.chipsPos { display: flex; gap: 6px; }
+.chipPos { flex: 1; min-height: 48px; border-radius: 14px; background: var(--branco); border: 2px solid var(--linha); font-weight: 700; font-size: 15px; }
+.chipPos:active { background: var(--fundo); }
+.painelCompacto .btnContorno { min-height: 52px; font-size: 16px; margin-top: 6px; }
+.painelCompacto .btnTexto { min-height: 44px; font-size: 15px; }
+.painelCompacto .notaInfantil { font-size: 13px; padding: 10px; margin-top: 4px; }
+
+/* ---------- Qualidade de impressão ---------- */
+.qualidade { display: flex; gap: 10px; align-items: flex-start; border-radius: 14px; padding: 10px 12px; font-size: 14px; line-height: 1.35; border: 2px solid var(--linha); background: var(--branco); }
+.qualidade b { display: block; }
+.qualidade span { color: var(--cinza-escuro); }
+.qualidade.grande { font-size: 15px; padding: 14px; }
+.qualidade .ic { margin-top: 1px; }
+.q-otima { border-color: var(--preto); }
+.q-otima .ic { color: var(--preto); }
+.q-boa .ic { color: #2f6b3a; }
+.q-media { border-color: #c9a227; background: #fffaf0; }
+.q-media .ic { color: #8a6a00; }
+.q-baixa { border-color: var(--perigo); background: #fff3f2; }
+.q-baixa .ic, .q-baixa b { color: var(--perigo); }
+.q-verificar .ic { color: var(--cinza-escuro); }
+.seloQualidade { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 10px; border: 1.5px solid var(--linha); background: var(--branco); margin: -2px 4px 0; }
+.seloQualidade.q-baixa { color: var(--perigo); }
+.alertaPedido { color: var(--perigo) !important; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+
+/* ---------- Fontes de arte (catálogo / enviar / buscar) ---------- */
+.galeriaCabeca { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 14px 24px 4px; }
+.galeriaCabeca .tituloTela { flex: 1 1 auto; font-size: 24px; }
+.segmentoFontes button { min-height: 50px; padding: 0 16px; }
+.fonteConteudo { display: flex; flex-direction: column; }
+.galeriaTopo { padding: 10px 24px 6px; }
+.galeriaTopo .busca { flex: 1 1 340px; }
+.temas { top: 76px; }
+
+.envio { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; padding: 14px 24px 28px; }
+.caixaEnvio { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; min-height: 340px; border: 3px dashed var(--cinza); border-radius: var(--raio-g); background: var(--branco); padding: 30px; cursor: pointer; transition: background .15s; }
+.caixaEnvio:active { background: var(--fundo); }
+.caixaEnvio strong { font-size: 24px; }
+.caixaEnvio span { color: var(--cinza-escuro); font-size: 16px; }
+.caixaEnvio .formatos { font-weight: 700; color: var(--preto); letter-spacing: 1px; margin-top: 6px; }
+.envioInfo { background: var(--branco); border-radius: var(--raio-g); padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--sombra); }
+.envioInfo h3 { display: flex; align-items: center; gap: 8px; font-size: 19px; }
+.guiaQualidade { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.guiaQualidade li { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: 14px; border: 2px solid var(--linha); }
+.guiaQualidade li div { display: flex; flex-direction: column; gap: 2px; }
+.guiaQualidade span { color: var(--cinza-escuro); font-size: 14px; line-height: 1.4; }
+.guiaQualidade .otima { border-color: var(--preto); }
+.guiaQualidade .boa .ic { color: #2f6b3a; }
+.guiaQualidade .baixa { border-color: #f1c3bf; background: #fff6f5; }
+.guiaQualidade .baixa .ic, .guiaQualidade .baixa b { color: var(--perigo); }
+
+.buscaWeb { padding: 6px 24px 28px; display: flex; flex-direction: column; gap: 10px; }
+.buscaWebForm { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.buscaWebForm .busca { flex: 1 1 380px; }
+.buscaWebForm .btn { min-height: 56px; }
+.chave { display: flex; align-items: center; gap: 8px; min-height: 56px; padding: 0 14px; border-radius: 16px; background: var(--branco); border: 2px solid var(--linha); font-weight: 700; font-size: 15px; cursor: pointer; }
+.chave input { width: 22px; height: 22px; accent-color: var(--preto); }
+.chave span { display: flex; align-items: center; gap: 6px; }
+.avisoWeb { display: flex; gap: 8px; align-items: center; color: var(--cinza-escuro); font-size: 14px; }
+.gradeWeb { padding: 4px 0; }
+.cartaoWeb { background: var(--palco) !important; }
+.cartaoWeb img { padding: 6%; }
+.maisWeb { display: flex; justify-content: center; }
+
+/* Carregando */
+.janelaCarregando .janelaCorpo { padding: 36px 24px; }
+.carregando { display: flex; flex-direction: column; align-items: center; gap: 16px; font-size: 18px; font-weight: 600; }
+.girando { width: 44px; height: 44px; border-radius: 50%; border: 5px solid var(--cinza-claro); border-top-color: var(--preto); animation: girar .8s linear infinite; display: inline-block; }
+@keyframes girar { to { transform: rotate(360deg); } }
+
+@media (max-aspect-ratio: 1/1) {
+  .duasColunas .palco { height: 52dvh; }
+  .envio { grid-template-columns: 1fr; }
+  .caixaEnvio { min-height: 220px; }
+}
+
+/* Ajustar: camiseta ocupando todo o palco; botões flutuando por cima */
+.ajustar .palcoArea { padding-top: 0 !important; }
+.ajustar .segmentoTopo { left: 14px; top: 14px; transform: none; }
+.ajustar .dicaPalco { position: absolute; right: 14px; bottom: 14px; margin: 0; max-width: 46%; font-size: 14px; }

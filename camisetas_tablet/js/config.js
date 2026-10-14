@@ -14,6 +14,8 @@ export const PADRAO = {
   whatsapp: '',            // só dígitos com DDI e DDD (ex.: 5512999999999). Vazio = sem botão
   senha: '1234',           // senha da área do administrador
   inatividadeMin: 3,       // minutos parado até perguntar "Ainda está aí?"
+  permitirEnvio: true,     // cliente pode enviar a própria arte
+  permitirBusca: true,     // cliente pode buscar imagens na internet
 };
 
 /**

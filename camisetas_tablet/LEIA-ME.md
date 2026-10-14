@@ -9,8 +9,16 @@ tamanhos e recebe o **número do pedido** para mostrar ao atendente.
 ## Como o cliente usa
 
 1. **Camiseta**: modelo, malha e cor (a camiseta muda na hora).
-2. **Arte**: galeria por temas, com busca. As artes aparecem na cor da camiseta.
-   Tocar numa arte mostra ela grande na camiseta, e dá para passar o dedo para ver as próximas.
+2. **Arte**, de três jeitos:
+   - **Artes da loja**: galeria por temas, com busca. As artes aparecem na cor da camiseta.
+     Tocar numa arte mostra ela grande na camiseta, e dá para passar o dedo para ver as próximas.
+   - **Enviar minha arte**: arquivo do tablet, pendrive, Google Drive… (PDF, SVG, AI, PNG, JPG).
+   - **Buscar na internet**: imagens do [Openverse](https://openverse.org) só com licença
+     que permite uso comercial e modificação; filtro "Só vetores".
+   Na arte do cliente e nas imagens da internet o app mostra a **qualidade de impressão**
+   no tamanho escolhido (vetor = ótima; imagem: boa a partir de 220 dpi, aceitável de 150 a 220,
+   baixa abaixo de 150), sugere o tamanho máximo com boa qualidade e pede confirmação antes de
+   usar uma imagem de qualidade baixa. Também dá para remover um fundo branco.
 3. **Ajustar**: arrastar com um dedo, mudar o tamanho com dois dedos ou com os botões + e −.
    A arte nunca passa da área máxima (38 × 42 cm na masculina, 30 × 35 na feminina e
    juvenil; no infantil a arte é reduzida automaticamente para caber em 20 × 24).
@@ -33,7 +41,10 @@ por 2 segundos. Senha inicial: **1234** (troque em Configurações).
   ocultar, apagar e trocar o tema.
 - **Exportar cópia / Importar cópia**: leva o catálogo pronto para outro tablet.
 - **Pedidos**: lista com o PDF de cada pedido (imagens da frente e costas,
-  tamanhos, nome do arquivo de cada arte e medidas em cm).
+  tamanhos, nome do arquivo de cada arte e medidas em cm). Pedidos com arte do cliente ou
+  da internet mostram a qualidade, têm o botão **Artes do cliente** (baixa os arquivos
+  originais e o crédito/licença) e um alerta quando alguma arte está com qualidade baixa.
+- **Configurações**: liga/desliga "Enviar minha arte" e "Buscar na internet".
 - **Configurações**: nome da loja, frase inicial, WhatsApp, senha e tempo de inatividade.
 
 ### Formatos das artes
@@ -64,6 +75,11 @@ As artes ficam guardadas **no próprio tablet** (não vão para a internet).
 4. Comando de deploy: o padrão, `npx wrangler deploy`. Branch: `main`.
 
 (Alternativa sem mudar o diretório raiz: comando `npx wrangler deploy --config wrangler.tablet.jsonc`.)
+
+A busca de imagens usa o Worker (`worker/index.js`, rotas `/api/busca` e `/api/imagem`),
+publicado junto com o app. Sem configurar nada ela já funciona (com o limite gratuito do
+Openverse). Para mais buscas por dia, cadastre-se grátis na API do Openverse e crie no Worker
+as variáveis secretas `OPENVERSE_CLIENT_ID` e `OPENVERSE_CLIENT_SECRET`.
 
 Ao publicar uma versão nova, troque `VERSAO` em `sw.js` para os tablets
 baixarem os arquivos novos.
