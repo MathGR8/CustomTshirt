@@ -59,8 +59,11 @@ As artes ficam guardadas **no próprio tablet** (não vão para a internet).
 É um segundo site, separado do original:
 
 1. No Cloudflare: **Workers & Pages → Criar → Importar repositório** (este mesmo).
-2. Nome do projeto: `camisetas-tablet` (igual ao `name` de `wrangler.tablet.jsonc`).
-3. Comando de deploy: `npx wrangler deploy --config wrangler.tablet.jsonc`.
+2. Nome do projeto: `camisetas-tablet` (igual ao `name` de `camisetas_tablet/wrangler.jsonc`).
+3. Em **Configurações avançadas → Caminho / Diretório raiz**: `camisetas_tablet`.
+4. Comando de deploy: o padrão, `npx wrangler deploy`. Branch: `main`.
+
+(Alternativa sem mudar o diretório raiz: comando `npx wrangler deploy --config wrangler.tablet.jsonc`.)
 
 Ao publicar uma versão nova, troque `VERSAO` em `sw.js` para os tablets
 baixarem os arquivos novos.

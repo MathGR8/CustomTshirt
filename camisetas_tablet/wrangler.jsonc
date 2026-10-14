@@ -1,0 +1,12 @@
+// Configuração do Cloudflare do APP DO TABLET.
+// No Cloudflare, no Worker do tablet: Configurações → Build →
+//   "Diretório raiz" (Root directory / Path) = camisetas_tablet
+//   "Comando de deploy" = npx wrangler deploy   (o padrão)
+// O "name" precisa ser IGUAL ao nome do Worker criado no painel.
+{
+  "name": "camisetas-tablet",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "."
+  }
+}
