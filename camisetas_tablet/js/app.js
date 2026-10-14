@@ -26,6 +26,7 @@ import { urlDa, processarArquivoCliente, removerFundoDaArte } from './catalog.js
 import { qualidade, ICONE_QUALIDADE, buscarImagens, baixarImagem, credito } from './fontes.js';
 import { abrirTabela, resumoMedidas } from './medidas.js';
 import { desenharTexto, editorTexto } from './texto.js';
+import { mostrarPrecos, dinheiro, aPartirDe, precoBase, precoPeca, precoItem, acrescimoTamanho, valorItem, valorTotal } from './precos.js';
 import { maxCm, textoMedidas, medidas, totalPecas, salvarPedido, numeroPedido, textoResumo, escalaInfantil, ladosDo } from './order.js';
 
 // ---------- Estado ----------
@@ -36,6 +37,7 @@ const novoItem = (base = {}) => ({
   cor: base.cor || MALHAS[0].cores[0],
   modo: null,          // 'pronta' (arte da loja, fixa) | 'criar' (livre) | null (ainda não escolheu)
   pronta: null,        // id da arte da camiseta pronta
+  precoPronta: null,   // preço próprio da camiseta pronta (se a loja definiu)
   artes: [], quantidades: {}
 });
 
@@ -64,6 +66,11 @@ async function previaPronta(resumo, modeloId, cor) {
   const it = { modelo: modeloId, cor, artes };
   return ladosDo(it).map(l => `<figure>${palco(it, l, { mostrarArea: true })}<figcaption>${l}</figcaption></figure>`).join('');
 }
+
+/** Preços visíveis para o cliente? */
+const comPreco = () => mostrarPrecos(S.cfg);
+/** Preço de uma camiseta pronta numa cor (preço próprio ou o do modelo/malha). */
+const precoDaPronta = (r, modeloId, cor) => +r.fixo?.preco > 0 ? +r.fixo.preco : precoBase(S.cfg, modeloId, malhaDaCor(cor));
 
 // ---------- Estrutura da tela ----------
 
@@ -330,6 +337,7 @@ TELAS.modelo = () => {
           <svg viewBox="0 0 ${VB.w} ${VB.h}" aria-hidden="true">${camisetaSVG({ modelo: m.id, lado: 'Frente', cor: coresDoModelo(m.id).includes(it.cor) ? it.cor : coresDoModelo(m.id)[0] })}</svg>
           <strong>${esc(m.nome)}</strong><small>${esc(m.desc)}</small>
           <span class="tamanhosLista">Tamanhos ${m.tamanhos[0]} ao ${m.tamanhos.at(-1)}</span>
+          ${comPreco() && aPartirDe(S.cfg, m.id) ? `<span class="preco">a partir de <b>${dinheiro(aPartirDe(S.cfg, m.id))}</b></span>` : ''}
           ${icone('check', 22)}
         </button>`).join('')}
       </div>
@@ -452,6 +460,7 @@ function galeriaProntas() {
       return `<button type="button" class="cartaoArte" data-i="${i}">
         <span class="cartaoImg" style="background-color:${CORES[cores[0]].hex}"><img data-id="${esc(a.id)}" alt=""></span>
         <span class="cartaoNome">${esc(a.nome)}</span>
+        ${comPreco() && precoDaPronta(a, it.modelo, cores[0]) ? `<span class="preco precoCartao">${dinheiro(Math.min(...cores.map(c => precoDaPronta(a, it.modelo, c)).filter(Boolean)))}</span>` : ''}
         <span class="bolinhasCor">${cores.slice(0, 7).map(c => `<i style="--c:${CORES[c].hex}" title="${esc(CORES[c].nome || c)}"></i>`).join('')}</span>
         ${it.pronta === a.id ? `<span class="selo">${icone('check', 14)} Escolhida</span>` : ''}
         ${a.fixo?.costas ? `<span class="selo seloCostas">Frente + costas</span>` : ''}
@@ -514,7 +523,8 @@ async function verPronta(lista, i) {
     $$('#verCores [data-cor]', j.el).forEach(b => (b.onclick = () => { cor = b.dataset.cor; pintar(); }));
     $$('#verLados [data-lado]', j.el).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lado === lado)));
     const a = artes.find(x => x.lado === lado) || artes[0];
-    $('#verMedida', j.el).innerHTML = a ? `${icone('regua', 16)} Estampa de ${textoMedidas(it.modelo, a, true)}` : '';
+    $('#verMedida', j.el).innerHTML = (a ? `${icone('regua', 16)} Estampa de ${textoMedidas(it.modelo, a, true)}` : '')
+      + (comPreco() && precoDaPronta(r, it.modelo, cor) ? `<span class="preco precoGrande">${dinheiro(precoPeca(S.cfg, { modelo: it.modelo, malha: malhaDaCor(cor), modo: 'pronta', precoPronta: r.fixo?.preco, artes }, null))}</span>` : '');
   };
   const carregar = async () => {
     const r = lista[atual];
@@ -542,6 +552,7 @@ async function verPronta(lista, i) {
   $('#usar', j.el).onclick = () => {
     const r = lista[atual];
     it.modo = 'pronta'; it.pronta = r.id; it.artes = artes; it.cor = cor; it.malha = malhaDaCor(cor);
+    it.precoPronta = +r.fixo?.preco > 0 ? +r.fixo.preco : null;
     S.lado = 'Frente';
     j.fechar();
     aviso(`"${r.nome}" na cor ${CORES[cor].nome || cor}.`, 'ok');
@@ -812,7 +823,7 @@ TELAS.personalizar = () => {
       <div class="painel painelCompacto">
         <div class="corCompacta">
           <div class="rotuloLinha">${icone('camisa', 18)} <b>Cor da camiseta</b><span class="medidas">${esc(CORES[it.cor].nome || it.cor)}</span></div>
-          <div class="segmento segPeq" role="group" aria-label="Malha">${MALHAS.map(mm => `<button type="button" data-malha="${esc(mm.id)}" aria-pressed="${mm.id === it.malha}">${esc(mm.nome)}</button>`).join('')}</div>
+          <div class="segmento segPeq" role="group" aria-label="Malha">${MALHAS.map(mm => `<button type="button" data-malha="${esc(mm.id)}" aria-pressed="${mm.id === it.malha}">${esc(mm.nome)}${comPreco() && precoBase(S.cfg, it.modelo, mm.id) ? ` <small>${dinheiro(precoBase(S.cfg, it.modelo, mm.id))}</small>` : ''}</button>`).join('')}</div>
           <div class="coresMini">${(MALHAS.find(mm => mm.id === it.malha) || MALHAS[0]).cores.filter(c => coresDoModelo(it.modelo).includes(c)).map(c => `<button type="button" class="corMini ${CORES[c].mescla ? 'mescla' : ''}" data-cor="${c}" style="--c:${CORES[c].hex}" aria-pressed="${c === it.cor}" title="${esc(CORES[c].nome || c)}" aria-label="${esc(CORES[c].nome || c)}"></button>`).join('')}</div>
         </div>
         ${a ? `
@@ -966,7 +977,8 @@ TELAS.personalizar = () => {
   }
   rodape({
     voltar: { texto: 'Estampa', acao: () => irPara('estampa') },
-    meio: it.artes.length ? `${it.artes.length} arte${it.artes.length > 1 ? 's' : ''} · ${['Frente', 'Costas'].filter(l => conta(l)).join(' e ')}` : '',
+    meio: (it.artes.length ? `${it.artes.length} arte${it.artes.length > 1 ? 's' : ''} · ${['Frente', 'Costas'].filter(l => conta(l)).join(' e ')}` : '')
+      + (comPreco() && precoItem(S.cfg, it) ? `${it.artes.length ? ' · ' : ''}<b>${dinheiro(precoItem(S.cfg, it))}</b> a peça` : ''),
     avancar: { texto: 'Tamanhos', acao: () => irPara('tamanhos') }
   });
   if (!S.coachVisto && a) {
@@ -999,6 +1011,7 @@ TELAS.tamanhos = () => {
         <div class="gradeTamanhos">${g.tamanhos.map(t => `
           <div class="cartaoTamanho ${(it.quantidades[t] || 0) > 0 ? 'temQtd' : ''}" data-t="${t}">
             <span class="tamanhoNome">${t}</span>
+            ${comPreco() && precoPeca(S.cfg, it, t) ? `<span class="preco">${dinheiro(precoPeca(S.cfg, it, t))}${acrescimoTamanho(S.cfg, it.modelo, t) > 0 ? ' <small>(+' + dinheiro(acrescimoTamanho(S.cfg, it.modelo, t)) + ')</small>' : ''}</span>` : ''}
             <button type="button" class="medidaTamanho" data-medida="${t}">${resumoMedidas(it.modelo, t)}</button>
             <div class="contador">
               <button type="button" class="btnRedondo" data-d="-1" aria-label="Menos ${t}">${icone('menos', 26)}</button>
@@ -1011,7 +1024,7 @@ TELAS.tamanhos = () => {
   $$('[data-medida]').forEach(b => (b.onclick = e => { e.stopPropagation(); abrirTabela(it.modelo, b.dataset.medida); }));
   const atualizarRodape = () => rodape({
     voltar: it.modo === 'pronta' ? { texto: 'Estampa', acao: () => irPara('estampa') } : { texto: 'Personalizar', acao: () => irPara('personalizar') },
-    meio: `<span class="total">${total()} peça${total() === 1 ? '' : 's'}</span>`,
+    meio: `<span class="total">${total()} peça${total() === 1 ? '' : 's'}${comPreco() && valorItem(S.cfg, it).total ? ` · ${dinheiro(valorItem(S.cfg, it).total)}` : ''}</span>`,
     avancar: total() ? { texto: 'Revisar', acao: () => irPara('revisar') } : { texto: 'Revisar', desabilitado: true, motivo: 'Escolha pelo menos uma camiseta (toque em +).' }
   });
   $$('.cartaoTamanho').forEach(c => c.addEventListener('click', e => {
@@ -1042,6 +1055,7 @@ TELAS.revisar = () => {
             <h3>Camiseta ${i + 1}</h3>
             <p>${esc(descr(it))}</p>
             <div class="chips">${tam(it)}</div>
+            ${comPreco() && valorItem(S.cfg, it).total ? `<p class="precoItem">${valorItem(S.cfg, it).linhas.map(l => `${l.qtd}× ${l.t} ${dinheiro(l.unit)}`).join(' · ')} = <b>${dinheiro(valorItem(S.cfg, it).total)}</b></p>` : ''}
             <ul class="itemArtes">
               ${it.modo === 'pronta' ? `<li>${icone('estrela', 16)} <b>Camiseta pronta</b></li>` : ''}
               ${it.artes.length ? it.artes.map(a => `<li>${icone(a.tipo === 'texto' ? 'editar' : 'arte', 16)} <b>${a.lado}:</b> ${esc(a.nome)} <small>${textoMedidas(it.modelo, a, true)}</small></li>`).join('') : `<li>${icone('camisa', 16)} Camiseta lisa (sem estampa)</li>`}</ul>
@@ -1071,7 +1085,7 @@ TELAS.revisar = () => {
   const semQtd = S.itens.findIndex(it => !totalPecas(it));
   rodape({
     voltar: { texto: 'Tamanhos', acao: () => irPara('tamanhos') },
-    meio: `<span class="total">${totalGeral} peça${totalGeral === 1 ? '' : 's'} no total</span>`,
+    meio: `<span class="total">${totalGeral} peça${totalGeral === 1 ? '' : 's'}${comPreco() && valorTotal(S.cfg, S.itens) ? ` · ${dinheiro(valorTotal(S.cfg, S.itens))}` : ' no total'}</span>`,
     avancar: semQtd >= 0
       ? { texto: 'Finalizar', desabilitado: true, motivo: `A camiseta ${semQtd + 1} está sem tamanhos. Toque em "Editar" ou remova.` }
       : { texto: 'Finalizar', acao: () => irPara('dados') }
@@ -1102,7 +1116,7 @@ TELAS.dados = () => {
       if (!S.cliente.nome) { aviso('Digite o seu nome para continuar.', 'erro'); $('#nome').focus(); return; }
       const b = $('#rAvancar'); b.disabled = true; b.innerHTML = 'Salvando…';
       try {
-        S.ultimoPedido = await salvarPedido(S.itens, S.cliente);
+        S.ultimoPedido = await salvarPedido(S.itens, S.cliente, S.cfg);
         irPara('pronto');
       } catch (e) {
         b.disabled = false; b.innerHTML = `Enviar pedido ${icone('avancar')}`;
@@ -1126,13 +1140,14 @@ TELAS.pronto = () => {
       <p class="prontoNumeroRotulo">Número do pedido</p>
       <p class="prontoNumero">${numeroPedido(p.numero)}</p>
       <p class="textoAjuda">Obrigado, <b>${esc(p.cliente.nome)}</b>! Mostre este número ao atendente para concluir.<br>${p.itens.length} camiseta${p.itens.length > 1 ? 's' : ''} diferente${p.itens.length > 1 ? 's' : ''} · ${total} peça${total === 1 ? '' : 's'}</p>
+      ${p.precos?.mostrar && p.total ? `<p class="prontoValor">Total: <b>${dinheiro(p.total)}</b><small>Valor estimado. O atendente confirma na hora.</small></p>` : ''}
       <div class="linhaBotoes centro">
         ${S.cfg.whatsapp ? `<button type="button" class="btn btnClaro btnGrande" id="zap">${icone('whatsapp')} Enviar resumo pelo WhatsApp</button>` : ''}
         <button type="button" class="btn btnEscuro btnGrande" id="novo">${icone('camisa')} Fazer outro pedido</button>
       </div>
       <p class="dicaPequena" id="contagem"></p>
     </section>`;
-  $('#zap') && ($('#zap').onclick = () => window.open(`https://wa.me/${S.cfg.whatsapp}?text=${encodeURIComponent(textoResumo(p, S.cfg.loja))}`, '_blank'));
+  $('#zap') && ($('#zap').onclick = () => window.open(`https://wa.me/${S.cfg.whatsapp}?text=${encodeURIComponent(textoResumo(p, S.cfg.loja, !!p.precos?.mostrar))}`, '_blank'));
   $('#novo').onclick = recomecar;
   let s = 90;
   clearInterval(tPronto);

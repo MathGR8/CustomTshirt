@@ -4,18 +4,20 @@
  *  - Artes: importar arquivos/pasta/.zip, organizar temas, renomear, ocultar, apagar,
  *           configurar a "camiseta pronta" (lado, tamanho, posição, cores, arte das costas),
  *           exportar e importar uma cópia do catálogo (para outro tablet)
- *  - Pedidos: ver, baixar o PDF, apagar
+ *  - Pedidos: ver em tela cheia (camiseta e cada arte/texto), baixar o PDF, apagar
+ *  - Preços: preço de cada modelo/malha, acréscimos, mostrar ou esconder do cliente
  *  - Configurações: nome da loja, frase, WhatsApp, senha, tempo de inatividade
  *  - Ajuda: como preparar as artes do Corel, instalar o app e travar o tablet
  */
 
-import { PADRAO, CORES, POSICOES } from './config.js';
+import { PADRAO, CORES, POSICOES, MODELOS, MALHAS } from './config.js';
 import { DB } from './db.js';
 import { icone } from './icons.js';
 import { $, $$, esc, aviso, janela, confirmar, pedirSenha, progressoJanela } from './ui.js';
 import { importar, urlDa, limparUrls, exportarCatalogo, importarCatalogo, lib } from './catalog.js';
 import { credito } from './fontes.js';
-import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo } from './order.js';
+import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo, imagemLado } from './order.js';
+import { precosDe, dinheiro } from './precos.js';
 import { modelo } from './shirt.js';
 
 let App = null;
@@ -30,6 +32,7 @@ export async function abrirAdmin(app) {
     <nav class="abas" role="tablist">
       <button type="button" data-aba="artes" aria-selected="true">${icone('arte', 20)} Artes</button>
       <button type="button" data-aba="pedidos" aria-selected="false">${icone('lista', 20)} Pedidos</button>
+      <button type="button" data-aba="precos" aria-selected="false">${icone('dinheiro', 20)} Preços</button>
       <button type="button" data-aba="config" aria-selected="false">${icone('engrenagem', 20)} Configurações</button>
       <button type="button" data-aba="ajuda" aria-selected="false">${icone('ajuda', 20)} Ajuda</button>
     </nav>
@@ -214,10 +217,12 @@ async function editarArte(id, temas, depois) {
           <div class="segmento segPeq" id="ePos">${Object.entries(POSICOES).map(([k, p]) => `<button type="button" data-pos="${k}" aria-pressed="${fx.pos === k}">${p.nome}</button>`).join('')}</div></div>
         <div class="campoPeq"><span>Cores liberadas <small>(nenhuma marcada = todas)</small></span>
           <div class="coresAdmin" id="eCores">${todasCores.map(c => `<label class="corAdmin"><input type="checkbox" value="${esc(c)}" ${fx.cores?.includes(c) ? 'checked' : ''}><i style="--c:${CORES[c].hex}"></i>${esc(CORES[c].nome || c)}</label>`).join('')}</div></div>
+        <label class="campoPeq"><span>Preço próprio desta camiseta pronta <small>(opcional; vazio = preço do modelo, na aba Preços)</small></span>
+          <span class="campoDinheiro"><i>R$</i><input id="ePreco" inputmode="decimal" value="${fx.preco ? String(fx.preco).replace('.', ',') : ''}" placeholder="—"></span></label>
         <label class="campoPeq"><span>Arte das costas (opcional)</span>
           <select id="eCostas"><option value="">Nenhuma</option>${outras.map(o => `<option value="${esc(o.id)}" ${fx.costas === o.id ? 'selected' : ''}>${esc(o.tema)} · ${esc(o.nome)}</option>`).join('')}</select></label>
         <p class="textoAjuda dicaCostas">A arte escolhida para as costas some da galeria e aparece junto com esta.</p>
-        <label class="checkLinha"><input type="checkbox" id="eTodas"> Usar este tamanho, posição e cores em todas as artes do tema "<span id="eTemaNome">${esc(a.tema)}</span>"</label>
+        <label class="checkLinha"><input type="checkbox" id="eTodas"> Usar este tamanho, posição, cores e preço em todas as artes do tema "<span id="eTemaNome">${esc(a.tema)}</span>"</label>
         <div class="linhaBotoes">
           <button type="button" class="btn btnClaro btnPerigoTexto" id="eApagar">${icone('lixo', 20)} Apagar</button>
           <button type="button" class="btn btnEscuro" id="eSalvar">${icone('check', 20)} Salvar</button>
@@ -227,7 +232,8 @@ async function editarArte(id, temas, depois) {
   const ler = () => ({
     lado: fx.lado, cm: +$('#eCm', j.el).value, pos: fx.pos,
     cores: $$('#eCores input:checked', j.el).map(i => i.value),
-    costas: $('#eCostas', j.el).value || null
+    costas: $('#eCostas', j.el).value || null,
+    preco: lerValor($('#ePreco', j.el).value) || null
   });
   const pintar = async () => {
     const f = ler();
@@ -257,7 +263,7 @@ async function editarArte(id, temas, depois) {
     await DB.salvar('artes', a);
     if ($('#eTodas', j.el).checked) {
       const doTema = (await DB.todos('artes')).filter(x => !x.cliente && x.tema === a.tema && x.id !== a.id && x.id !== f.costas);
-      doTema.forEach(x => (x.fixo = { ...(x.fixo || FIXO_PADRAO), lado: f.lado, cm: f.cm, pos: f.pos, cores: a.fixo.cores }));
+      doTema.forEach(x => (x.fixo = { ...(x.fixo || FIXO_PADRAO), lado: f.lado, cm: f.cm, pos: f.pos, cores: a.fixo.cores, preco: f.preco }));
       await DB.salvarVarios('artes', doTema);
       aviso(`Aplicado a ${doTema.length + 1} artes do tema.`, 'ok');
     }
@@ -285,15 +291,16 @@ ABAS.pedidos = async el => {
         const doCliente = p.itens.flatMap(it => it.artes).filter(a => a.origem && a.origem !== 'catalogo');
         const prontas = p.itens.filter(it => it.modo === 'pronta').length;
         return `<article class="pedidoAdmin">
-          ${img ? `<img src="${img}" alt="">` : ''}
+          ${img ? `<button type="button" class="pedidoMini" data-ver="${p.id}" aria-label="Ver pedido"><img src="${img}" alt=""></button>` : ''}
           <div class="pedidoInfo">
             <strong>Nº ${numeroPedido(p.numero)} — ${esc(p.cliente?.nome || 'Sem nome')}</strong>
             <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${p.cliente?.telefone ? ' · ' + esc(p.cliente.telefone) : ''}</small>
-            <small>${p.itens.map(it => modelo(it.modelo).nome).join(', ')} · ${total} peça${total === 1 ? '' : 's'}${prontas ? ` · ${prontas} pronta${prontas > 1 ? 's' : ''}` : ''}</small>
+            <small>${p.itens.map(it => modelo(it.modelo).nome).join(', ')} · ${total} peça${total === 1 ? '' : 's'}${prontas ? ` · ${prontas} pronta${prontas > 1 ? 's' : ''}` : ''}${p.total ? ` · <b>${dinheiro(p.total)}</b>` : ''}</small>
             ${doCliente.some(a => /Baixa/.test(a.qualidade || '')) ? `<small class="alertaPedido">${icone('fechar', 14)} Tem arte com qualidade BAIXA</small>` : ''}
           </div>
           <div class="linhaBotoes">
-            <button type="button" class="btn btnEscuro" data-pdf="${p.id}">${icone('baixar', 20)} PDF</button>
+            <button type="button" class="btn btnEscuro" data-ver="${p.id}">${icone('expandir', 20)} Ver pedido</button>
+            <button type="button" class="btn btnClaro" data-pdf="${p.id}">${icone('baixar', 20)} PDF</button>
             ${doCliente.length ? `<button type="button" class="btn btnClaro" data-artes="${p.id}">${icone('baixar', 20)} Artes e textos do cliente (${doCliente.length})</button>` : ''}
             <button type="button" class="btn btnClaro" data-copiar="${p.id}">${icone('lista', 20)} Copiar texto</button>
             <button type="button" class="btnIcone" data-apagar="${p.id}" aria-label="Apagar pedido">${icone('lixo', 20)}</button>
@@ -302,6 +309,7 @@ ABAS.pedidos = async el => {
       }).join('')}</div>` : `<div class="vazio">${icone('lista', 48)}<p>Nenhum pedido ainda.</p></div>`}
     </div>`;
   const achar = id => lista.find(p => String(p.id) === String(id));
+  $$('[data-ver]', el).forEach(b => (b.onclick = () => verPedido(achar(b.dataset.ver), { pdf: () => el.querySelector(`[data-pdf="${b.dataset.ver}"]`)?.click(), artes: () => el.querySelector(`[data-artes="${b.dataset.ver}"]`)?.click() })));
   $$('[data-pdf]', el).forEach(b => (b.onclick = async () => {
     b.disabled = true;
     try { const p = achar(b.dataset.pdf); baixar(await pdfPedido(p, App.S.cfg.loja), `pedido-${numeroPedido(p.numero)}.pdf`); }
@@ -355,6 +363,200 @@ async function apagarArtesDoCliente(pedidos, todos) {
   const outros = new Set(todos.filter(p => !pedidos.includes(p)).flatMap(p => p.itens.flatMap(it => it.artes.map(a => a.artId))));
   for (const id of ids) if (!outros.has(id)) await DB.apagar('artes', id).catch(() => {});
 }
+
+// ---------- Ver pedido (tela cheia) ----------
+
+/** Pedido em tela cheia: camisetas grandes, cada arte/texto, tamanhos e valores. */
+async function verPedido(p, acoes = {}) {
+  if (!p) return;
+  const d = new Date(p.data), c = p.cliente || {};
+  const totalPc = p.itens.reduce((s, it) => s + totalPecas(it), 0);
+  const nomeCor = it => CORES[it.cor]?.nome || it.cor;
+  const descArte = a => a.tipo === 'texto'
+    ? `<b>Texto:</b> “${esc(a.texto).replace(/\n/g, '<br>')}”<small>${esc(a.descricao || '')}</small>`
+    : `<b>${esc(a.nome)}</b><small>${a.origem === 'cliente' ? `Arte do cliente · ${esc(a.arquivo || '')}` : a.origem === 'internet' ? `Imagem da internet${a.credito ? ' · ' + esc(a.credito) : ''}` : `${esc(a.tema || '')} · ${esc(a.arquivo || '')}${a.pagina > 1 ? ` (pág. ${a.pagina})` : ''}`}</small>`;
+  const j = janela({ titulo: `${icone('lista')} Pedido nº ${numeroPedido(p.numero)}`, classe: 'janelaPedido', html: `
+    <div class="pedidoDetalhe">
+      <header class="pedidoCab">
+        <div class="pedidoCliente">
+          <strong>${esc(c.nome || 'Sem nome')}</strong>
+          <span>${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${c.telefone ? ` · ${icone('whatsapp', 16)} ${esc(c.telefone)}` : ''}</span>
+          ${c.obs ? `<p class="pedidoObs">${icone('editar', 16)} ${esc(c.obs)}</p>` : ''}
+        </div>
+        <div class="pedidoResumo">
+          <span>${p.itens.length} camiseta${p.itens.length > 1 ? 's' : ''} · ${totalPc} peça${totalPc === 1 ? '' : 's'}</span>
+          ${p.total ? `<strong>${dinheiro(p.total)}</strong>${p.precos?.mostrar ? '' : '<small>(preços escondidos para o cliente)</small>'}` : ''}
+        </div>
+        <div class="linhaBotoes">
+          <button type="button" class="btn btnEscuro" id="dPdf">${icone('baixar', 20)} PDF</button>
+          ${p.itens.some(it => it.artes.some(a => a.origem && a.origem !== 'catalogo')) ? `<button type="button" class="btn btnClaro" id="dArtes">${icone('baixar', 20)} Artes do cliente</button>` : ''}
+        </div>
+      </header>
+      ${p.itens.map((it, i) => `
+        <section class="pedidoItem">
+          <h3>Camiseta ${i + 1}${p.itens.length > 1 ? ` de ${p.itens.length}` : ''} <span>${esc(modelo(it.modelo).nome)} · ${esc(it.malha)} · ${esc(nomeCor(it))}</span>${it.modo === 'pronta' ? ' <span class="etiqueta">Pronta</span>' : ''}</h3>
+          <div class="pedidoCorpo">
+            <div class="pedidoLados">${Object.keys(it.imagens).map(l => `
+              <button type="button" class="ladoGrande" data-vista="lado|${i}|${l}">
+                <img src="${it.imagens[l]}" alt="${l}" data-hd="${i}|${l}"><span>${l}</span><i>${icone('expandir', 20)}</i>
+              </button>`).join('')}
+            </div>
+            <div class="pedidoInfoItem">
+              <table class="tabelaPedido">
+                <thead><tr><th>Tamanho</th><th>Qtd</th>${it.valor?.total ? '<th>Preço</th><th>Subtotal</th>' : ''}</tr></thead>
+                <tbody>${(it.valor?.linhas?.length ? it.valor.linhas : Object.entries(it.quantidades).filter(([, q]) => q > 0).map(([t, qtd]) => ({ t, qtd })))
+                  .map(l => `<tr><th>${l.t}</th><td>${l.qtd}</td>${it.valor?.total ? `<td>${dinheiro(l.unit)}</td><td>${dinheiro(l.sub)}</td>` : ''}</tr>`).join('')}</tbody>
+                <tfoot><tr><th>Total</th><td>${totalPecas(it)}</td>${it.valor?.total ? `<td></td><td>${dinheiro(it.valor.total)}</td>` : ''}</tr></tfoot>
+              </table>
+              <ul class="artesPedido">${it.artes.length ? it.artes.map((a, k) => `
+                <li>
+                  <button type="button" class="arteMini" data-vista="arte|${i}|${k}" style="--fundo:${CORES[it.cor]?.hex || '#ddd'}"><img data-arte="${i}|${k}" alt=""></button>
+                  <div class="arteDesc">
+                    <span class="arteLado">${a.lado} · ${esc(a.medidas || '')}</span>
+                    ${descArte(a)}
+                    ${a.qualidade ? `<small class="${/Baixa/.test(a.qualidade) ? 'alertaPedido' : ''}">Qualidade: ${esc(a.qualidade)}</small>` : ''}
+                  </div>
+                </li>`).join('') : `<li class="semArte">${icone('camisa', 18)} Camiseta lisa (sem estampa)</li>`}
+              </ul>
+            </div>
+          </div>
+        </section>`).join('')}
+    </div>` });
+  $('#dPdf', j.el).onclick = () => acoes.pdf?.();
+  $('#dArtes', j.el) && ($('#dArtes', j.el).onclick = () => acoes.artes?.());
+
+  // Vistas para a tela cheia (lados em alta resolução e cada arte sozinha)
+  const vistas = [];
+  const fonteArte = async a => (a.tipo === 'texto' ? a.url : await urlDa(a.artId, 'previa'));
+  p.itens.forEach((it, i) => {
+    Object.keys(it.imagens).forEach(l => vistas.push({ chave: `lado|${i}|${l}`, titulo: `Camiseta ${i + 1} · ${l}`, fundo: '#ffffff', src: it.imagens[l] }));
+    it.artes.forEach((a, k) => vistas.push({ chave: `arte|${i}|${k}`, titulo: `Camiseta ${i + 1} · ${a.lado} · ${a.tipo === 'texto' ? 'Texto' : a.nome} · ${a.medidas || ''}`, fundo: CORES[it.cor]?.hex || '#ddd', src: null, arte: a }));
+  });
+  $$('[data-vista]', j.el).forEach(b => (b.onclick = () => zoomVistas(vistas, vistas.findIndex(v => v.chave === b.dataset.vista))));
+  // Miniaturas das artes
+  for (const [i, it] of p.itens.entries()) for (const [k, a] of it.artes.entries()) {
+    const src = await fonteArte(a).catch(() => null);
+    const v = vistas.find(x => x.chave === `arte|${i}|${k}`); if (v) v.src = src;
+    const img = $(`[data-arte="${i}|${k}"]`, j.el); if (img && src) img.src = src;
+  }
+  // Camisetas redesenhadas em alta resolução (se as artes ainda estão no tablet)
+  for (const [i, it] of p.itens.entries()) for (const l of Object.keys(it.imagens)) {
+    try {
+      const hd = await imagemLado(it, l, 1800);
+      const v = vistas.find(x => x.chave === `lado|${i}|${l}`); if (v) v.src = hd;
+      const img = $(`[data-hd="${i}|${l}"]`, j.el); if (img) img.src = hd;
+    } catch { /* fica a imagem salva no pedido */ }
+  }
+}
+
+/** Visualizador em tela cheia: toque para ampliar, arraste para mover, setas para passar. */
+function zoomVistas(vistas, inicio = 0) {
+  let i = Math.max(0, inicio), nivel = 1;
+  const j = janela({ titulo: '', classe: 'janelaZoom', html: `
+    <div class="zoomTopo"><span id="zTitulo"></span>
+      <div class="linhaBotoes">
+        <button type="button" class="btnRedondo" id="zMenos" aria-label="Diminuir">${icone('menos', 22)}</button>
+        <button type="button" class="btnRedondo" id="zMais" aria-label="Ampliar">${icone('mais', 22)}</button>
+      </div></div>
+    <div class="zoomArea" id="zArea"><img id="zImg" alt=""></div>
+    <button type="button" class="zoomNav esq" id="zAnt" aria-label="Anterior">${icone('voltar', 32)}</button>
+    <button type="button" class="zoomNav dir" id="zProx" aria-label="Próxima">${icone('avancar', 32)}</button>
+    <p class="zoomDica">Toque na imagem para ampliar · arraste para mover</p>` });
+  const area = $('#zArea', j.el), img = $('#zImg', j.el);
+  const aplicar = (cx = 0.5, cy = 0.5) => {
+    img.style.width = `${nivel * 100}%`; img.style.height = `${nivel * 100}%`;
+    area.classList.toggle('ampliado', nivel > 1);
+    area.scrollLeft = cx * area.scrollWidth - area.clientWidth / 2;
+    area.scrollTop = cy * area.scrollHeight - area.clientHeight / 2;
+  };
+  const mostrar = () => {
+    const v = vistas[i];
+    nivel = 1; aplicar();
+    img.src = v.src || '';
+    area.style.setProperty('--fundo', v.fundo);
+    area.classList.toggle('soArteZoom', !!v.arte);
+    $('#zTitulo', j.el).textContent = `${v.titulo}  (${i + 1}/${vistas.length})`;
+    $('#zAnt', j.el).hidden = $('#zProx', j.el).hidden = vistas.length < 2;
+  };
+  $('#zAnt', j.el).onclick = () => { i = (i - 1 + vistas.length) % vistas.length; mostrar(); };
+  $('#zProx', j.el).onclick = () => { i = (i + 1) % vistas.length; mostrar(); };
+  $('#zMais', j.el).onclick = () => { nivel = Math.min(5, nivel + 1); aplicar(); };
+  $('#zMenos', j.el).onclick = () => { nivel = Math.max(1, nivel - 1); aplicar(); };
+  // Toque: amplia no ponto tocado (ou volta ao normal); arrastar move a imagem ampliada
+  let arr = null, moveu = false;
+  area.addEventListener('pointerdown', e => { arr = { x: e.clientX, y: e.clientY, sl: area.scrollLeft, st: area.scrollTop }; moveu = false; area.setPointerCapture?.(e.pointerId); });
+  area.addEventListener('pointermove', e => {
+    if (!arr) return;
+    const dx = e.clientX - arr.x, dy = e.clientY - arr.y;
+    if (Math.abs(dx) + Math.abs(dy) > 8) moveu = true;
+    if (nivel > 1) { area.scrollLeft = arr.sl - dx; area.scrollTop = arr.st - dy; }
+  });
+  area.addEventListener('pointerup', e => {
+    if (!arr) return;
+    const dx = e.clientX - arr.x; arr = null;
+    if (nivel === 1 && moveu && Math.abs(dx) > 60 && vistas.length > 1) return (dx < 0 ? $('#zProx', j.el) : $('#zAnt', j.el)).click();
+    if (moveu) return;
+    const r = area.getBoundingClientRect();
+    const cx = (area.scrollLeft + e.clientX - r.left) / area.scrollWidth, cy = (area.scrollTop + e.clientY - r.top) / area.scrollHeight;
+    nivel = nivel > 1 ? 1 : 3;
+    aplicar(cx, cy);
+  });
+  const teclas = e => { if (e.key === 'ArrowRight') $('#zProx', j.el).click(); if (e.key === 'ArrowLeft') $('#zAnt', j.el).click(); };
+  document.addEventListener('keydown', teclas);
+  j.aoFechar.then(() => document.removeEventListener('keydown', teclas));
+  mostrar();
+}
+
+// ---------- Preços ----------
+
+/** "59,90" / "59.9" / "R$ 59" → 59.9 (vazio/inválido = 0). */
+const lerValor = v => {
+  const t = String(v ?? '').replace(/[^\d,.-]/g, '');
+  const n = parseFloat(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+};
+const mostrarValor = v => (+v ? (+v).toFixed(2).replace('.', ',') : '');
+
+ABAS.precos = el => {
+  const pr = precosDe(App.S.cfg);
+  const temAcrescimo = m => Object.values(pr.tamanhos?.[m.id] || {}).some(v => +v);
+  el.innerHTML = `
+    <div class="adminCaixa formPrecos">
+      <h3>${icone('dinheiro', 22)} Preços das camisetas</h3>
+      <label class="chaveGrande"><input type="checkbox" id="pMostrar" ${pr.mostrar ? 'checked' : ''}>
+        <span><b>Mostrar preços para o cliente</b><small>Desligado: o cliente não vê nenhum preço. Os pedidos continuam com o valor aqui no administrador.</small></span></label>
+      <p class="textoAjuda">Preço de <b>uma peça</b> com estampa. Vazio = sem preço (não aparece). Camisetas prontas podem ter preço próprio (toque na arte, na aba Artes).</p>
+      ${MODELOS.map(m => `
+        <fieldset class="precoModelo">
+          <legend>${icone('camisa', 20)} ${esc(m.nome)}</legend>
+          <div class="formLinha">${MALHAS.map(x => `
+            <label class="campoPeq"><span>${esc(x.nome)}</span>
+              <span class="campoDinheiro"><i>R$</i><input inputmode="decimal" data-base="${esc(m.id)}|${esc(x.id)}" value="${mostrarValor(pr.base?.[m.id]?.[x.id])}" placeholder="0,00"></span></label>`).join('')}
+          </div>
+          <details class="acrescimos" ${temAcrescimo(m) ? 'open' : ''}>
+            <summary>${icone('mais', 18)} Acréscimo por tamanho <small>(ex.: tamanhos grandes custam mais)</small></summary>
+            <div class="gradeAcrescimo">${m.tamanhos.map(t => `
+              <label><span>${t}</span><span class="campoDinheiro"><i>+R$</i><input inputmode="decimal" data-tam="${esc(m.id)}|${t}" value="${mostrarValor(pr.tamanhos?.[m.id]?.[t])}" placeholder="0"></span></label>`).join('')}
+            </div>
+          </details>
+        </fieldset>`).join('')}
+      <label class="campoPeq"><span>Acréscimo por peça com estampa na <b>frente e nas costas</b></span>
+        <span class="campoDinheiro"><i>+R$</i><input inputmode="decimal" id="pCostas" value="${mostrarValor(pr.costas)}" placeholder="0,00"></span></label>
+      <button type="button" class="btn btnEscuro btnGrande" id="pSalvar">${icone('check')} Salvar preços</button>
+    </div>`;
+  $('#pSalvar', el).onclick = async () => {
+    const base = {}, tamanhos = {};
+    $$('[data-base]', el).forEach(i => { const [m, x] = i.dataset.base.split('|'); const v = lerValor(i.value); if (v) (base[m] ||= {})[x] = v; });
+    $$('[data-tam]', el).forEach(i => { const [m, t] = i.dataset.tam.split('|'); const v = lerValor(i.value); if (v) (tamanhos[m] ||= {})[t] = v; });
+    const precos = { mostrar: $('#pMostrar', el).checked, base, tamanhos, costas: lerValor($('#pCostas', el).value) };
+    if (precos.mostrar && !Object.keys(base).length) aviso('Preencha pelo menos um preço para o cliente ver.', 'erro');
+    const nova = { ...App.S.cfg, precos };
+    await DB.salvarConfig(nova);
+    App.aplicarConfig(nova);
+    aviso('Preços salvos.');
+    ABAS.precos(el);
+  };
+};
 
 // ---------- Configurações ----------
 
@@ -414,6 +616,9 @@ ABAS.ajuda = el => {
       <h3>${icone('cadeado', 22)} Acesso a esta área</h3>
       <p>Toque <b>5 vezes</b> no nome da loja (canto superior esquerdo) ou segure o dedo nele por 2 segundos. Troque a senha em <b>Configurações</b>.</p>
       <h3>${icone('lista', 22)} Pedidos</h3>
+      <p>Toque em <b>Ver pedido</b> para ver as camisetas e cada arte em tela cheia (toque na imagem para ampliar).</p>
+      <h3>${icone('dinheiro', 22)} Preços</h3>
+      <p>Na aba <b>Preços</b>, preencha o preço de cada modelo e malha, os acréscimos por tamanho e para frente + costas. Desligue <b>Mostrar preços para o cliente</b> para esconder os valores do app.</p>
       <p>Os pedidos ficam salvos neste tablet, na aba <b>Pedidos</b>, com o PDF para produção (imagens da frente/costas, tamanhos, nome do arquivo de cada arte e medidas em cm).</p>
       <p>Quando o cliente <b>envia a própria arte</b> ou usa uma <b>imagem da internet</b>, o pedido mostra a qualidade de impressão e o botão <b>Artes do cliente</b> baixa o arquivo original (e o crédito/licença das imagens da internet). Pedidos com arte de qualidade baixa aparecem com um alerta.</p>
     </div>`;

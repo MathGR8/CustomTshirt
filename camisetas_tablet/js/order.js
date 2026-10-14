@@ -10,6 +10,7 @@ import { urlDa, lib } from './catalog.js';
 import { DB } from './db.js';
 import { qualidade, credito } from './fontes.js';
 import { descreverTexto } from './texto.js';
+import { valorItem, mostrarPrecos, dinheiro } from './precos.js';
 
 const um = v => Math.round(v * 10) / 10;
 const f = v => String(um(v)).replace('.', ',');
@@ -78,11 +79,12 @@ export const totalPecas = item => Object.values(item.quantidades || {}).reduce((
  * Salva o pedido no tablet (com as imagens já desenhadas).
  * @returns {Promise<Object>} pedido salvo
  */
-export async function salvarPedido(itens, cliente) {
+export async function salvarPedido(itens, cliente, cfg = {}) {
   const numero = await DB.proximoNumero();
   const pedido = {
     id: Date.now(), numero, data: new Date().toISOString(), cliente,
-    itens: []
+    precos: { mostrar: mostrarPrecos(cfg) }, // o cliente viu os preços?
+    itens: [], total: 0
   };
   for (const it of itens) {
     const lados = ladosDo(it);
@@ -90,7 +92,8 @@ export async function salvarPedido(itens, cliente) {
     for (const l of lados) imagens[l] = await imagemLado(it, l);
     pedido.itens.push({
       modelo: it.modelo, malha: it.malha, cor: it.cor, quantidades: { ...it.quantidades },
-      modo: it.modo || 'criar', pronta: it.pronta || null,
+      modo: it.modo || 'criar', pronta: it.pronta || null, precoPronta: it.precoPronta || null,
+      valor: valorItem(cfg, it),
       // O texto guarda a própria imagem (url); as outras artes ficam no catálogo
       artes: it.artes.map(({ uid, url, ...a }) => ({
         ...a, ...(a.tipo === 'texto' ? { url, descricao: descreverTexto(a) } : {}),
@@ -101,6 +104,7 @@ export async function salvarPedido(itens, cliente) {
       imagens
     });
   }
+  pedido.total = pedido.itens.reduce((s, it) => s + (it.valor?.total || 0), 0);
   await DB.salvar('pedidos', pedido);
   return pedido;
 }
@@ -108,19 +112,20 @@ export async function salvarPedido(itens, cliente) {
 export const numeroPedido = n => String(n).padStart(4, '0');
 
 /** Texto curto do pedido (WhatsApp). */
-export function textoResumo(pedido, loja) {
+export function textoResumo(pedido, loja, comPrecos = true) {
   const linhas = [`*Pedido nº ${numeroPedido(pedido.numero)}* — ${loja}`];
   if (pedido.cliente?.nome) linhas.push(`Cliente: ${pedido.cliente.nome}${pedido.cliente.telefone ? ' · ' + pedido.cliente.telefone : ''}`);
   pedido.itens.forEach((it, i) => {
     const cor = CORES[it.cor]?.nome || it.cor;
-    const tam = Object.entries(it.quantidades).filter(([, n]) => n > 0).map(([t, n]) => `${t}×${n}`).join(', ');
+    const tam = comPrecos && it.valor?.total ? it.valor.linhas.map(l => `${l.t}×${l.qtd} (${dinheiro(l.unit)})`).join(', ')
+      : Object.entries(it.quantidades).filter(([, n]) => n > 0).map(([t, n]) => `${t}×${n}`).join(', ');
     linhas.push('', `*${i + 1}) ${modelo(it.modelo).nome} · ${it.malha} · ${cor}${it.modo === 'pronta' ? ' · camiseta pronta' : ''}*`, `Tamanhos: ${tam}`);
     it.artes.forEach(a => linhas.push(a.tipo === 'texto'
       ? `• ${a.lado}: texto "${a.texto.replace(/\n/g, ' / ')}" (${a.medidas}) — ${a.descricao}`
       : `• ${a.lado}: ${a.nome} (${a.medidas})${a.origem === 'cliente' ? ' — arte do cliente' : a.origem === 'internet' ? ' — imagem da internet' : ''}${a.qualidade ? ` · qualidade ${a.qualidade}` : ''}`));
   });
   const total = pedido.itens.reduce((s, it) => s + totalPecas(it), 0);
-  linhas.push('', `Total: ${total} peça${total === 1 ? '' : 's'}`);
+  linhas.push('', `Total: ${total} peça${total === 1 ? '' : 's'}${comPrecos && pedido.total ? ` · *${dinheiro(pedido.total)}*` : ''}`);
   if (pedido.cliente?.obs) linhas.push(`Obs.: ${pedido.cliente.obs}`);
   return linhas.join('\n');
 }
@@ -164,9 +169,12 @@ export async function pdfPedido(pedido, loja) {
     });
     y += alt + 6;
     const tam = Object.entries(it.quantidades).filter(([, n]) => n > 0);
+    const v = it.valor?.total ? it.valor : null;
     pdf.autoTable({
       startY: y, margin: { left: M, right: L / 2 + 2 }, theme: 'grid',
-      head: [['TAMANHO', 'QTD']], body: [...tam.map(([t, n]) => [t, String(n)]), ['Total', String(totalPecas(it))]],
+      head: [v ? ['TAMANHO', 'QTD', 'PREÇO', 'SUBTOTAL'] : ['TAMANHO', 'QTD']],
+      body: v ? [...v.linhas.map(l => [l.t, String(l.qtd), dinheiro(l.unit), dinheiro(l.sub)]), ['Total', String(totalPecas(it)), '', dinheiro(v.total)]]
+              : [...tam.map(([t, n]) => [t, String(n)]), ['Total', String(totalPecas(it))]],
       styles: { fontSize: 9, cellPadding: 1.8 }, headStyles: { fillColor: [30, 30, 30] }
     });
     const yTam = pdf.lastAutoTable.finalY;
@@ -188,7 +196,7 @@ export async function pdfPedido(pedido, loja) {
   const total = pedido.itens.reduce((s, it) => s + totalPecas(it), 0);
   if (y > 270) { pdf.addPage(); cab(); y = 32; }
   pdf.setFont('helvetica', 'bold'); pdf.setFontSize(12);
-  pdf.text(`Total do pedido: ${total} peça${total === 1 ? '' : 's'}`, M, y);
+  pdf.text(`Total do pedido: ${total} peça${total === 1 ? '' : 's'}${pedido.total ? ` · ${dinheiro(pedido.total)}` : ''}`, M, y);
   return pdf.output('blob');
 }
 

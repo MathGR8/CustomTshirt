@@ -57,6 +57,14 @@ por 2 segundos. Senha inicial: **1234** (troque em Configurações).
   originais e o crédito/licença) e um alerta quando alguma arte está com qualidade baixa.
   Os **textos** aparecem no PDF com o texto, a fonte e as cores, e vão no mesmo .zip como PNG
   transparente.
+- **Preços**: preço de uma peça para cada modelo e malha, acréscimo por tamanho (ex.: X1 a X8
+  mais caros) e acréscimo para estampa na frente e nas costas. A chave **Mostrar preços para o
+  cliente** esconde todos os preços do app (os pedidos continuam com o valor no administrador).
+  Camiseta pronta pode ter **preço próprio** (toque na arte, na aba Artes). Com os preços ligados
+  o cliente vê "a partir de" em cada modelo, o preço de cada tamanho e o total no fim.
+- **Ver pedido**: abre o pedido em tela cheia, com as camisetas grandes (frente e costas), a
+  tabela de tamanhos e valores e cada arte/texto separado. Tocar numa imagem abre o visualizador:
+  toque para ampliar, arraste para mover, setas para passar entre as camisetas e as artes.
 - **Configurações**: liga/desliga "Enviar minha arte" e "Buscar na internet".
 - **Configurações**: nome da loja, frase inicial, WhatsApp, senha e tempo de inatividade.
 
