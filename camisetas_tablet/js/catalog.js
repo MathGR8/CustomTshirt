@@ -231,6 +231,14 @@ async function lerPdf(file, aoPagina) {
       const c = canvas(viewport.width, viewport.height);
       // background transparente: sem isso o PDF.js pinta a página de branco
       await page.render({ canvasContext: c.getContext('2d'), viewport, background: 'rgba(0,0,0,0)' }).promise;
+      // Tem foto/imagem dentro? (sem imagem = vetor puro: fica nítido em qualquer tamanho)
+      let temImagem = false;
+      try {
+        const ops = await page.getOperatorList();
+        const O = pdfjs.OPS;
+        temImagem = ops.fnArray.some(fn => fn === O.paintImageXObject || fn === O.paintInlineImageXObject || fn === O.paintImageXObjectRepeat);
+      } catch { /* sem essa informação */ }
+      c.temImagem = temImagem;
       paginas.push(c);
       aoPagina?.(n, doc.numPages);
     }
@@ -274,9 +282,93 @@ async function lerCdr(file) {
   return bitmapDeBlob(new Blob([bmp], { type: 'image/bmp' }));
 }
 
+// ---------- Processamento de um arquivo ----------
+
+/** Lê um arquivo e devolve as páginas (canvas). */
+async function lerArquivo(file, ext) {
+  if (ext === 'pdf' || ext === 'ai') return { paginas: await lerPdf(file), tipo: 'pdf' };
+  if (ext === 'cdr') return { paginas: [await lerCdr(file)], tipo: 'cdr' };
+  const tipoMime = file.type || (ext === 'svg' ? 'image/svg+xml' : 'image/' + ext.replace('jpg', 'jpeg'));
+  return { paginas: [await bitmapDeBlob(file.type ? file : new Blob([file], { type: tipoMime }))], tipo: ext === 'svg' ? 'svg' : 'imagem' };
+}
+
+/**
+ * Transforma um arquivo em artes (registros prontos para o banco).
+ * Guarda a resolução original (pxW/pxH) e se é vetor, para avaliar a qualidade.
+ */
+async function gerarArtes(file, caminho, opc, base = {}) {
+  const ext = (caminho.split('.').pop() || '').toLowerCase();
+  const { paginas, tipo } = await lerArquivo(file, ext);
+  const baixaRes = tipo === 'cdr' && Math.max(paginas[0].width, paginas[0].height) < 900;
+  const lista = [];
+  const maxPag = opc.maxPaginas || paginas.length;
+  for (let pg = 0; pg < Math.min(paginas.length, maxPag); pg++) {
+    const c = paginas[pg];
+    // Fundo de cor única (JPG, prévia do Corel, PDF com fundo pintado)
+    if (opc.removerFundo && ext !== 'png' && ext !== 'svg') removerFundo(c);
+    const partes = opc.separar ? acharArtes(c) : [];
+    const pedacos = partes.length > 1 ? partes.map(r => recortar(c, r)) : [c];
+    for (let pt = 0; pt < pedacos.length; pt++) {
+      const arte = aparar(pedacos[pt]);
+      if (!arte) continue; // página em branco
+      const previa = reduzir(arte, IMAGENS.previa);
+      const mini = reduzir(arte, IMAGENS.miniatura);
+      const vetor = tipo === 'svg' || (tipo === 'pdf' && !c.temImagem);
+      lista.push({
+        ...base, arquivo: caminho, pagina: pg + 1, parte: pt + 1, tipo: ext,
+        sufixo: (paginas.length > 1 ? ` · pág. ${pg + 1}` : '') + (pedacos.length > 1 ? ` · ${pt + 1}` : ''),
+        w: previa.width, h: previa.height, baixaRes,
+        // Qualidade: tamanho real da imagem (raster) ou vetor
+        vetor, pdfComImagem: tipo === 'pdf' && !!c.temImagem, pxW: arte.width, pxH: arte.height,
+        miniatura: await paraBlob(mini, 0.85),
+        previa: await paraBlob(previa, 0.92)
+      });
+    }
+  }
+  return { artes: lista, baixaRes, paginas: paginas.length };
+}
+
+/**
+ * Arte enviada pelo cliente (ou baixada da internet): vira uma arte "oculta"
+ * do banco, usada só neste pedido. O arquivo original fica guardado para a produção.
+ * @returns {Promise<Object>} resumo da arte (sem as imagens)
+ */
+export async function processarArquivoCliente(file, { origem = 'cliente', fonte = null, nome = null } = {}) {
+  const caminho = file.name || 'arte.png';
+  const ext = (caminho.split('.').pop() || '').toLowerCase();
+  if (!EXT_OK.test(caminho) && ext !== 'ai') throw new Error('Formato não aceito. Use PDF, SVG, PNG ou JPG.');
+  const r = await gerarArtes(file, caminho, { maxPaginas: 1 });
+  if (!r.artes.length) throw new Error('O arquivo está vazio (nada desenhado).');
+  const a = r.artes[0];
+  const reg = {
+    ...a, id: `cliente/${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    tema: origem === 'internet' ? 'Internet' : 'Arte do cliente', nome: nome || nomeBonito(caminho),
+    origem, fonte, cliente: true, oculto: true, criado: Date.now(), original: file,
+    paginasNoArquivo: r.paginas
+  };
+  await DB.salvar('artes', reg);
+  const { miniatura, previa, original, ...resumo } = reg;
+  return resumo;
+}
+
+/** Tenta remover o fundo de cor única da prévia de uma arte do cliente. @returns {boolean} */
+export async function removerFundoDaArte(id) {
+  const a = await DB.pegar('artes', id);
+  if (!a) return false;
+  const c = await bitmapDeBlob(a.previa);
+  if (!removerFundo(c)) return false;
+  const arte = aparar(c, 0.01) || c;
+  a.previa = await paraBlob(arte, 0.92);
+  a.miniatura = await paraBlob(reduzir(arte, IMAGENS.miniatura), 0.85);
+  a.w = arte.width; a.h = arte.height; a.fundoRemovido = true;
+  await DB.salvar('artes', a);
+  esquecerUrls(id);
+  return true;
+}
+
 // ---------- Importação ----------
 
-const EXT_OK = /\.(pdf|cdr|png|jpe?g|webp|svg|zip)$/i;
+const EXT_OK = /\.(pdf|ai|cdr|png|jpe?g|webp|svg|zip)$/i;
 
 /** Deixa o nome do arquivo mais apresentável: "banda_rock-01.pdf" → "Banda rock 01". */
 export function nomeBonito(arquivo) {
@@ -331,40 +423,19 @@ export async function importar(lista, opc, progresso, sinal = {}) {
     const { file, caminho } = arquivos[i];
     progresso?.({ feitos: i, total: arquivos.length, arquivo: caminho });
     const tema = (temaDoCaminho(caminho) || opc.temaPadrao || 'Diversos').trim();
-    const ext = (caminho.split('.').pop() || '').toLowerCase();
     try {
-      let paginas, baixaRes = false;
-      if (ext === 'pdf') paginas = await lerPdf(file);
-      else if (ext === 'cdr') { paginas = [await lerCdr(file)]; baixaRes = Math.max(paginas[0].width, paginas[0].height) < 900; }
-      else paginas = [await bitmapDeBlob(file.type ? file : new Blob([file], { type: ext === 'svg' ? 'image/svg+xml' : 'image/' + ext.replace('jpg', 'jpeg') }))];
-
-      const novos = [];
-      for (let pg = 0; pg < paginas.length; pg++) {
-        let c = paginas[pg];
-        // Fundo de cor única (JPG, prévia do Corel, PDF com fundo pintado)
-        if (opc.removerFundo && ext !== 'png' && ext !== 'svg') removerFundo(c);
-        const partes = opc.separar ? acharArtes(c) : [];
-        const pedacos = partes.length > 1 ? partes.map(r => recortar(c, r)) : [c];
-        for (let pt = 0; pt < pedacos.length; pt++) {
-          const arte = aparar(pedacos[pt]);
-          if (!arte) continue; // página em branco
-          const previa = reduzir(arte, IMAGENS.previa);
-          const mini = reduzir(arte, IMAGENS.miniatura);
-          const id = `${tema}/${caminho}#${pg + 1}#${pt + 1}`;
-          const sufixo = (paginas.length > 1 ? ` · pág. ${pg + 1}` : '') + (pedacos.length > 1 ? ` · ${pt + 1}` : '');
-          const antigo = existentes.get(id);
-          novos.push({
-            id, tema, arquivo: caminho, pagina: pg + 1, parte: pt + 1, tipo: ext,
-            nome: antigo?.nome || nomeBonito(caminho) + sufixo,
-            oculto: antigo?.oculto || false,
-            w: previa.width, h: previa.height, baixaRes,
-            ordem: antigo?.ordem ?? ordem++,
-            criado: antigo?.criado || Date.now(),
-            miniatura: await paraBlob(mini, 0.85),
-            previa: await paraBlob(previa, 0.92)
-          });
-        }
-      }
+      const { artes, baixaRes } = await gerarArtes(file, caminho, opc);
+      const novos = artes.map(({ sufixo, ...a }) => {
+        const id = `${tema}/${caminho}#${a.pagina}#${a.parte}`;
+        const antigo = existentes.get(id);
+        return {
+          ...a, id, tema, origem: 'catalogo',
+          nome: antigo?.nome || nomeBonito(caminho) + sufixo,
+          oculto: antigo?.oculto || false,
+          ordem: antigo?.ordem ?? ordem++,
+          criado: antigo?.criado || Date.now()
+        };
+      });
       if (!novos.length) { avisos.push(`${caminho}: nada desenhado (página em branco).`); continue; }
       await DB.salvarVarios('artes', novos);
       importadas += novos.length;
@@ -392,6 +463,11 @@ export async function urlDa(id, tipo = 'miniatura') {
   return u;
 }
 
+/** Esquece as URLs de uma arte (depois de alterar a imagem). */
+function esquecerUrls(id) {
+  ['miniatura', 'previa'].forEach(t => { const k = id + '|' + t; if (urls.has(k)) { URL.revokeObjectURL(urls.get(k)); urls.delete(k); } });
+}
+
 /** Esquece as URLs (depois de apagar/reimportar). */
 export function limparUrls() {
   urls.forEach(u => URL.revokeObjectURL(u));
@@ -403,7 +479,7 @@ export function limparUrls() {
 export async function exportarCatalogo(progresso) {
   const JSZip = await lib('jszip');
   const zip = new JSZip();
-  const lista = await DB.todos('artes');
+  const lista = (await DB.todos('artes')).filter(a => !a.cliente);
   const meta = [];
   lista.forEach((a, i) => {
     const { miniatura, previa, ...m } = a;

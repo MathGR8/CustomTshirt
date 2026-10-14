@@ -6,7 +6,11 @@
 {
   "name": "camisetas-tablet",
   "compatibility_date": "2026-10-01",
+  // Worker: busca de imagens na internet (/api/busca) e download (/api/imagem).
+  // O resto (o app) são os arquivos estáticos da pasta.
+  "main": "worker/index.js",
   "assets": {
-    "directory": "."
+    "directory": ".",
+    "binding": "ASSETS"
   }
 }

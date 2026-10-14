@@ -12,7 +12,8 @@ import { PADRAO } from './config.js';
 import { DB } from './db.js';
 import { icone } from './icons.js';
 import { $, $$, esc, aviso, janela, confirmar, pedirSenha, progressoJanela } from './ui.js';
-import { importar, urlDa, limparUrls, exportarCatalogo, importarCatalogo } from './catalog.js';
+import { importar, urlDa, limparUrls, exportarCatalogo, importarCatalogo, lib } from './catalog.js';
+import { credito } from './fontes.js';
 import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo } from './order.js';
 import { modelo } from './shirt.js';
 
@@ -49,7 +50,7 @@ const ABAS = {};
 // ---------- Artes ----------
 
 ABAS.artes = async el => {
-  const lista = await DB.artesResumo();
+  const lista = (await DB.artesResumo()).filter(a => !a.cliente);
   const temas = [...new Set(lista.map(a => a.tema))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const espaco = await DB.espaco();
   const mb = b => (b / 1048576).toFixed(0) + ' MB';
@@ -225,15 +226,18 @@ ABAS.pedidos = async el => {
       ${lista.length ? `<div class="listaPedidos">${lista.map(p => {
         const d = new Date(p.data), total = p.itens.reduce((s, it) => s + totalPecas(it), 0);
         const img = Object.values(p.itens[0]?.imagens || {})[0];
+        const doCliente = p.itens.flatMap(it => it.artes).filter(a => a.origem && a.origem !== 'catalogo');
         return `<article class="pedidoAdmin">
           ${img ? `<img src="${img}" alt="">` : ''}
           <div class="pedidoInfo">
             <strong>Nº ${numeroPedido(p.numero)} — ${esc(p.cliente?.nome || 'Sem nome')}</strong>
             <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${p.cliente?.telefone ? ' · ' + esc(p.cliente.telefone) : ''}</small>
             <small>${p.itens.map(it => modelo(it.modelo).nome).join(', ')} · ${total} peça${total === 1 ? '' : 's'}</small>
+            ${doCliente.some(a => /Baixa/.test(a.qualidade || '')) ? `<small class="alertaPedido">${icone('fechar', 14)} Tem arte com qualidade BAIXA</small>` : ''}
           </div>
           <div class="linhaBotoes">
             <button type="button" class="btn btnEscuro" data-pdf="${p.id}">${icone('baixar', 20)} PDF</button>
+            ${doCliente.length ? `<button type="button" class="btn btnClaro" data-artes="${p.id}">${icone('baixar', 20)} Artes do cliente (${doCliente.length})</button>` : ''}
             <button type="button" class="btn btnClaro" data-copiar="${p.id}">${icone('lista', 20)} Copiar texto</button>
             <button type="button" class="btnIcone" data-apagar="${p.id}" aria-label="Apagar pedido">${icone('lixo', 20)}</button>
           </div>
@@ -247,19 +251,47 @@ ABAS.pedidos = async el => {
     catch (e) { aviso('Não foi possível gerar o PDF: ' + e.message, 'erro'); }
     b.disabled = false;
   }));
+  $$('[data-artes]', el).forEach(b => (b.onclick = async () => {
+    b.disabled = true;
+    try {
+      const p = achar(b.dataset.artes);
+      const JSZip = await lib('jszip');
+      const zip = new JSZip();
+      const vistos = new Set();
+      for (const a of p.itens.flatMap(it => it.artes).filter(x => x.origem && x.origem !== 'catalogo')) {
+        if (vistos.has(a.artId)) continue;
+        vistos.add(a.artId);
+        const reg = await DB.pegar('artes', a.artId);
+        if (reg?.original) zip.file(`${String(vistos.size).padStart(2, '0')}-${reg.original.name || reg.arquivo}`, reg.original);
+        if (reg?.fonte) zip.file(`${String(vistos.size).padStart(2, '0')}-credito.txt`, `${reg.nome}\n${credito(reg.fonte)}\nLicença: ${reg.fonte.licencaUrl || ''}\nPágina: ${reg.fonte.pagina || ''}\nArquivo: ${reg.fonte.url || ''}\n`);
+      }
+      if (!vistos.size) throw new Error('as artes deste pedido não estão mais no tablet');
+      baixar(await zip.generateAsync({ type: 'blob' }), `pedido-${numeroPedido(p.numero)}-artes-do-cliente.zip`);
+    } catch (e) { aviso('Não foi possível baixar: ' + e.message, 'erro'); }
+    b.disabled = false;
+  }));
   $$('[data-copiar]', el).forEach(b => (b.onclick = async () => {
     try { await navigator.clipboard.writeText(textoResumo(achar(b.dataset.copiar), App.S.cfg.loja)); aviso('Texto copiado.'); }
     catch { aviso('Não foi possível copiar neste aparelho.', 'erro'); }
   }));
   $$('[data-apagar]', el).forEach(b => (b.onclick = async () => {
     if (!(await confirmar('Apagar este pedido do tablet?', { sim: 'Apagar', perigo: true }))) return;
+    await apagarArtesDoCliente([achar(b.dataset.apagar)], lista);
     await DB.apagar('pedidos', +b.dataset.apagar); ABAS.pedidos(el);
   }));
   $('#apagarTodos', el) && ($('#apagarTodos', el).onclick = async () => {
     if (!(await confirmar('Apagar TODOS os pedidos deste tablet?', { sim: 'Apagar todos', perigo: true }))) return;
+    await apagarArtesDoCliente(lista, lista);
     await DB.limpar('pedidos'); ABAS.pedidos(el);
   });
 };
+
+/** Apaga as artes de clientes dos pedidos (se nenhum outro pedido usa). */
+async function apagarArtesDoCliente(pedidos, todos) {
+  const ids = new Set(pedidos.flatMap(p => p.itens.flatMap(it => it.artes)).filter(a => a.origem && a.origem !== 'catalogo').map(a => a.artId));
+  const outros = new Set(todos.filter(p => !pedidos.includes(p)).flatMap(p => p.itens.flatMap(it => it.artes.map(a => a.artId))));
+  for (const id of ids) if (!outros.has(id)) await DB.apagar('artes', id).catch(() => {});
+}
 
 // ---------- Configurações ----------
 
@@ -270,6 +302,8 @@ ABAS.config = el => {
       <label class="campoPeq"><span>Nome da loja (aparece no topo e no PDF)</span><input id="cLoja" value="${esc(c.loja)}"></label>
       <label class="campoPeq"><span>Frase da tela inicial</span><input id="cSlogan" value="${esc(c.slogan)}"></label>
       <label class="campoPeq"><span>WhatsApp da loja (só números, com 55 e DDD). Vazio = sem botão de WhatsApp</span><input id="cZap" inputmode="numeric" value="${esc(c.whatsapp)}" placeholder="5512999999999"></label>
+      <label class="checkLinha"><input type="checkbox" id="cEnvio" ${c.permitirEnvio !== false ? 'checked' : ''}> Cliente pode <b>enviar a própria arte</b></label>
+      <label class="checkLinha"><input type="checkbox" id="cBusca" ${c.permitirBusca !== false ? 'checked' : ''}> Cliente pode <b>buscar imagens na internet</b> (só imagens com licença livre para uso comercial)</label>
       <label class="campoPeq"><span>Voltar ao início depois de quantos minutos parado</span><input id="cIdle" type="number" min="1" max="30" value="${c.inatividadeMin}"></label>
       <label class="campoPeq"><span>Nova senha do administrador (deixe vazio para manter)</span><input id="cSenha" inputmode="numeric" maxlength="6" placeholder="4 a 6 números"></label>
       <button type="button" class="btn btnEscuro btnGrande" id="cSalvar">${icone('check')} Salvar configurações</button>
@@ -283,6 +317,8 @@ ABAS.config = el => {
       slogan: $('#cSlogan', el).value.trim() || PADRAO.slogan,
       whatsapp: $('#cZap', el).value.replace(/\D/g, ''),
       inatividadeMin: Math.max(1, Math.min(30, +$('#cIdle', el).value || 3)),
+      permitirEnvio: $('#cEnvio', el).checked,
+      permitirBusca: $('#cBusca', el).checked,
       senha: senha || c.senha
     };
     await DB.salvarConfig(nova);
@@ -315,5 +351,6 @@ ABAS.ajuda = el => {
       <p>Toque <b>5 vezes</b> no nome da loja (canto superior esquerdo) ou segure o dedo nele por 2 segundos. Troque a senha em <b>Configurações</b>.</p>
       <h3>${icone('lista', 22)} Pedidos</h3>
       <p>Os pedidos ficam salvos neste tablet, na aba <b>Pedidos</b>, com o PDF para produção (imagens da frente/costas, tamanhos, nome do arquivo de cada arte e medidas em cm).</p>
+      <p>Quando o cliente <b>envia a própria arte</b> ou usa uma <b>imagem da internet</b>, o pedido mostra a qualidade de impressão e o botão <b>Artes do cliente</b> baixa o arquivo original (e o crédito/licença das imagens da internet). Pedidos com arte de qualidade baixa aparecem com um alerta.</p>
     </div>`;
 };
