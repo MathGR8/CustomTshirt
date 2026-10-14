@@ -672,3 +672,112 @@ input[type="range"]::-moz-range-thumb { width: 32px; height: 32px; border-radius
 .tamanhos .cabecaTela + .textoAjuda { margin: 6px 0 16px; }
 .caminhoAmostras { overflow: hidden; }
 .amostraPronta { width: auto; height: 78%; max-width: 31%; flex-shrink: 1; }
+
+/* =========================================================
+   Preços
+   ========================================================= */
+.preco { font-weight: 800; font-size: 16px; color: var(--preto); }
+.preco small { font-weight: 600; color: var(--cinza-escuro); font-size: 13px; }
+.modeloCard .preco { margin-top: 4px; font-weight: 600; font-size: 15px; color: var(--cinza-escuro); }
+.modeloCard .preco b { color: var(--preto); font-size: 19px; }
+.precoCartao { padding: 0 4px; font-size: 15px; }
+.precoGrande { display: block; font-size: 30px; font-weight: 900; color: var(--preto); margin-top: 6px; width: 100%; }
+.verMedida { flex-wrap: wrap; }
+.cartaoTamanho .preco { font-size: 15px; }
+.precoItem { color: var(--preto) !important; font-weight: 600 !important; }
+.precoItem b { font-size: 19px; }
+.prontoValor { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 22px; }
+.prontoValor b { font-size: 30px; }
+.prontoValor small { color: var(--cinza); font-size: 14px; }
+.segPeq button small { background: transparent; padding: 0; font-size: 12px; color: inherit; opacity: .8; }
+
+/* Administrador: aba Preços */
+.formPrecos { max-width: 900px; }
+.chaveGrande { display: flex; gap: 14px; align-items: center; padding: 14px 16px; border: 2px solid var(--preto); border-radius: var(--raio); }
+.chaveGrande input { width: 30px; height: 30px; accent-color: var(--preto); flex-shrink: 0; }
+.chaveGrande span { display: flex; flex-direction: column; gap: 2px; font-size: 17px; }
+.chaveGrande small { color: var(--cinza-escuro); font-size: 14px; }
+.precoModelo { border: 2px solid var(--linha); border-radius: var(--raio); padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+.precoModelo legend { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; padding: 0 6px; }
+.campoDinheiro { display: flex; align-items: center; border: 2px solid var(--linha); border-radius: 14px; background: var(--branco); padding-left: 12px; }
+.campoDinheiro:focus-within { border-color: var(--preto); }
+.campoDinheiro i { font-style: normal; font-weight: 700; color: var(--cinza-escuro); font-size: 15px; }
+.campoPeq .campoDinheiro input, .campoDinheiro input { border: 0 !important; min-height: 50px; padding: 0 10px; font-size: 19px; width: 100%; min-width: 0; outline: 0; background: transparent; }
+.acrescimos summary { display: flex; align-items: center; gap: 6px; min-height: 44px; font-weight: 700; cursor: pointer; list-style: none; }
+.acrescimos summary::-webkit-details-marker { display: none; }
+.acrescimos summary small { color: var(--cinza); font-weight: 500; }
+.gradeAcrescimo { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; padding-top: 6px; }
+.gradeAcrescimo label { display: flex; flex-direction: column; gap: 4px; font-weight: 800; font-size: 14px; }
+.gradeAcrescimo .campoDinheiro input { min-height: 44px; font-size: 17px; }
+
+/* =========================================================
+   Pedido em tela cheia
+   ========================================================= */
+.pedidoMini { padding: 0; border-radius: 10px; }
+.janelaPedido { width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh; border-radius: 0; }
+.janelaPedido .janelaCorpo { flex: 1; background: var(--fundo); padding: 16px; }
+.pedidoDetalhe { display: flex; flex-direction: column; gap: 16px; max-width: 1400px; width: 100%; margin: 0 auto; }
+.pedidoCab { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; background: var(--preto); color: var(--branco); border-radius: var(--raio-g); padding: 18px 22px; }
+.pedidoCliente { flex: 1 1 300px; display: flex; flex-direction: column; gap: 4px; }
+.pedidoCliente strong { font-size: 26px; }
+.pedidoCliente span { display: flex; align-items: center; gap: 6px; color: #cfcfcf; }
+.pedidoObs { display: flex; gap: 6px; align-items: flex-start; background: #262626; border-radius: 12px; padding: 8px 12px; margin-top: 4px; }
+.pedidoResumo { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; color: #cfcfcf; }
+.pedidoResumo strong { font-size: 30px; color: var(--branco); }
+.pedidoResumo small { font-size: 13px; }
+.pedidoCab .btnClaro { border-color: #3a3a3a; }
+.pedidoCab .btnEscuro { background: var(--branco); color: var(--preto); }
+.pedidoItem { background: var(--branco); border-radius: var(--raio-g); padding: 18px; box-shadow: var(--sombra); display: flex; flex-direction: column; gap: 14px; }
+.pedidoItem h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; font-size: 22px; }
+.pedidoItem h3 > span:not(.etiqueta) { font-weight: 600; color: var(--cinza-escuro); font-size: 18px; }
+.pedidoCorpo { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 18px; align-items: start; }
+.pedidoLados { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.ladoGrande { position: relative; background: var(--palco); border-radius: var(--raio); padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.ladoGrande img { width: 100%; aspect-ratio: 1 / 1.1; object-fit: contain; mix-blend-mode: multiply; }
+.ladoGrande span { font-weight: 800; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: var(--cinza-escuro); }
+.ladoGrande i { position: absolute; top: 10px; right: 10px; width: 40px; height: 40px; border-radius: 12px; background: var(--branco); display: grid; place-items: center; box-shadow: var(--sombra); }
+.ladoGrande:active { transform: scale(.99); }
+.pedidoInfoItem { display: flex; flex-direction: column; gap: 14px; }
+.tabelaPedido { width: 100%; border-collapse: collapse; font-size: 17px; border-radius: 14px; overflow: hidden; box-shadow: 0 0 0 2px var(--linha); }
+.tabelaPedido th, .tabelaPedido td { padding: 9px 10px; text-align: center; border-top: 1px solid var(--linha); }
+.tabelaPedido thead th { background: var(--preto); color: var(--branco); font-size: 13px; text-transform: uppercase; letter-spacing: .5px; border: 0; }
+.tabelaPedido tbody th { font-weight: 900; }
+.tabelaPedido tfoot { font-weight: 800; background: var(--fundo); }
+.artesPedido { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.artesPedido li { display: flex; gap: 12px; align-items: center; border: 2px solid var(--linha); border-radius: var(--raio); padding: 8px; }
+.arteMini { width: 92px; height: 92px; flex-shrink: 0; border-radius: 12px; background: var(--fundo); padding: 8px; display: grid; place-items: center; }
+.arteMini img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.arteDesc { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 15px; }
+.arteDesc small { color: var(--cinza-escuro); overflow-wrap: anywhere; }
+.arteLado { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--cinza); }
+.semArte { color: var(--cinza-escuro); }
+
+/* Visualizador (tela cheia) */
+.janelaZoom { width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh; border-radius: 0; background: #0d0d0d; color: var(--branco); }
+.janelaZoom .janelaTopo { position: absolute; right: 10px; top: 10px; z-index: 3; border: 0; padding: 0; background: transparent; }
+.janelaZoom .janelaTopo .btnIcone { background: #262626; color: var(--branco); width: 56px; height: 56px; }
+.janelaZoom .janelaCorpo { height: 100%; padding: 0; gap: 0; position: relative; overflow: hidden; }
+.zoomTopo { position: absolute; left: 0; right: 80px; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; background: linear-gradient(#0d0d0dee, #0d0d0d00); font-weight: 700; }
+.zoomTopo .btnRedondo { background: #262626; color: var(--branco); border-color: #3a3a3a; width: 52px; height: 52px; }
+.zoomArea { position: absolute; inset: 0; overflow: hidden; display: block; touch-action: none; cursor: zoom-in; background: #f3f3f1; }
+.zoomArea.soArteZoom { background: var(--fundo); }
+.zoomArea.ampliado { cursor: grab; }
+.zoomArea img { display: block; width: 100%; height: 100%; object-fit: contain; padding: 70px 70px 40px; -webkit-user-drag: none; user-select: none; }
+.zoomArea.ampliado img { padding: 0; max-width: none; }
+.zoomNav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 60px; height: 84px; border-radius: 18px; background: #262626cc; color: var(--branco); display: grid; place-items: center; }
+.zoomNav.esq { left: 10px; } .zoomNav.dir { right: 10px; }
+.zoomDica { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 2; background: #262626cc; padding: 6px 14px; border-radius: 20px; font-size: 14px; pointer-events: none; white-space: nowrap; }
+
+@media (max-aspect-ratio: 1/1) {
+  .pedidoCorpo { grid-template-columns: 1fr; }
+  .pedidoResumo { align-items: flex-start; }
+}
+.arteMini img { width: 100%; height: 100%; object-fit: contain; }
+.zoomArea { background: var(--fundo, #ffffff); }
+.pedidoLados { grid-template-columns: repeat(auto-fill, minmax(240px, 360px)); }
+.arteMini { display: block; overflow: hidden; }
+.arteMini img { display: block; }
+.pedidoLados { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.ladoGrande { max-width: 440px; }
+.pedidoLados { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ladoGrande { max-width: none; }
