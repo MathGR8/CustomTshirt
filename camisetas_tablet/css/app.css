@@ -519,3 +519,156 @@ input[type="range"]::-moz-range-thumb { width: 32px; height: 32px; border-radius
 .ajustar .palcoArea { padding-top: 0 !important; }
 .ajustar .segmentoTopo { left: 14px; top: 14px; transform: none; }
 .ajustar .dicaPalco { position: absolute; right: 14px; bottom: 14px; margin: 0; max-width: 46%; font-size: 14px; }
+
+/* =========================================================
+   Fluxo novo: Modelo → Estampa (pronta ou criar) → Personalizar
+   ========================================================= */
+.cabecaTela { display: flex; align-items: center; justify-content: space-between; gap: 12px 18px; flex-wrap: wrap; }
+.cabecaTela .btn { min-height: 52px; }
+
+/* 1. Modelo */
+.telaModelo { padding: 24px; max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; min-height: 100%; }
+.modelosGrandes { flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-content: center; }
+.modeloCard { position: relative; background: var(--branco); border: 2px solid var(--linha); border-radius: var(--raio-g); padding: 22px 18px 20px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; box-shadow: var(--sombra); transition: transform .1s; }
+.modeloCard:active { transform: scale(.98); }
+.modeloCard svg { width: 82%; max-width: 260px; height: auto; margin-bottom: 8px; filter: drop-shadow(0 10px 14px rgba(0,0,0,.12)); }
+.modeloCard strong { font-size: 24px; font-weight: 800; }
+.modeloCard small { color: var(--cinza-escuro); font-size: 16px; }
+.tamanhosLista { margin-top: 6px; font-size: 14px; font-weight: 700; background: var(--fundo); border-radius: 10px; padding: 4px 12px; }
+.modeloCard > .ic { position: absolute; top: 14px; right: 14px; width: 34px; height: 34px; padding: 6px; border-radius: 50%; background: var(--preto); color: var(--branco); opacity: 0; transform: scale(.5); transition: .15s; }
+.modeloCard[aria-pressed="true"] { border-color: var(--preto); box-shadow: 0 0 0 2px var(--preto) inset, var(--sombra); }
+.modeloCard[aria-pressed="true"] > .ic { opacity: 1; transform: none; }
+
+/* 2. Estampa: dois caminhos */
+.caminhos { padding: 24px; max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 22px; min-height: 100%; justify-content: center; }
+.caminhos .tituloTela { align-self: flex-start; }
+.cartoesCaminho { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.caminho { position: relative; background: var(--branco); border: 2px solid var(--linha); border-radius: var(--raio-g); padding: 24px; display: flex; flex-direction: column; gap: 12px; text-align: left; box-shadow: var(--sombra); transition: transform .1s; }
+.caminho:active { transform: scale(.985); }
+.caminho[aria-pressed="true"] { border-color: var(--preto); box-shadow: 0 0 0 2px var(--preto) inset, var(--sombra); }
+.caminho strong { display: flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 800; }
+.caminho > span:not(.caminhoAmostras):not(.caminhoIcones) { color: var(--cinza-escuro); font-size: 17px; line-height: 1.45; }
+.caminho em { font-style: normal; font-weight: 700; font-size: 14px; align-self: flex-start; background: var(--fundo); border-radius: 10px; padding: 5px 12px; }
+.caminhoAmostras, .caminhoIcones { height: 190px; border-radius: var(--raio); background: var(--palco); display: flex; align-items: center; justify-content: center; gap: 12px; padding: 16px; }
+.amostraPronta { width: 30%; aspect-ratio: 1; border-radius: 16px; background: var(--fundo); display: block; overflow: hidden; box-shadow: var(--sombra); }
+.amostraPronta:nth-child(2) { transform: translateY(-10px) scale(1.08); }
+.amostraPronta img { width: 100%; height: 100%; object-fit: contain; padding: 12%; opacity: 0; transition: opacity .25s; }
+.amostraPronta img.ok { opacity: 1; }
+.caminhoIcones { background: var(--preto); color: var(--branco); gap: 28px; }
+
+/* Galeria das prontas */
+.bolinhasCor { display: flex; gap: 4px; padding: 0 4px; }
+.bolinhasCor i { width: 14px; height: 14px; border-radius: 50%; background: var(--c); border: 1px solid rgba(0,0,0,.2); }
+.seloCostas { left: auto; right: 10px; background: var(--branco); color: var(--preto); box-shadow: var(--sombra); }
+.coresProntas { display: flex; flex-wrap: wrap; gap: 12px; }
+.corGrande { width: 54px; height: 54px; }
+
+/* Janela "Colocar uma imagem" */
+.janelaImagem { width: min(1100px, 96vw); height: min(820px, 92dvh); }
+.janelaImagem .janelaCorpo { flex: 1; padding: 14px 0 0; gap: 8px; }
+.janelaImagem .segmentoFontes { align-self: center; }
+.janelaImagem .envio, .janelaImagem .buscaWeb { padding-top: 6px; }
+
+/* Personalizar */
+.corCompacta { background: var(--branco); border-radius: var(--raio); padding: 4px 12px 12px; box-shadow: var(--sombra); display: flex; flex-direction: column; gap: 8px; }
+.corCompacta .rotuloLinha { margin-top: 6px; }
+.segPeq { display: flex; width: 100%; box-shadow: none; background: var(--fundo); padding: 4px; }
+.segPeq button { flex: 1; min-height: 42px; padding: 0 8px; font-size: 14px; }
+.corCompacta .coresMini { flex-wrap: wrap; gap: 10px; padding: 2px 4px; }
+.botoesAdicionar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.botoesAdicionar .btn { margin-top: 6px; }
+.adicionarNoPalco { background: rgba(255,255,255,.94); border-radius: var(--raio-g); padding: 18px 22px; box-shadow: var(--sombra-forte); gap: 14px; font-size: 18px; text-align: center; }
+.adicionarNoPalco .btn { min-width: 150px; }
+
+/* Tamanhos: medidas no cartão */
+.medidaTamanho { font-size: 14px; font-weight: 700; color: var(--cinza-escuro); background: var(--fundo); border-radius: 10px; padding: 6px 10px; min-height: 36px; }
+.medidaTamanho:empty { display: none; }
+
+/* Tabela de medidas */
+.janelaMedidas { width: min(980px, 96vw); max-height: 92dvh; }
+.janelaMedidas .abasMedidas { align-self: center; box-shadow: none; background: var(--fundo); }
+.medidasCorpo { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 22px; align-items: start; }
+.desenhoMedidas { background: var(--palco); border-radius: var(--raio-g); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.desenhoMedidas svg { width: 100%; height: auto; max-height: 52dvh; }
+.desenhoMedidas figcaption { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 16px; font-weight: 700; font-size: 15px; }
+.desenhoMedidas figcaption b, .tabelaMedidas th b { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--preto); color: var(--branco); font-size: 13px; margin-right: 4px; }
+.seta line { stroke: var(--preto); stroke-width: 6; }
+.seta circle { fill: var(--preto); }
+.seta text { fill: var(--branco); font: 800 40px system-ui, sans-serif; text-anchor: middle; }
+#pontaM path { fill: var(--preto); }
+.tabelasMedidas { display: flex; flex-direction: column; gap: 18px; }
+.tabelaMedidas { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--branco); border-radius: var(--raio); overflow: hidden; box-shadow: 0 0 0 2px var(--linha); font-size: 18px; }
+.tabelaMedidas caption { text-align: left; font-weight: 800; font-size: 18px; padding: 2px 6px 8px; }
+.tabelaMedidas thead th { background: var(--preto); color: var(--branco); font-size: 14px; font-weight: 700; padding: 12px 8px; text-transform: uppercase; letter-spacing: .5px; }
+.tabelaMedidas thead th b { background: var(--branco); color: var(--preto); }
+.tabelaMedidas td, .tabelaMedidas tbody th { padding: 11px 8px; text-align: center; border-top: 1px solid var(--linha); }
+.tabelaMedidas tbody th { font-weight: 900; font-size: 19px; }
+.tabelaMedidas tbody th small { color: var(--cinza); font-weight: 600; font-size: 13px; }
+.tabelaMedidas tbody tr:nth-child(even) { background: #f8f8f6; }
+.tabelaMedidas tr.destaque { background: var(--preto) !important; color: var(--branco); }
+.tabelaMedidas tr.destaque small { color: #bbb; }
+
+/* Editor de texto */
+.janelaTexto { width: min(1000px, 96vw); max-height: 94dvh; }
+.editorTexto { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 20px; align-items: start; }
+.textoPrevia { position: sticky; top: 0; background: var(--fundo); border-radius: var(--raio-g); padding: 14px; }
+.previaTexto { background: var(--fundo); min-height: 220px; border-radius: var(--raio); display: grid; place-items: center; padding: 20px; text-align: center; white-space: pre-line; overflow-wrap: anywhere; font-size: clamp(30px, 4.6vw, 54px); line-height: 1.15; }
+.textoPrevia .previaTexto { background: var(--fundo); }
+.textoPrevia { --fundo: #191919; background: var(--fundo); }
+.textoCampos { display: flex; flex-direction: column; gap: 10px; }
+.campoTexto { display: flex; flex-direction: column; gap: 6px; font-weight: 700; }
+.campoTexto small { color: var(--cinza); font-weight: 500; }
+.campoTexto textarea { border: 2px solid var(--linha); border-radius: 14px; padding: 12px 14px; font-size: 22px; resize: none; outline: 0; }
+.campoTexto textarea:focus { border-color: var(--preto); }
+.gradeFontes { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.botaoFonte { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 76px; padding: 8px 4px; border-radius: 14px; background: var(--branco); border: 2px solid var(--linha); }
+.botaoFonte .amostra { font-size: 30px; line-height: 1.1; }
+.botaoFonte small { font-family: system-ui, sans-serif; font-weight: 600; font-size: 12px; color: var(--cinza-escuro); }
+.botaoFonte[aria-pressed="true"] { border-color: var(--preto); box-shadow: 0 0 0 2px var(--preto) inset; }
+.coresTexto { display: flex; flex-wrap: wrap; gap: 8px; }
+.corTexto { width: 42px; height: 42px; border-radius: 50%; background: var(--c); border: 2px solid rgba(0,0,0,.18); }
+.corTexto[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--branco), 0 0 0 5px var(--preto); }
+.janelaTexto .chipPos { flex-direction: column; display: flex; align-items: center; justify-content: center; line-height: 1.1; }
+.janelaTexto .chipPos small { font-weight: 500; font-size: 12px; color: var(--cinza-escuro); }
+.janelaTexto .chipPos[aria-pressed="true"], .chipPos[aria-pressed="true"] { background: var(--preto); color: var(--branco); border-color: var(--preto); }
+.janelaTexto .chipPos[aria-pressed="true"] small { color: #ccc; }
+.janelaTexto #okTexto { margin-top: 6px; }
+
+/* Administrador: camiseta pronta */
+.janelaEditarArte { width: min(1080px, 96vw); }
+.editarPrevia { background: var(--palco); place-items: stretch; align-content: start; gap: 12px; }
+.previaLados { display: flex; gap: 10px; justify-content: center; }
+.previaLados figure { flex: 1; max-width: 340px; text-align: center; font-size: 13px; font-weight: 700; color: var(--cinza-escuro); text-transform: uppercase; }
+.previaLados .palcoSvg { height: auto; }
+.previaCores { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.subtituloAdmin { display: flex; align-items: center; gap: 8px; font-size: 18px; border-top: 1px solid var(--linha); padding-top: 14px; }
+.coresAdmin { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.corAdmin { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--preto); min-height: 40px; }
+.corAdmin input { width: 22px; height: 22px; accent-color: var(--preto); }
+.corAdmin i { width: 22px; height: 22px; border-radius: 50%; background: var(--c); border: 1px solid rgba(0,0,0,.25); }
+.campoPeq select { border: 2px solid var(--linha); border-radius: 14px; min-height: 54px; padding: 0 12px; font-size: 16px; background: var(--branco); }
+.dicaCostas { font-size: 13px; margin-top: -8px; }
+#eCm { accent-color: var(--preto); height: 40px; }
+
+@media (max-aspect-ratio: 1/1) {
+  .modelosGrandes { grid-template-columns: 1fr; gap: 12px; align-content: start; }
+  .modeloCard { display: grid; grid-template-columns: 120px 1fr; justify-items: start; align-items: center; text-align: left; column-gap: 18px; padding: 14px 18px; }
+  .modeloCard svg { grid-row: 1 / span 3; width: 100%; margin: 0; }
+  .cartoesCaminho { grid-template-columns: 1fr; }
+  .caminhoAmostras, .caminhoIcones { height: 140px; }
+  .medidasCorpo { grid-template-columns: 1fr; }
+  .desenhoMedidas svg { max-height: 30dvh; }
+  .editorTexto { grid-template-columns: 1fr; }
+  .textoPrevia { position: static; }
+  .previaTexto { min-height: 140px; }
+}
+@media (max-width: 700px) {
+  .modeloCard { grid-template-columns: 90px 1fr; }
+  .caminho strong { font-size: 22px; }
+}
+
+.editarCampos .campoPeq { flex: none; }
+.editarPrevia { position: sticky; top: 0; align-self: start; }
+.tamanhos .cabecaTela + .textoAjuda { margin: 6px 0 16px; }
+.caminhoAmostras { overflow: hidden; }
+.amostraPronta { width: auto; height: 78%; max-width: 31%; flex-shrink: 1; }

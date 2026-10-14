@@ -9,6 +9,7 @@ import { CORES } from './config.js';
 import { urlDa, lib } from './catalog.js';
 import { DB } from './db.js';
 import { qualidade, credito } from './fontes.js';
+import { descreverTexto } from './texto.js';
 
 const um = v => Math.round(v * 10) / 10;
 const f = v => String(um(v)).replace('.', ',');
@@ -48,7 +49,7 @@ export async function imagemLado(item, lado, largura = 900) {
   const area = areaImpressao(item.modelo, lado);
   const artes = [];
   for (const a of item.artes.filter(x => x.lado === lado)) {
-    const url = await urlDa(a.artId, 'previa');
+    const url = a.tipo === 'texto' ? a.url : await urlDa(a.artId, 'previa');
     if (!url) continue;
     const img = await carregarImagem(url);
     const wu = a.cm * area.upc, hu = wu * proporcao(a);
@@ -89,8 +90,11 @@ export async function salvarPedido(itens, cliente) {
     for (const l of lados) imagens[l] = await imagemLado(it, l);
     pedido.itens.push({
       modelo: it.modelo, malha: it.malha, cor: it.cor, quantidades: { ...it.quantidades },
+      modo: it.modo || 'criar', pronta: it.pronta || null,
+      // O texto guarda a própria imagem (url); as outras artes ficam no catálogo
       artes: it.artes.map(({ uid, url, ...a }) => ({
-        ...a, medidas: textoMedidas(it.modelo, a),
+        ...a, ...(a.tipo === 'texto' ? { url, descricao: descreverTexto(a) } : {}),
+        medidas: textoMedidas(it.modelo, a),
         qualidade: qualidade(a)?.rotulo || null,
         credito: a.fonte ? credito(a.fonte) : null
       })),
@@ -110,8 +114,10 @@ export function textoResumo(pedido, loja) {
   pedido.itens.forEach((it, i) => {
     const cor = CORES[it.cor]?.nome || it.cor;
     const tam = Object.entries(it.quantidades).filter(([, n]) => n > 0).map(([t, n]) => `${t}×${n}`).join(', ');
-    linhas.push('', `*${i + 1}) ${modelo(it.modelo).nome} · ${it.malha} · ${cor}*`, `Tamanhos: ${tam}`);
-    it.artes.forEach(a => linhas.push(`• ${a.lado}: ${a.nome} (${a.medidas})${a.origem === 'cliente' ? ' — arte do cliente' : a.origem === 'internet' ? ' — imagem da internet' : ''}${a.qualidade ? ` · qualidade ${a.qualidade}` : ''}`));
+    linhas.push('', `*${i + 1}) ${modelo(it.modelo).nome} · ${it.malha} · ${cor}${it.modo === 'pronta' ? ' · camiseta pronta' : ''}*`, `Tamanhos: ${tam}`);
+    it.artes.forEach(a => linhas.push(a.tipo === 'texto'
+      ? `• ${a.lado}: texto "${a.texto.replace(/\n/g, ' / ')}" (${a.medidas}) — ${a.descricao}`
+      : `• ${a.lado}: ${a.nome} (${a.medidas})${a.origem === 'cliente' ? ' — arte do cliente' : a.origem === 'internet' ? ' — imagem da internet' : ''}${a.qualidade ? ` · qualidade ${a.qualidade}` : ''}`));
   });
   const total = pedido.itens.reduce((s, it) => s + totalPecas(it), 0);
   linhas.push('', `Total: ${total} peça${total === 1 ? '' : 's'}`);
@@ -144,7 +150,7 @@ export async function pdfPedido(pedido, loja) {
     if (i > 0 || y > 60) { pdf.addPage(); cab(); y = 32; }
     const cor = CORES[it.cor]?.nome || it.cor;
     pdf.setFont('helvetica', 'bold'); pdf.setFontSize(12);
-    pdf.text(`Camiseta ${i + 1} de ${pedido.itens.length} — ${modelo(it.modelo).nome} · ${it.malha} · ${cor}`, M, y + 4);
+    pdf.text(`Camiseta ${i + 1} de ${pedido.itens.length} — ${modelo(it.modelo).nome} · ${it.malha} · ${cor}${it.modo === 'pronta' ? ' · PRONTA' : ''}`, M, y + 4);
     pdf.setFont('helvetica', 'normal');
     y += 9;
     // Imagens (Frente / Costas)
@@ -168,7 +174,8 @@ export async function pdfPedido(pedido, loja) {
       startY: y, margin: { left: L / 2 + 2, right: M }, theme: 'grid',
       head: [['ARTE', 'LADO', 'TAMANHO (L × A)']],
       body: it.artes.length ? it.artes.map(a => [
-        a.origem === 'cliente' ? `${a.nome}\nARTE DO CLIENTE: ${a.arquivo}${a.qualidade ? '\nQualidade: ' + a.qualidade : ''}`
+        a.tipo === 'texto' ? `TEXTO: "${a.texto}"\n${a.descricao}`
+          : a.origem === 'cliente' ? `${a.nome}\nARTE DO CLIENTE: ${a.arquivo}${a.qualidade ? '\nQualidade: ' + a.qualidade : ''}`
           : a.origem === 'internet' ? `${a.nome}\nIMAGEM DA INTERNET${a.qualidade ? ' · ' + a.qualidade : ''}\n${a.credito || ''}`
           : `${a.nome}\n${a.tema} · ${a.arquivo}${a.pagina > 1 ? ' (pág. ' + a.pagina + ')' : ''}`,
         a.lado, a.medidas.replace(' · ', '\n')])

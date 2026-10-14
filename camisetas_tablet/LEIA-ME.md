@@ -8,26 +8,32 @@ tamanhos e recebe o **número do pedido** para mostrar ao atendente.
 
 ## Como o cliente usa
 
-1. **Camiseta**: modelo, malha e cor (a camiseta muda na hora).
-2. **Arte**, de três jeitos:
-   - **Artes da loja**: galeria por temas, com busca. As artes aparecem na cor da camiseta.
-     Tocar numa arte mostra ela grande na camiseta, e dá para passar o dedo para ver as próximas.
-   - **Enviar minha arte**: arquivo do tablet, pendrive, Google Drive… (PDF, SVG, AI, PNG, JPG).
-   - **Buscar na internet**: imagens do [Openverse](https://openverse.org) só com licença
-     que permite uso comercial e modificação; filtro "Só vetores".
-   Na arte do cliente e nas imagens da internet o app mostra a **qualidade de impressão**
-   no tamanho escolhido (vetor = ótima; imagem: boa a partir de 220 dpi, aceitável de 150 a 220,
-   baixa abaixo de 150), sugere o tamanho máximo com boa qualidade e pede confirmação antes de
-   usar uma imagem de qualidade baixa. Também dá para remover um fundo branco.
-3. **Ajustar**: arrastar com um dedo, mudar o tamanho com dois dedos ou com os botões + e −.
-   A arte nunca passa da área máxima (38 × 42 cm na masculina, 30 × 35 na feminina e
-   juvenil; no infantil a arte é reduzida automaticamente para caber em 20 × 24).
-4. **Tamanhos**: quantidades com + e −.
-5. **Revisar**: dá para adicionar outras camisetas no mesmo pedido.
-6. **Seus dados** e **Pronto**: o número do pedido aparece em destaque.
+1. **Modelo**: Masculina, Feminina ou Infantil/Juvenil. O botão **Tabela de medidas**
+   mostra largura, altura, manga/cintura de cada tamanho com o desenho de como medir.
+2. **Estampa**, dois caminhos:
+   - **Camiseta pronta**: as artes da loja (galeria por temas, com busca). Tamanho e posição
+     da arte já vêm definidos pela loja; o cliente só escolhe a **cor** (entre as liberadas)
+     e vai direto para os tamanhos. Pode ter arte na frente e nas costas.
+   - **Criar a minha**: o cliente escolhe a malha e a cor e coloca:
+     - **Imagem**: enviar a própria arte (PDF, SVG, AI, PNG, JPG — do tablet, pendrive,
+       Google Drive…) ou **buscar na internet** ([Openverse](https://openverse.org), só imagens
+       com licença que permite uso comercial e modificação; filtro "Só vetores").
+     - **Texto**: 13 fontes, 12 cores, contorno opcional e tamanhos rápidos (8, 15, 24 e 32 cm).
+       Depois dá para editar (lápis) e ajustar o tamanho como uma arte.
+     Arrastar com um dedo, mudar o tamanho com dois dedos ou com os botões + e −.
+     A arte nunca passa da área máxima (38 × 42 cm na masculina, 30 × 35 na feminina e
+     juvenil; no infantil a arte é reduzida automaticamente para caber em 20 × 24).
+     Nas imagens o app mostra a **qualidade de impressão** (vetor = ótima; imagem: boa a partir
+     de 220 dpi, aceitável de 150 a 220, baixa abaixo de 150) e pede confirmação antes de usar
+     uma imagem de qualidade baixa.
+   - Também há "Quero camiseta lisa".
+3. **Tamanhos**: quantidades com + e −; cada tamanho mostra as medidas da peça (toque para
+   abrir a tabela com o tamanho destacado).
+4. **Revisar**: dá para adicionar outras camisetas no mesmo pedido.
+5. **Seus dados** e **Pronto**: o número do pedido aparece em destaque.
 
 Cada tela tem o botão **Ajuda** com dicas curtas. Na tela inicial há o
-**Ver como funciona**, e a primeira vez em "Ajustar" mostra uma dica animada.
+**Ver como funciona**, e a primeira vez em "Personalizar" mostra uma dica animada.
 Se o cliente sair no meio, depois de alguns minutos o app pergunta
 **"Ainda está aí?"** e volta ao início.
 
@@ -39,11 +45,18 @@ por 2 segundos. Senha inicial: **1234** (troque em Configurações).
 - **Artes**: importar arquivos, uma pasta ou um **.ZIP** com pastas. O nome da
   pasta vira o tema (ex.: `Rock/banda.pdf` → tema Rock). Também dá para renomear,
   ocultar, apagar e trocar o tema.
+- **Camiseta pronta** (toque numa arte): lado (frente/costas), **largura da arte** (definida
+  para a masculina; nos outros modelos fica proporcional), **posição** (centro, peito, no alto),
+  **cores liberadas** e uma **arte para as costas** (ela some da galeria e vai junto). Há uma
+  prévia na camiseta e a opção de aplicar o mesmo tamanho/posição/cores a todo o tema.
+  Sem configurar: frente, 28 cm, no alto, todas as cores.
 - **Exportar cópia / Importar cópia**: leva o catálogo pronto para outro tablet.
 - **Pedidos**: lista com o PDF de cada pedido (imagens da frente e costas,
   tamanhos, nome do arquivo de cada arte e medidas em cm). Pedidos com arte do cliente ou
   da internet mostram a qualidade, têm o botão **Artes do cliente** (baixa os arquivos
   originais e o crédito/licença) e um alerta quando alguma arte está com qualidade baixa.
+  Os **textos** aparecem no PDF com o texto, a fonte e as cores, e vão no mesmo .zip como PNG
+  transparente.
 - **Configurações**: liga/desliga "Enviar minha arte" e "Buscar na internet".
 - **Configurações**: nome da loja, frase inicial, WhatsApp, senha e tempo de inatividade.
 
@@ -87,4 +100,6 @@ baixarem os arquivos novos.
 ## Onde ajustar
 
 - `js/config.js`: modelos, tamanhos, áreas máximas, malhas, cores e textos padrão.
+- `js/medidas.js`: tabelas de medidas.
+- `js/texto.js`: fontes, cores e tamanhos dos textos (as fontes vêm do Google Fonts, em `index.html`).
 - `js/shirt.js`: desenho das camisetas e posição da área de impressão.
