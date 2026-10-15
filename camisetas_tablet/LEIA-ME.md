@@ -50,6 +50,9 @@ por 2 segundos. Senha inicial: **1234** (troque em Configurações).
 - **Artes**: importar arquivos, uma pasta ou um **.ZIP** com pastas. O nome da
   pasta vira o tema (ex.: `Rock/banda.pdf` → tema Rock). Também dá para renomear,
   ocultar, apagar e trocar o tema.
+- **Selecionar várias**: botão no catálogo (ou segure o dedo numa arte). Marque artes soltas ou um
+  tema inteiro e aplique de uma vez: configurar camiseta pronta (cada campo pode ficar "não mudar"),
+  mover para outro tema, ocultar, mostrar ou apagar.
 - **Camiseta pronta** (toque numa arte): lado (frente/costas), **largura da arte** (definida
   para a masculina; nos outros modelos fica proporcional), **posição** (centro, peito, no alto),
   **cores liberadas** e uma **arte para as costas** (ela some da galeria e vai junto). Há uma
@@ -79,11 +82,30 @@ por 2 segundos. Senha inicial: **1234** (troque em Configurações).
 | Formato | Como fica |
 |---|---|
 | **PDF** (recomendado) | Cada página vira uma arte, recortada em volta do desenho, com fundo transparente. |
-| **CorelDRAW (.cdr)** | O navegador não abre arquivos do Corel. O app usa a **imagem de prévia** que o Corel grava dentro do arquivo (resolução menor, com o selo "baixa resolução"). Para melhor qualidade, exporte em PDF. |
+| **CorelDRAW (.cdr)** | O navegador não abre arquivos do Corel. O app usa a **imagem de prévia** que o Corel grava dentro do arquivo (resolução menor, com o selo "baixa resolução"). Para melhor qualidade, converta em PDF (veja abaixo). |
 | PNG, JPG, SVG | Usados direto (o fundo branco de JPG pode ser removido na importação). |
 | .ZIP | Uma pasta compactada com subpastas por tema. |
 
 As artes ficam guardadas **no próprio tablet** (não vão para a internet).
+
+No PDF o app também lê o **tamanho real do desenho** (em cm). Esse tamanho vira a largura padrão da
+camiseta pronta (até 38 cm), e aparece na edição da arte com o botão "usar este tamanho".
+
+### Converter .cdr em PDF sem o CorelDRAW
+
+O arquivo `ferramentas/converter-cdr-para-pdf.bat` (também em Administrador → Ajuda) converte todos
+os .cdr de uma pasta e das subpastas em PDF vetorial, usando o **LibreOffice** (grátis):
+
+1. Instale o LibreOffice: <https://pt-br.libreoffice.org/baixe-ja/>.
+2. Arraste a pasta das artes para cima do `converter-cdr-para-pdf.bat` (Windows).
+   Cada PDF é salvo ao lado do .cdr, na mesma pasta (o tema continua o mesmo).
+3. Importe a pasta (ou o .ZIP) de novo no tablet. Quando há `arte.cdr` e `arte.pdf`, o app usa só
+   o PDF; se a versão .cdr já estava no tablet, o PDF a substitui mantendo nome, tema e configuração.
+
+Os arquivos que o LibreOffice não conseguir abrir (algumas versões muito novas ou antigas do Corel)
+ficam listados em `cdr-nao-convertidos.txt`, e para eles o app continua usando a prévia.
+No Mac/Linux, o comando equivalente é
+`soffice --headless --convert-to pdf --outdir <pasta> <arquivo>.cdr`.
 
 ## Instalar no tablet
 

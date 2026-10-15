@@ -3,6 +3,7 @@
  * @description Área do administrador (protegida por senha):
  *  - Artes: importar arquivos/pasta/.zip, organizar temas, renomear, ocultar, apagar,
  *           configurar a "camiseta pronta" (lado, tamanho, posição, cores, arte das costas),
+ *           selecionar várias artes de uma vez (apagar, ocultar, mover de tema, camiseta pronta),
  *           exportar e importar uma cópia do catálogo (para outro tablet)
  *  - Pedidos: ver em tela cheia (camiseta e cada arte/texto), baixar o PDF, apagar
  *  - Preços: preço de cada modelo/malha, acréscimos, mostrar ou esconder do cliente
@@ -13,7 +14,7 @@
 import { PADRAO, CORES, POSICOES, MODELOS, MALHAS } from './config.js';
 import { DB } from './db.js';
 import { icone } from './icons.js';
-import { $, $$, esc, aviso, janela, confirmar, pedirSenha, progressoJanela } from './ui.js';
+import { $, $$, esc, num, aviso, janela, confirmar, pedirSenha, progressoJanela } from './ui.js';
 import { importar, urlDa, limparUrls, exportarCatalogo, importarCatalogo, lib } from './catalog.js';
 import { credito } from './fontes.js';
 import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo, imagemLado } from './order.js';
@@ -38,10 +39,12 @@ export async function abrirAdmin(app) {
     </nav>
     <div class="abaConteudo" id="abaConteudo"></div>` });
   const ir = aba => {
+    selecao = null;
     $$('[data-aba]', j.el).forEach(b => b.setAttribute('aria-selected', String(b.dataset.aba === aba)));
     ABAS[aba]($('#abaConteudo', j.el));
   };
   $$('[data-aba]', j.el).forEach(b => (b.onclick = () => ir(b.dataset.aba)));
+  selecao = null;
   ir('artes');
   if (String(App.S.cfg.senha) === PADRAO.senha) aviso('Dica: troque a senha padrão (1234) em Configurações.');
   await j.aoFechar;
@@ -50,6 +53,8 @@ export async function abrirAdmin(app) {
 }
 
 const ABAS = {};
+/** Artes marcadas no modo "Selecionar várias" (null = modo desligado). */
+let selecao = null;
 
 // ---------- Artes ----------
 
@@ -79,26 +84,31 @@ ABAS.artes = async el => {
       <div class="caixaTopo">
         <h3>${icone('arte', 22)} Catálogo <small>${lista.length} arte${lista.length === 1 ? '' : 's'} em ${temas.length} tema${temas.length === 1 ? '' : 's'}${espaco ? ` · ${mb(espaco.usage)} usados` : ''}</small></h3>
         <div class="linhaBotoes">
+          ${lista.length ? `<button type="button" class="btn ${selecao ? 'btnEscuro' : 'btnClaro'}" id="modoSelecao">${icone('check', 20)} ${selecao ? 'Concluir seleção' : 'Selecionar várias'}</button>` : ''}
           <button type="button" class="btn btnClaro" id="exportar" ${lista.length ? '' : 'disabled'}>${icone('baixar', 20)} Exportar cópia</button>
           <label class="btn btnClaro">${icone('upload', 20)} Importar cópia<input type="file" id="inCopia" accept=".zip,application/zip" hidden></label>
         </div>
       </div>
+      ${selecao ? `<div class="dicaSelecao">${icone('mao', 18)} Toque nas artes para marcar. <button type="button" class="btnTexto" id="selTodas">Marcar todas</button> <button type="button" class="btnTexto" id="selNenhuma">Desmarcar</button></div>` : `<p class="dicaPequena dicaSegurar">Dica: segure o dedo numa arte para selecionar várias.</p>`}
       ${temas.length ? temas.map(t => {
         const doTema = lista.filter(a => a.tema === t).sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
         return `<details class="temaAdmin" open>
           <summary><strong>${esc(t)}</strong> <small>${doTema.length}</small>
-            <span class="summaryAcoes"><button type="button" class="btnIcone" data-renomear-tema="${esc(t)}" aria-label="Renomear tema">${icone('editar', 20)}</button>
+            <span class="summaryAcoes">${selecao ? `<button type="button" class="btn btnClaro btnPeq" data-sel-tema="${esc(t)}">${icone('check', 18)} Marcar tema</button>` : ''}<button type="button" class="btnIcone" data-renomear-tema="${esc(t)}" aria-label="Renomear tema">${icone('editar', 20)}</button>
             <button type="button" class="btnIcone" data-apagar-tema="${esc(t)}" aria-label="Apagar tema">${icone('lixo', 20)}</button></span></summary>
           <div class="gradeAdmin">${doTema.map(a => `
-            <button type="button" class="miniAdmin ${a.oculto ? 'oculta' : ''}" data-arte="${esc(a.id)}">
+            <button type="button" class="miniAdmin ${a.oculto ? 'oculta' : ''} ${selecao?.has(a.id) ? 'marcada' : ''}" data-arte="${esc(a.id)}" ${selecao ? `aria-pressed="${selecao.has(a.id)}"` : ''}>
+              ${selecao ? `<span class="marcaSel">${icone('check', 18)}</span>` : ''}
               <span class="miniImg"><img data-id="${esc(a.id)}" alt=""></span>
               <span class="miniNome">${esc(a.nome)}</span>
               ${a.baixaRes ? '<span class="seloAviso">baixa resolução</span>' : ''}
               ${a.oculto ? '<span class="seloAviso">oculta</span>' : ''}
+              ${a.fixo ? '<span class="seloPronta" title="Camiseta pronta configurada">' + icone('estrela', 14) + '</span>' : ''}
             </button>`).join('')}</div>
         </details>`;
       }).join('') : `<div class="vazio">${icone('pasta', 48)}<p>Nenhuma arte ainda. Use <b>Escolher arquivos</b> acima.</p></div>`}
-    </div>`;
+    </div>
+    ${selecao ? `<div class="barraSelecao" id="barraSelecao"></div>` : ''}`;
 
   // Miniaturas sob demanda
   const obs = new IntersectionObserver(es => es.forEach(async e => {
@@ -154,7 +164,51 @@ ABAS.artes = async el => {
     } catch (err) { p.fechar(); aviso(err.message, 'erro'); }
   };
 
-  $$('[data-arte]', el).forEach(b => (b.onclick = () => editarArte(b.dataset.arte, temas, () => ABAS.artes(el))));
+  // Seleção de várias artes
+  const pintarBarra = () => {
+    const n = selecao?.size || 0, barra = $('#barraSelecao', el);
+    if (!barra) return;
+    barra.innerHTML = `
+      <strong>${n} selecionada${n === 1 ? '' : 's'}</strong>
+      <div class="linhaBotoes">
+        <button type="button" class="btn btnClaro" data-massa="pronta" ${n ? '' : 'disabled'}>${icone('estrela', 20)} Camiseta pronta</button>
+        <button type="button" class="btn btnClaro" data-massa="tema" ${n ? '' : 'disabled'}>${icone('pasta', 20)} Mover para tema</button>
+        <button type="button" class="btn btnClaro" data-massa="ocultar" ${n ? '' : 'disabled'}>${icone('olho', 20)} Ocultar</button>
+        <button type="button" class="btn btnClaro" data-massa="mostrar" ${n ? '' : 'disabled'}>${icone('olho', 20)} Mostrar</button>
+        <button type="button" class="btn btnPerigo" data-massa="apagar" ${n ? '' : 'disabled'}>${icone('lixo', 20)} Apagar</button>
+      </div>`;
+    $$('[data-massa]', barra).forEach(b => (b.onclick = () => acaoEmMassa(b.dataset.massa, lista, temas, () => ABAS.artes(el))));
+  };
+  const marcar = (id, sim) => {
+    if (sim) selecao.add(id); else selecao.delete(id);
+    const b = el.querySelector(`[data-arte="${CSS.escape(id)}"]`);
+    b?.classList.toggle('marcada', sim); b?.setAttribute('aria-pressed', String(sim));
+  };
+  $('#modoSelecao', el) && ($('#modoSelecao', el).onclick = () => { selecao = selecao ? null : new Set(); ABAS.artes(el); });
+  $('#selTodas', el) && ($('#selTodas', el).onclick = () => { lista.forEach(a => marcar(a.id, true)); pintarBarra(); });
+  $('#selNenhuma', el) && ($('#selNenhuma', el).onclick = () => { lista.forEach(a => marcar(a.id, false)); pintarBarra(); });
+  $$('[data-sel-tema]', el).forEach(b => (b.onclick = e => {
+    e.preventDefault();
+    const doTema = lista.filter(a => a.tema === b.dataset.selTema);
+    const todas = doTema.every(a => selecao.has(a.id));
+    doTema.forEach(a => marcar(a.id, !todas));
+    pintarBarra();
+  }));
+  pintarBarra();
+  $$('[data-arte]', el).forEach(b => {
+    let tSegurar = null, segurou = false;
+    b.addEventListener('pointerdown', () => {
+      segurou = false;
+      if (selecao) return;
+      tSegurar = setTimeout(() => { segurou = true; selecao = new Set([b.dataset.arte]); ABAS.artes(el); }, 650);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => b.addEventListener(t, () => clearTimeout(tSegurar)));
+    b.onclick = () => {
+      if (segurou) return;
+      if (selecao) { marcar(b.dataset.arte, !selecao.has(b.dataset.arte)); pintarBarra(); return; }
+      editarArte(b.dataset.arte, temas, () => ABAS.artes(el));
+    };
+  });
   $$('[data-renomear-tema]', el).forEach(b => (b.onclick = async e => {
     e.preventDefault();
     const velho = b.dataset.renomearTema;
@@ -175,14 +229,105 @@ ABAS.artes = async el => {
   }));
 };
 
-function perguntarTexto(titulo, valor = '') {
+/** Ações com as artes selecionadas. */
+async function acaoEmMassa(acao, lista, temas, depois) {
+  const ids = [...selecao];
+  const n = ids.length;
+  const pegar = async () => (await Promise.all(ids.map(id => DB.pegar('artes', id)))).filter(Boolean);
+  if (acao === 'apagar') {
+    if (!(await confirmar(`Apagar ${n} arte${n > 1 ? 's' : ''} do tablet? Os arquivos originais no computador não são apagados.`, { sim: 'Apagar', perigo: true }))) return;
+    const p = progressoJanela('Apagando artes');
+    for (const [i, id] of ids.entries()) { await DB.apagar('artes', id); p.atualizar((i + 1) / n, `${i + 1} de ${n}`); }
+    // Tira a referência de "arte das costas" que apontava para uma apagada
+    const restantes = (await DB.todos('artes')).filter(a => a.fixo?.costas && ids.includes(a.fixo.costas));
+    restantes.forEach(a => (a.fixo.costas = null));
+    if (restantes.length) await DB.salvarVarios('artes', restantes);
+    p.fechar(); limparUrls();
+    aviso(`${n} arte${n > 1 ? 's' : ''} apagada${n > 1 ? 's' : ''}.`);
+  } else if (acao === 'ocultar' || acao === 'mostrar') {
+    const artes = await pegar();
+    artes.forEach(a => (a.oculto = acao === 'ocultar'));
+    await DB.salvarVarios('artes', artes);
+    aviso(acao === 'ocultar' ? `${n} arte${n > 1 ? 's' : ''} escondida${n > 1 ? 's' : ''} dos clientes.` : `${n} arte${n > 1 ? 's' : ''} à mostra para os clientes.`);
+  } else if (acao === 'tema') {
+    const novo = await perguntarTexto(`Mover ${n} arte${n > 1 ? 's' : ''} para o tema`, '', temas);
+    if (!novo) return;
+    const artes = await pegar();
+    artes.forEach(a => (a.tema = novo));
+    await DB.salvarVarios('artes', artes);
+    aviso(`Movida${n > 1 ? 's' : ''} para "${novo}".`);
+  } else if (acao === 'pronta') {
+    const f = await prontaEmMassa(n);
+    if (!f) return;
+    const artes = await pegar();
+    artes.forEach(a => {
+      const atual = { ...FIXO_PADRAO, ...(a.cmW ? { cm: Math.min(38, a.cmW) } : {}), ...(a.fixo || {}) };
+      if (f.lado) atual.lado = f.lado;
+      if (f.pos) atual.pos = f.pos;
+      if (f.cm === 'arquivo') { if (a.cmW) atual.cm = Math.min(38, a.cmW); } else if (f.cm) atual.cm = f.cm;
+      if (f.cores !== undefined) atual.cores = f.cores;
+      if (f.preco !== undefined) atual.preco = f.preco;
+      a.fixo = atual;
+    });
+    await DB.salvarVarios('artes', artes);
+    aviso(`Camiseta pronta atualizada em ${n} arte${n > 1 ? 's' : ''}.`, 'ok');
+  }
+  selecao = null;
+  await App.recarregarCatalogo();
+  depois();
+}
+
+/** Janela "camiseta pronta" para várias artes: cada campo pode ficar "não mudar". */
+function prontaEmMassa(n) {
+  const todasCores = Object.keys(CORES);
+  const seg = (id, ops) => `<div class="segmento segPeq" id="${id}">${ops.map(([v, t], i) => `<button type="button" data-v="${v}" aria-pressed="${i === 0}">${t}</button>`).join('')}</div>`;
+  const j = janela({ titulo: `${icone('estrela')} Camiseta pronta · ${n} arte${n > 1 ? 's' : ''}`, classe: 'janelaMedia', html: `
+    <p class="textoAjuda">Só muda o que você escolher. O que ficar em <b>Não mudar</b> continua como está em cada arte.</p>
+    <div class="campoPeq"><span>Lado</span>${seg('mLado', [['', 'Não mudar'], ['Frente', 'Frente'], ['Costas', 'Costas']])}</div>
+    <div class="campoPeq"><span>Largura da arte (na masculina)</span>${seg('mCmModo', [['', 'Não mudar'], ['arquivo', 'Tamanho do arquivo (PDF)'], ['valor', 'Definir']])}
+      <label class="linhaCm" id="mCmLinha" hidden><input type="range" id="mCm" min="5" max="38" step="0.5" value="28"> <b id="mCmTxt">28 cm</b></label></div>
+    <div class="campoPeq"><span>Posição</span>${seg('mPos', [['', 'Não mudar'], ...Object.entries(POSICOES).map(([k, p]) => [k, p.nome])])}</div>
+    <div class="campoPeq"><span>Cores liberadas</span>${seg('mCoresModo', [['', 'Não mudar'], ['todas', 'Todas'], ['escolher', 'Escolher']])}
+      <div class="coresAdmin" id="mCores" hidden>${todasCores.map(c => `<label class="corAdmin"><input type="checkbox" value="${esc(c)}"><i style="--c:${CORES[c].hex}"></i>${esc(CORES[c].nome || c)}</label>`).join('')}</div></div>
+    <div class="campoPeq"><span>Preço próprio</span>${seg('mPrecoModo', [['', 'Não mudar'], ['tirar', 'Usar o preço do modelo'], ['valor', 'Definir']])}
+      <span class="campoDinheiro" id="mPrecoLinha" hidden><i>R$</i><input inputmode="decimal" id="mPreco" placeholder="0,00"></span></div>
+    <div class="linhaBotoes"><button type="button" class="btn btnClaro" data-fechar>Cancelar</button>
+      <button type="button" class="btn btnEscuro" id="mAplicar">${icone('check', 20)} Aplicar</button></div>` });
+  const val = id => $(`#${id} [aria-pressed="true"]`, j.el).dataset.v;
+  $$('.segmento', j.el).forEach(sg => (sg.onclick = e => {
+    const b = e.target.closest('[data-v]'); if (!b) return;
+    $$('[data-v]', sg).forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    $('#mCmLinha', j.el).hidden = val('mCmModo') !== 'valor';
+    $('#mCores', j.el).hidden = val('mCoresModo') !== 'escolher';
+    $('#mPrecoLinha', j.el).hidden = val('mPrecoModo') !== 'valor';
+  }));
+  $('#mCm', j.el).oninput = e => { $('#mCmTxt', j.el).textContent = `${e.target.value} cm`; };
+  $('#mAplicar', j.el).onclick = () => {
+    const f = { lado: val('mLado') || null, pos: val('mPos') || null };
+    const cm = val('mCmModo');
+    f.cm = cm === 'arquivo' ? 'arquivo' : cm === 'valor' ? +$('#mCm', j.el).value : null;
+    const cores = val('mCoresModo');
+    if (cores === 'todas') f.cores = null;
+    if (cores === 'escolher') { const lista = $$('#mCores input:checked', j.el).map(i => i.value); f.cores = lista.length ? lista : null; }
+    const pr = val('mPrecoModo');
+    if (pr === 'tirar') f.preco = null;
+    if (pr === 'valor') { const v = lerValor($('#mPreco', j.el).value); if (!v) return aviso('Digite o preço.', 'erro'); f.preco = v; }
+    j.fechar(f);
+  };
+  return j.aoFechar;
+}
+
+function perguntarTexto(titulo, valor = '', sugestoes = []) {
   const j = janela({ titulo, classe: 'janelaPequena', html: `
-    <input class="inputGrande" id="txt" value="${esc(valor)}">
+    <input class="inputGrande" id="txt" value="${esc(valor)}" ${sugestoes.length ? 'list="txtSug"' : ''}>
+    ${sugestoes.length ? `<datalist id="txtSug">${sugestoes.map(t => `<option value="${esc(t)}">`).join('')}</datalist>
+      <div class="chips">${sugestoes.map(t => `<button type="button" class="chip" data-sug="${esc(t)}">${esc(t)}</button>`).join('')}</div>` : ''}
     <div class="linhaBotoes"><button type="button" class="btn btnClaro" data-fechar>Cancelar</button>
       <button type="button" class="btn btnEscuro" id="okTxt">Salvar</button></div>` });
   const inp = $('#txt', j.el); setTimeout(() => inp.select(), 50);
   $('#okTxt', j.el).onclick = () => j.fechar(inp.value.trim());
   inp.onkeydown = e => { if (e.key === 'Enter') j.fechar(inp.value.trim()); };
+  $$('[data-sug]', j.el).forEach(b => (b.onclick = () => j.fechar(b.dataset.sug)));
   return j.aoFechar;
 }
 
@@ -194,7 +339,7 @@ async function editarArte(id, temas, depois) {
   if (!a) return;
   const outras = (await DB.artesResumo()).filter(x => !x.cliente && x.id !== id)
     .sort((x, y) => (x.tema === a.tema ? 0 : 1) - (y.tema === a.tema ? 0 : 1) || x.nome.localeCompare(y.nome, 'pt-BR'));
-  const fx = { ...FIXO_PADRAO, ...(a.fixo || {}) };
+  const fx = { ...FIXO_PADRAO, ...(a.cmW ? { cm: Math.min(38, a.cmW) } : {}), ...(a.fixo || {}) };
   const todasCores = Object.keys(CORES);
   let corPrevia = (fx.cores?.length ? fx.cores : todasCores)[0];
   const j = janela({ titulo: 'Editar arte', classe: 'janelaMedia janelaEditarArte', html: `
@@ -213,6 +358,7 @@ async function editarArte(id, temas, depois) {
           <div class="segmento segPeq" id="eLado">${['Frente', 'Costas'].map(l => `<button type="button" data-lado="${l}" aria-pressed="${fx.lado === l}">${l}</button>`).join('')}</div></div>
         <label class="campoPeq"><span>Largura da arte na <b>masculina</b>: <b id="eCmTxt">${fx.cm} cm</b> <small>(nos outros modelos fica proporcional)</small></span>
           <input type="range" id="eCm" min="5" max="38" step="0.5" value="${fx.cm}"></label>
+        ${a.cmW ? `<p class="textoAjuda tamArquivo">${icone('regua', 16)} No arquivo: <b>${num(a.cmW)} × ${num(a.cmH)} cm</b> <button type="button" class="btnTexto" id="eUsarArquivo">usar este tamanho</button></p>` : ''}
         <div class="campoPeq"><span>Posição</span>
           <div class="segmento segPeq" id="ePos">${Object.entries(POSICOES).map(([k, p]) => `<button type="button" data-pos="${k}" aria-pressed="${fx.pos === k}">${p.nome}</button>`).join('')}</div></div>
         <div class="campoPeq"><span>Cores liberadas <small>(nenhuma marcada = todas)</small></span>
@@ -248,6 +394,7 @@ async function editarArte(id, temas, depois) {
   $$('#eLado [data-lado]', j.el).forEach(b => (b.onclick = () => { fx.lado = b.dataset.lado; $$('#eLado [data-lado]', j.el).forEach(x => x.setAttribute('aria-pressed', String(x === b))); pintar(); }));
   $$('#ePos [data-pos]', j.el).forEach(b => (b.onclick = () => { fx.pos = b.dataset.pos; $$('#ePos [data-pos]', j.el).forEach(x => x.setAttribute('aria-pressed', String(x === b))); pintar(); }));
   let tCm;
+  $('#eUsarArquivo', j.el) && ($('#eUsarArquivo', j.el).onclick = () => { $('#eCm', j.el).value = Math.min(38, a.cmW); pintar(); });
   $('#eCm', j.el).oninput = () => { $('#eCmTxt', j.el).textContent = `${$('#eCm', j.el).value} cm`; clearTimeout(tCm); tCm = setTimeout(pintar, 120); };
   $('#eCores', j.el).onchange = pintar;
   $('#eCostas', j.el).onchange = pintar;
@@ -602,7 +749,8 @@ ABAS.ajuda = el => {
       <ol>
         <li>Organize as artes em <b>pastas por tema</b> (ex.: <i>Rock</i>, <i>Futebol</i>, <i>Religioso</i>). O nome da pasta vira o tema no app.</li>
         <li><b>Melhor formato: PDF.</b> No CorelDRAW: <i>Arquivo → Exportar</i> (ou <i>Publicar em PDF</i>) com fundo transparente. Cada página do PDF vira uma arte.</li>
-        <li>Arquivos <b>.cdr</b> também funcionam, mas o app usa a <b>prévia</b> que o Corel grava dentro do arquivo (resolução menor). Eles aparecem com o selo "baixa resolução" — exporte esses em PDF quando puder.</li>
+        <li>Arquivos <b>.cdr</b> também funcionam, mas o app usa a <b>prévia</b> que o Corel grava dentro do arquivo (resolução menor, selo "baixa resolução").</li>
+        <li><b>Sem CorelDRAW?</b> Use o <a href="ferramentas/converter-cdr-para-pdf.bat" download>conversor de .cdr para PDF</a> (Windows): instale o <b>LibreOffice</b> (grátis), arraste a pasta das artes para cima do conversor e ele cria um PDF ao lado de cada .cdr. Depois importe a pasta de novo: o PDF substitui a versão .cdr (mantendo nome e configuração) e o tamanho da arte no arquivo vira o tamanho padrão da camiseta pronta.</li>
         <li>Para importar tudo de uma vez: compacte a pasta das artes em <b>.ZIP</b> no computador, copie para o tablet e escolha o .ZIP em <b>Escolher arquivos</b>.</li>
         <li>Para usar o mesmo catálogo em outro tablet: <b>Exportar cópia</b> aqui e <b>Importar cópia</b> no outro.</li>
         <li><b>Camiseta pronta:</b> toque numa arte para definir o lado, a largura (na masculina), a posição, as cores liberadas e a arte das costas. Marque "usar em todas as artes do tema" para configurar o tema inteiro de uma vez.</li>
@@ -617,6 +765,8 @@ ABAS.ajuda = el => {
       <p>Toque <b>5 vezes</b> no nome da loja (canto superior esquerdo) ou segure o dedo nele por 2 segundos. Troque a senha em <b>Configurações</b>.</p>
       <h3>${icone('lista', 22)} Pedidos</h3>
       <p>Toque em <b>Ver pedido</b> para ver as camisetas e cada arte em tela cheia (toque na imagem para ampliar).</p>
+      <h3>${icone('check', 22)} Várias artes de uma vez</h3>
+      <p>Em <b>Artes</b>, toque em <b>Selecionar várias</b> (ou segure o dedo numa arte). Marque as artes ou um tema inteiro e escolha: <b>Camiseta pronta</b> (tamanho, posição, cores e preço para todas), <b>Mover para tema</b>, <b>Ocultar</b>, <b>Mostrar</b> ou <b>Apagar</b>.</p>
       <h3>${icone('dinheiro', 22)} Preços</h3>
       <p>Na aba <b>Preços</b>, preencha o preço de cada modelo e malha, os acréscimos por tamanho e para frente + costas. Desligue <b>Mostrar preços para o cliente</b> para esconder os valores do app.</p>
       <p>Os pedidos ficam salvos neste tablet, na aba <b>Pedidos</b>, com o PDF para produção (imagens da frente/costas, tamanhos, nome do arquivo de cada arte e medidas em cm).</p>

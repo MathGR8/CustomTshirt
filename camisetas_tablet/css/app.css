@@ -810,3 +810,22 @@ input[type="range"]::-moz-range-thumb { width: 32px; height: 32px; border-radius
 .janelaEditarItem .coresProntas { gap: 8px; }
 .janelaEditarItem .corGrande { width: 46px; height: 46px; }
 .janelaEditarItem .opcaoMenu { min-height: 60px; padding: 8px 12px; }
+
+/* =========================================================
+   Administrador: selecionar várias artes
+   ========================================================= */
+.btnPeq { min-height: 44px; padding: 0 12px; font-size: 14px; border-radius: 12px; }
+.dicaSegurar { justify-content: flex-start; }
+.dicaSelecao { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; background: var(--fundo); border-radius: 14px; padding: 6px 12px; font-weight: 600; }
+.miniAdmin .marcaSel { position: absolute; top: 6px; right: 6px; z-index: 2; width: 30px; height: 30px; border-radius: 50%; background: var(--branco); border: 2px solid var(--cinza); display: grid; place-items: center; color: transparent; }
+.miniAdmin.marcada .marcaSel { background: var(--preto); border-color: var(--preto); color: var(--branco); }
+.miniAdmin.marcada .miniImg { box-shadow: 0 0 0 3px var(--preto); }
+.seloPronta { position: absolute; bottom: 34px; right: 6px; width: 24px; height: 24px; border-radius: 50%; background: var(--preto); color: var(--branco); display: grid; place-items: center; }
+.barraSelecao { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; background: var(--preto); color: var(--branco); border-radius: var(--raio-g); padding: 12px 16px; box-shadow: var(--sombra-forte); }
+.barraSelecao strong { font-size: 18px; }
+.barraSelecao .btnClaro { border-color: #3a3a3a; }
+.linhaCm { display: flex; align-items: center; gap: 12px; }
+.linhaCm input { flex: 1; accent-color: var(--preto); height: 40px; }
+.tamArquivo { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 14px; margin-top: -6px; }
+.tamArquivo .btnTexto { min-height: 36px; font-size: 14px; }
+.janelaPequena .chips .chip { cursor: pointer; }

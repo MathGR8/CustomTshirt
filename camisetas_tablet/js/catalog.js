@@ -11,6 +11,8 @@
  *
  * PDF: cada página vira uma arte (recortada em volta do desenho; opcional:
  *      separar várias artes da mesma página).
+ *      Guarda o tamanho real do desenho no PDF (cmW × cmH), usado como tamanho
+ *      padrão da camiseta pronta.
  * CDR: o navegador não abre arquivos do Corel; usamos a imagem de prévia que
  *      o próprio CorelDRAW grava dentro do arquivo (resolução menor). Para a
  *      melhor qualidade, exporte as artes do Corel em PDF.
@@ -239,6 +241,7 @@ async function lerPdf(file, aoPagina) {
         temImagem = ops.fnArray.some(fn => fn === O.paintImageXObject || fn === O.paintInlineImageXObject || fn === O.paintImageXObjectRepeat);
       } catch { /* sem essa informação */ }
       c.temImagem = temImagem;
+      c.cmPorPx = 2.54 / 72 / (viewport.width / v1.width); // 1 pt do PDF = 1/72 polegada
       paginas.push(c);
       aoPagina?.(n, doc.numPages);
     }
@@ -320,6 +323,8 @@ async function gerarArtes(file, caminho, opc, base = {}) {
         w: previa.width, h: previa.height, baixaRes,
         // Qualidade: tamanho real da imagem (raster) ou vetor
         vetor, pdfComImagem: tipo === 'pdf' && !!c.temImagem, pxW: arte.width, pxH: arte.height,
+        // Tamanho real do desenho no arquivo (só PDF), em cm
+        ...(c.cmPorPx ? { cmW: Math.round(arte.width * c.cmPorPx * 10) / 10, cmH: Math.round(arte.height * c.cmPorPx * 10) / 10 } : {}),
         miniatura: await paraBlob(mini, 0.85),
         previa: await paraBlob(previa, 0.92)
       });
@@ -412,8 +417,11 @@ async function expandir(lista) {
  * @returns {Promise<{importadas: number, avisos: string[]}>}
  */
 export async function importar(lista, opc, progresso, sinal = {}) {
-  const arquivos = await expandir(lista);
+  let arquivos = await expandir(lista);
   const avisos = [];
+  // Se a mesma arte veio em .cdr e .pdf (ex.: convertida com o conversor), usa só o PDF
+  const pdfs = new Set(arquivos.filter(a => /\.pdf$/i.test(a.caminho)).map(a => a.caminho.replace(/\.pdf$/i, '').toLowerCase()));
+  arquivos = arquivos.filter(a => !(/\.cdr$/i.test(a.caminho) && pdfs.has(a.caminho.replace(/\.cdr$/i, '').toLowerCase())));
   let importadas = 0;
   const existentes = new Map((await DB.artesResumo()).map(a => [a.id, a]));
   let ordem = existentes.size;
@@ -425,17 +433,29 @@ export async function importar(lista, opc, progresso, sinal = {}) {
     const tema = (temaDoCaminho(caminho) || opc.temaPadrao || 'Diversos').trim();
     try {
       const { artes, baixaRes } = await gerarArtes(file, caminho, opc);
+      // PDF que substitui uma arte importada antes do .cdr (mesma pasta e nome): herda nome, ordem e configuração
+      const idCdr = /\.pdf$/i.test(caminho) ? `${tema}/${caminho.replace(/\.pdf$/i, '.cdr')}#1#1` : null;
+      const doCdr = idCdr && existentes.get(idCdr);
       const novos = artes.map(({ sufixo, ...a }) => {
         const id = `${tema}/${caminho}#${a.pagina}#${a.parte}`;
-        const antigo = existentes.get(id);
+        const antigo = existentes.get(id) || (a.pagina === 1 && a.parte === 1 ? doCdr : null);
         return {
           ...a, id, tema, origem: 'catalogo',
           nome: antigo?.nome || nomeBonito(caminho) + sufixo,
           oculto: antigo?.oculto || false,
+          ...(antigo?.fixo ? { fixo: antigo.fixo } : {}),
           ordem: antigo?.ordem ?? ordem++,
           criado: antigo?.criado || Date.now()
         };
       });
+      if (doCdr && novos.length) {
+        await DB.apagar('artes', idCdr);
+        existentes.delete(idCdr);
+        // Quem usava a versão .cdr como "arte das costas" passa a usar a nova
+        const usam = [...existentes.values()].filter(x => x.fixo?.costas === idCdr);
+        for (const x of usam) { const r = await DB.pegar('artes', x.id); if (r) { r.fixo.costas = novos[0].id; await DB.salvar('artes', r); } }
+        avisos.push(`${caminho}: substituiu a versão .cdr (agora em alta qualidade).`);
+      }
       if (!novos.length) { avisos.push(`${caminho}: nada desenhado (página em branco).`); continue; }
       await DB.salvarVarios('artes', novos);
       importadas += novos.length;
