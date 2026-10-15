@@ -40,5 +40,5 @@ const P = {
 };
 
 export function icone(nome, tam = 24) {
-  return `<svg class="ic" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[nome] || ''}</svg>`;
+  return `<svg class="ic" width="${tam}" height="${tam}" style="--t:${tam / 16}rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[nome] || ''}</svg>`;
 }

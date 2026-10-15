@@ -717,7 +717,7 @@ function caixaQualidade(a, grande = false) {
   if (!q) return '';
   return `<div class="qualidade q-${q.nivel} ${grande ? 'grande' : ''}" role="status">
     ${icone(ICONE_QUALIDADE[q.nivel], grande ? 24 : 18)}
-    <div><b>Qualidade de impressão: ${q.rotulo}</b>${grande || q.nivel !== 'boa' ? `<span>${q.texto}</span>` : ''}</div></div>`;
+    <div><b>Qualidade de impressão: ${q.rotulo}</b>${grande || q.nivel === 'media' || q.nivel === 'baixa' ? `<span>${q.texto}</span>` : ''}</div></div>`;
 }
 
 /** Buscar imagens na internet (licença livre para uso comercial). */
