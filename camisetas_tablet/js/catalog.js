@@ -483,6 +483,13 @@ export async function urlDa(id, tipo = 'miniatura') {
   return u;
 }
 
+/** URL de uma miniatura já lida do banco (sem outra leitura). */
+export function urlMiniatura(id, blob) {
+  const chave = id + '|miniatura';
+  if (!urls.has(chave)) urls.set(chave, URL.createObjectURL(blob));
+  return urls.get(chave);
+}
+
 /** Esquece as URLs de uma arte (depois de alterar a imagem). */
 function esquecerUrls(id) {
   ['miniatura', 'previa'].forEach(t => { const k = id + '|' + t; if (urls.has(k)) { URL.revokeObjectURL(urls.get(k)); urls.delete(k); } });

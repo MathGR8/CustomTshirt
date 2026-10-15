@@ -65,6 +65,22 @@ export const DB = {
   },
 
   /** Lê só os campos leves das artes (sem as imagens), para listas rápidas. */
+  /** Miniaturas de todas as artes numa leitura só: Map id → Blob. */
+  async miniaturas() {
+    const db = await abrir();
+    return new Promise((ok, erro) => {
+      const mapa = new Map();
+      const req = db.transaction('artes', 'readonly').objectStore('artes').openCursor();
+      req.onsuccess = () => {
+        const c = req.result;
+        if (!c) return ok(mapa);
+        if (c.value.miniatura && !c.value.cliente) mapa.set(c.value.id, c.value.miniatura);
+        c.continue();
+      };
+      req.onerror = () => erro(req.error);
+    });
+  },
+
   async artesResumo() {
     const db = await abrir();
     return new Promise((ok, erro) => {

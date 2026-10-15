@@ -15,7 +15,7 @@ import { PADRAO, CORES, POSICOES, MODELOS, MALHAS } from './config.js';
 import { DB } from './db.js';
 import { icone } from './icons.js';
 import { $, $$, esc, num, aviso, janela, confirmar, pedirSenha, progressoJanela } from './ui.js';
-import { importar, urlDa, limparUrls, exportarCatalogo, importarCatalogo, lib } from './catalog.js';
+import { importar, urlDa, urlMiniatura, limparUrls, exportarCatalogo, importarCatalogo, lib } from './catalog.js';
 import { credito } from './fontes.js';
 import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo, imagemLado } from './order.js';
 import { precosDe, dinheiro } from './precos.js';
@@ -55,13 +55,14 @@ export async function abrirAdmin(app) {
 const ABAS = {};
 /** Artes marcadas no modo "Selecionar várias" (null = modo desligado). */
 let selecao = null;
+let obsAdmin = null;
 
 // ---------- Artes ----------
 
 ABAS.artes = async el => {
   const lista = (await DB.artesResumo()).filter(a => !a.cliente);
   const temas = [...new Set(lista.map(a => a.tema))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  const espaco = await DB.espaco();
+  const espaco = DB.espaco(); // preenchido depois (não segura a tela)
   const mb = b => (b / 1048576).toFixed(0) + ' MB';
   const pasta = 'webkitdirectory' in document.createElement('input');
   el.innerHTML = `
@@ -82,7 +83,7 @@ ABAS.artes = async el => {
     </div>
     <div class="adminCaixa">
       <div class="caixaTopo">
-        <h3>${icone('arte', 22)} Catálogo <small>${lista.length} arte${lista.length === 1 ? '' : 's'} em ${temas.length} tema${temas.length === 1 ? '' : 's'}${espaco ? ` · ${mb(espaco.usage)} usados` : ''}</small></h3>
+        <h3>${icone('arte', 22)} Catálogo <small>${lista.length} arte${lista.length === 1 ? '' : 's'} em ${temas.length} tema${temas.length === 1 ? '' : 's'}<span id="espacoUsado"></span></small></h3>
         <div class="linhaBotoes">
           ${lista.length ? `<button type="button" class="btn ${selecao ? 'btnEscuro' : 'btnClaro'}" id="modoSelecao">${icone('check', 20)} ${selecao ? 'Concluir seleção' : 'Selecionar várias'}</button>` : ''}
           <button type="button" class="btn btnClaro" id="exportar" ${lista.length ? '' : 'disabled'}>${icone('baixar', 20)} Exportar cópia</button>
@@ -99,7 +100,7 @@ ABAS.artes = async el => {
           <div class="gradeAdmin">${doTema.map(a => `
             <button type="button" class="miniAdmin ${a.oculto ? 'oculta' : ''} ${selecao?.has(a.id) ? 'marcada' : ''}" data-arte="${esc(a.id)}" ${selecao ? `aria-pressed="${selecao.has(a.id)}"` : ''}>
               ${selecao ? `<span class="marcaSel">${icone('check', 18)}</span>` : ''}
-              <span class="miniImg"><img data-id="${esc(a.id)}" alt=""></span>
+              <span class="miniImg"><img data-id="${esc(a.id)}" alt="" decoding="async"></span>
               <span class="miniNome">${esc(a.nome)}</span>
               ${a.baixaRes ? '<span class="seloAviso">baixa resolução</span>' : ''}
               ${a.oculto ? '<span class="seloAviso">oculta</span>' : ''}
@@ -110,14 +111,17 @@ ABAS.artes = async el => {
     </div>
     ${selecao ? `<div class="barraSelecao" id="barraSelecao"></div>` : ''}`;
 
-  // Miniaturas sob demanda
-  const obs = new IntersectionObserver(es => es.forEach(async e => {
+  espaco.then(e => { const s = $('#espacoUsado', el); if (s && e) s.textContent = ` · ${mb(e.usage)} usados`; });
+  // Miniaturas: todas lidas de uma vez; as que estão longe da tela só aparecem ao chegar perto
+  obsAdmin?.disconnect();
+  const minis = await DB.miniaturas();
+  obsAdmin = new IntersectionObserver(es => es.forEach(e => {
     if (!e.isIntersecting) return;
-    obs.unobserve(e.target);
-    const u = await urlDa(e.target.dataset.id);
-    if (u) e.target.src = u;
-  }), { rootMargin: '300px' });
-  $$('img[data-id]', el).forEach(i => obs.observe(i));
+    obsAdmin.unobserve(e.target);
+    const b = minis.get(e.target.dataset.id);
+    if (b) e.target.src = urlMiniatura(e.target.dataset.id, b);
+  }), { root: el.closest('.janelaCorpo'), rootMargin: '600px' });
+  $$('img[data-id]', el).forEach(i => obsAdmin.observe(i));
 
   const rodarImportacao = async (files, comPasta) => {
     if (!files.length) return;
