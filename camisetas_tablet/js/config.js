@@ -15,6 +15,7 @@ export const PADRAO = {
   inatividadeMin: 3,       // minutos parado até perguntar "Ainda está aí?"
   permitirEnvio: true,     // cliente pode enviar a própria arte
   permitirBusca: true,     // cliente pode buscar imagens na internet
+  telaLigada: true,        // não deixa a tela do tablet apagar com o app aberto
 };
 
 /**

@@ -110,9 +110,14 @@ No Mac/Linux, o comando equivalente é
 ## Instalar no tablet
 
 1. Abra o endereço do app no **Chrome** (Android) ou **Safari** (iPad).
-2. Menu → **Adicionar à tela inicial**. Ele abre em tela cheia, como um aplicativo.
-3. Para o cliente não sair do app: Android → **Fixar app**; iPad → **Acesso Guiado**.
-4. Depois de aberto uma vez com internet, funciona também sem internet.
+2. Chrome: menu **⋮** → **Instalar app** (ou **Adicionar à tela inicial** → **Instalar**).
+   Abra pelo ícone novo na tela inicial: ele abre em **tela cheia**, sem barra do navegador.
+3. Para o cliente não sair do app: Android → Configurações → Segurança → **Fixar app**
+   (ative, abra o app, toque no botão de apps recentes, toque no ícone do app → **Fixar**;
+   para soltar, segure **Voltar + Apps recentes**). iPad → **Acesso Guiado**.
+4. A tela fica sempre ligada com o app aberto (pode desligar em Administrador → Configurações).
+   Deixe o tablet na tomada.
+5. Depois de aberto uma vez com internet, funciona também sem internet.
 
 ## Publicar (Cloudflare)
 
