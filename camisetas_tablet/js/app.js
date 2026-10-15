@@ -20,11 +20,12 @@
 import { PADRAO, CORES, MALHAS, MODELOS, POSICOES } from './config.js';
 import { DB } from './db.js';
 import { icone } from './icons.js';
-import { $, $$, esc, num, aviso, janela, confirmar, ajuda, coach } from './ui.js';
+import { $, $$, esc, num, aviso, janela, confirmar, ajuda, coach, ajudarTeclado } from './ui.js';
 import { camisetaSVG, areaImpressao, modelo, VB } from './shirt.js';
 import { urlDa, processarArquivoCliente, removerFundoDaArte } from './catalog.js';
 import { qualidade, ICONE_QUALIDADE, buscarImagens, baixarImagem, credito } from './fontes.js';
 import { abrirTabela, resumoMedidas } from './medidas.js';
+import { enviarPendentes, vigiarEnvio } from './sync.js';
 import { desenharTexto, editorTexto } from './texto.js';
 import { mostrarPrecos, dinheiro, aPartirDe, precoBase, precoPeca, precoItem, precoTexto, acrescimoTamanho, valorItem, valorTotal } from './precos.js';
 import { maxCm, textoMedidas, medidas, totalPecas, salvarPedido, numeroPedido, escalaInfantil, ladosDo } from './order.js';
@@ -1192,6 +1193,7 @@ TELAS.dados = () => {
       const b = $('#rAvancar'); b.disabled = true; b.innerHTML = 'Salvando…';
       try {
         S.ultimoPedido = await salvarPedido(S.itens, S.cliente, S.cfg);
+        enviarPendentes(S.cfg).catch(() => {}); // manda para a confecção (se ligado)
         irPara('pronto');
       } catch (e) {
         b.disabled = false; b.innerHTML = `Enviar pedido ${icone('avancar')}`;
@@ -1327,6 +1329,8 @@ async function iniciar() {
   DB.persistir();
   irPara('inicio');
   vigiarInatividade();
+  ajudarTeclado();
+  vigiarEnvio(() => S.cfg);
   document.addEventListener('visibilitychange', manterTelaLigada);
   document.addEventListener('pointerdown', manterTelaLigada, { passive: true }); // alguns navegadores só liberam após um toque
   // Sem zoom acidental com dois toques / gestos fora do palco

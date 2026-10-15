@@ -107,6 +107,38 @@ ficam listados em `cdr-nao-convertidos.txt`, e para eles o app continua usando a
 No Mac/Linux, o comando equivalente é
 `soffice --headless --convert-to pdf --outdir <pasta> <arquivo>.cdr`.
 
+## Pedidos no computador da confecção
+
+Os pedidos são feitos no tablet da loja e podem ser vistos em qualquer computador:
+
+1. No tablet: **Administrador → Configurações → Pedidos no computador da confecção**.
+   Marque **Enviar pedidos para a confecção**, crie uma **senha da confecção** (mínimo 6
+   caracteres) e toque em **Testar e salvar**. A primeira senha usada fica valendo.
+2. No computador: abra `https://<endereço do app>/pedidos.html` e entre com a mesma senha.
+
+Cada pedido vai com as imagens das camisetas, os textos, a prévia das artes da loja e o
+**arquivo original** das artes enviadas pelo cliente. Sem internet, o pedido fica "aguardando
+envio" (aparece na aba Pedidos do tablet) e vai sozinho quando a internet voltar (ou toque em
+**Enviar agora**).
+
+No computador: lista com filtro (em aberto, novo, em produção, pronto, entregue), busca por
+nome/telefone/número, atualização automática a cada minuto e aviso quando chega pedido novo.
+Abrindo o pedido: camisetas grandes (toque para ampliar), tamanhos e valores, cada arte e texto,
+**PDF**, **Artes do cliente** (.zip com todos os arquivos), baixar cada arquivo, mudar a
+**situação** e apagar.
+
+Os pedidos ficam guardados no próprio Worker do Cloudflare (Durable Object com SQLite, incluído
+no plano grátis; nada a criar no painel). Para trocar a senha, crie no Worker a variável secreta
+`PEDIDOS_SENHA` (ela passa a valer no lugar da senha gravada).
+
+## Teclado do tablet
+
+- Com o app em tela cheia não há a barra do Android para baixar o teclado: aparece o botão
+  **Pronto** logo acima do teclado. O **Enter** de um campo passa para o próximo.
+- O tamanho do teclado é do próprio Android (Gboard): ⚙ do teclado → **Preferências** →
+  **Altura do teclado** (baixa / extra baixa). No ícone de teclado da barra do Gboard dá para
+  usar o modo **Flutuante** (menor, dá para arrastar) ou **Dividido**.
+
 ## Instalar no tablet
 
 1. Abra o endereço do app no **Chrome** (Android) ou **Safari** (iPad).

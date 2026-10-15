@@ -926,3 +926,57 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 .janelaImagem .envio { padding-bottom: 1rem; }
 .revisar { padding-top: 0.75rem; padding-bottom: 0.5rem; }
 @media (max-aspect-ratio: 1/1) { .janelaImagem { height: auto; max-height: 92dvh; } }
+
+/* Botão "Pronto" que fecha o teclado (fica logo acima do teclado) */
+.btnTeclado { position: fixed; z-index: 2000; display: flex; align-items: center; gap: 0.5rem; min-height: 3.25rem; padding: 0 1.25rem; border-radius: 1rem; background: var(--preto); color: var(--branco); font-weight: 800; font-size: 1.0625rem; box-shadow: var(--sombra-forte); }
+.btnTeclado[popover] { inset: auto; margin: 0; border: 0; overflow: visible; }
+
+/* =========================================================
+   Pedidos no computador da confecção (pedidos.html)
+   ========================================================= */
+.paginaPainel { min-height: 100%; height: auto; }
+html:has(body.paginaPainel) { font-size: 16px; }
+.paginaPainel { overflow: auto; }
+.painelEntrar { min-height: 100dvh; display: grid; place-items: center; padding: 1.5rem; background: var(--preto); }
+.caixaEntrar { width: min(26rem, 100%); background: var(--branco); border-radius: var(--raio-g); padding: 2rem; display: flex; flex-direction: column; gap: 1rem; box-shadow: var(--sombra-forte); }
+.caixaEntrar h1 { font-size: 1.75rem; }
+.marcaIcone.grande { width: 4rem; height: 4rem; border-radius: 1.125rem; background: var(--preto); color: var(--branco); display: grid; place-items: center; }
+.campoPeq input[type="password"] { border: 2px solid var(--linha); border-radius: 0.875rem; min-height: 3.375rem; padding: 0 0.875rem; font-size: 1.125rem; }
+.painel { min-height: 100dvh; display: flex; flex-direction: column; }
+.painelTopo { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; padding: 0.75rem 1.25rem; background: var(--preto); color: var(--branco); }
+.painelMarca { display: flex; align-items: center; gap: 0.625rem; font-size: 1.25rem; margin-right: auto; }
+.painelTopo .busca { flex: 0 1 20rem; color: var(--cinza-escuro); min-height: 3rem; }
+.painelTopo .segmento { box-shadow: none; flex-wrap: wrap; }
+.painelTopo .segmento button { min-height: 2.75rem; padding: 0 0.875rem; font-size: 0.9375rem; }
+.painelTopo .btnIcone { color: var(--branco); }
+.painelTopo .btnClaro { min-height: 3rem; }
+.painelLista { flex: 1; padding: 1.25rem; max-width: 100rem; width: 100%; margin: 0 auto; }
+.gradePedidos { display: grid; grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: 0.875rem; }
+.cartaoPedido { display: flex; gap: 0.875rem; align-items: stretch; text-align: left; background: var(--branco); border: 2px solid var(--linha); border-radius: var(--raio); padding: 0.75rem; box-shadow: var(--sombra); border-left-width: 0.5rem; }
+.cartaoPedido:hover { border-color: var(--cinza); }
+.cartaoPedido.st-novo { border-left-color: var(--preto); }
+.cartaoPedido.st-producao { border-left-color: #c9a227; }
+.cartaoPedido.st-pronto { border-left-color: #2f6b3a; }
+.cartaoPedido.st-entregue { border-left-color: var(--cinza-claro); opacity: .75; }
+.cpImg { width: 6rem; height: 6.5rem; flex-shrink: 0; border-radius: 0.75rem; background: var(--fundo); display: grid; place-items: center; overflow: hidden; color: var(--cinza); }
+.cpImg img { width: 100%; height: 100%; object-fit: contain; }
+.cpInfo { display: flex; flex-direction: column; gap: 0.1875rem; min-width: 0; flex: 1; }
+.cpTopo { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.cpTopo strong { font-size: 1.125rem; }
+.cpNome { font-weight: 700; font-size: 1.0625rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cpInfo small { color: var(--cinza-escuro); }
+.chipSituacao { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; padding: 0.1875rem 0.5rem; border-radius: 0.5rem; background: var(--fundo); white-space: nowrap; }
+.chipSituacao.st-novo { background: var(--preto); color: var(--branco); }
+.chipSituacao.st-producao { background: #fff4cc; color: #7a5b00; }
+.chipSituacao.st-pronto { background: #e3f3e6; color: #2f6b3a; }
+.situacaoPedido { flex-basis: 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 0.625rem; padding-top: 0.75rem; border-top: 1px solid #333; }
+.situacaoPedido .segmento { box-shadow: none; background: #262626; }
+.situacaoPedido .segmento button { color: #cfcfcf; min-height: 2.75rem; }
+.situacaoPedido .segmento button[aria-pressed="true"] { background: var(--branco); color: var(--preto); }
+.situacaoPedido .btnClaro { margin-left: auto; min-height: 2.75rem; border-color: #3a3a3a; }
+.btnArquivo { min-height: 2rem; font-size: 0.875rem; padding: 0; align-self: flex-start; }
+.seloEnvio { display: flex; align-items: center; gap: 0.25rem; color: #8a6a00 !important; font-weight: 600; }
+.seloEnvio.ok { color: #2f6b3a !important; }
+.linkPainel { overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
+.paginaPainel { -webkit-user-select: text; user-select: text; }
+.painelTopo small:empty { display: none; }
