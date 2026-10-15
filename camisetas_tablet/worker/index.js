@@ -9,10 +9,18 @@
  *       Baixa a imagem escolhida e devolve com CORS liberado, para o app
  *       poder usá-la no canvas (só imagens, até 25 MB).
  *
+ *   /api/pedidos...
+ *       Pedidos enviados pelo tablet para a confecção ver no computador
+ *       (pedidos.html). Ver worker/pedidos.js.
+ *
  * Opcional (mais buscas por dia): crie no Cloudflare as variáveis secretas
  * OPENVERSE_CLIENT_ID e OPENVERSE_CLIENT_SECRET (cadastro grátis em
  * https://api.openverse.org/v1/#tag/auth/operation/register).
  */
+
+import { Pedidos, rotaPedidos } from './pedidos.js';
+
+export { Pedidos };
 
 const OPENVERSE = 'https://api.openverse.org/v1';
 const LIMITE_BYTES = 25 * 1024 * 1024;
@@ -25,6 +33,7 @@ export default {
     try {
       if (url.pathname === '/api/busca') return await busca(url, env, ctx);
       if (url.pathname === '/api/imagem') return await imagem(url);
+      if (url.pathname === '/api/pedidos' || url.pathname.startsWith('/api/pedidos/')) return await rotaPedidos(req, env);
     } catch (e) {
       return json({ erro: 'falha', detalhe: String(e && e.message || e) }, 502);
     }

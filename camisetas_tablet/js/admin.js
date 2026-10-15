@@ -19,6 +19,7 @@ import { importar, urlDa, urlMiniatura, limparUrls, exportarCatalogo, importarCa
 import { credito } from './fontes.js';
 import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo, imagemLado } from './order.js';
 import { precosDe, dinheiro } from './precos.js';
+import { configEnvio, testarChave, enviarPendentes } from './sync.js';
 import { modelo } from './shirt.js';
 
 let App = null;
@@ -435,6 +436,7 @@ ABAS.pedidos = async el => {
   el.innerHTML = `
     <div class="adminCaixa">
       <div class="caixaTopo"><h3>${icone('lista', 22)} Pedidos feitos neste tablet <small>${lista.length}</small></h3>
+        ${configEnvio(App.S.cfg).ativo && lista.some(p => !p.enviado) ? `<button type="button" class="btn btnEscuro" id="enviarAgora">${icone('upload', 20)} Enviar agora</button>` : ''}
         ${lista.length ? `<button type="button" class="btn btnClaro btnPerigoTexto" id="apagarTodos">${icone('lixo', 20)} Apagar todos</button>` : ''}</div>
       ${lista.length ? `<div class="listaPedidos">${lista.map(p => {
         const d = new Date(p.data), total = p.itens.reduce((s, it) => s + totalPecas(it), 0);
@@ -447,6 +449,7 @@ ABAS.pedidos = async el => {
             <strong>Nº ${numeroPedido(p.numero)} — ${esc(p.cliente?.nome || 'Sem nome')}</strong>
             <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${p.cliente?.telefone ? ' · ' + esc(p.cliente.telefone) : ''}</small>
             <small>${p.itens.map(it => modelo(it.modelo).nome).join(', ')} · ${total} peça${total === 1 ? '' : 's'}${prontas ? ` · ${prontas} pronta${prontas > 1 ? 's' : ''}` : ''}${p.total ? ` · <b>${dinheiro(p.total)}</b>` : ''}</small>
+            ${configEnvio(App.S.cfg).ativo ? (p.enviado ? `<small class="seloEnvio ok">${icone('check', 14)} Enviado para a confecção</small>` : `<small class="seloEnvio">${icone('upload', 14)} Aguardando envio${p.erroEnvio ? ` (${esc(p.erroEnvio)})` : ''}</small>`) : ''}
             ${doCliente.some(a => /Baixa/.test(a.qualidade || '')) ? `<small class="alertaPedido">${icone('fechar', 14)} Tem arte com qualidade BAIXA</small>` : ''}
           </div>
           <div class="linhaBotoes">
@@ -460,6 +463,12 @@ ABAS.pedidos = async el => {
       }).join('')}</div>` : `<div class="vazio">${icone('lista', 48)}<p>Nenhum pedido ainda.</p></div>`}
     </div>`;
   const achar = id => lista.find(p => String(p.id) === String(id));
+  $('#enviarAgora', el) && ($('#enviarAgora', el).onclick = async () => {
+    const b = $('#enviarAgora', el); b.disabled = true; b.textContent = 'Enviando…';
+    const r = await enviarPendentes(App.S.cfg).catch(e => ({ erro: e.message }));
+    aviso(r.erro ? `Não foi possível enviar: ${r.erro}` : `${r.enviados} pedido${r.enviados === 1 ? '' : 's'} enviado${r.enviados === 1 ? '' : 's'}.`, r.erro ? 'erro' : 'ok');
+    ABAS.pedidos(el);
+  });
   $$('[data-ver]', el).forEach(b => (b.onclick = () => verPedido(achar(b.dataset.ver), { pdf: () => el.querySelector(`[data-pdf="${b.dataset.ver}"]`)?.click(), artes: () => el.querySelector(`[data-artes="${b.dataset.ver}"]`)?.click() })));
   $$('[data-pdf]', el).forEach(b => (b.onclick = async () => {
     b.disabled = true;
@@ -518,7 +527,12 @@ async function apagarArtesDoCliente(pedidos, todos) {
 // ---------- Ver pedido (tela cheia) ----------
 
 /** Pedido em tela cheia: camisetas grandes, cada arte/texto, tamanhos e valores. */
-async function verPedido(p, acoes = {}) {
+/**
+ * Pedido em tela cheia (no tablet e no computador da confecção).
+ * @param {Object} acoes - pdf(), artes(), fonteArte(a) → URL da imagem da arte,
+ *   topo (HTML extra no cabeçalho), extraArte(a) (HTML extra em cada arte), aoAbrir(janela)
+ */
+export async function verPedido(p, acoes = {}) {
   if (!p) return;
   const d = new Date(p.data), c = p.cliente || {};
   const totalPc = p.itens.reduce((s, it) => s + totalPecas(it), 0);
@@ -540,8 +554,9 @@ async function verPedido(p, acoes = {}) {
         </div>
         <div class="linhaBotoes">
           <button type="button" class="btn btnEscuro" id="dPdf">${icone('baixar', 20)} PDF</button>
-          ${p.itens.some(it => it.artes.some(a => a.origem && a.origem !== 'catalogo')) ? `<button type="button" class="btn btnClaro" id="dArtes">${icone('baixar', 20)} Artes do cliente</button>` : ''}
+          ${acoes.artes && p.itens.some(it => it.artes.some(a => a.origem && a.origem !== 'catalogo')) ? `<button type="button" class="btn btnClaro" id="dArtes">${icone('baixar', 20)} Artes do cliente</button>` : ''}
         </div>
+        ${acoes.topo || ''}
       </header>
       ${p.itens.map((it, i) => `
         <section class="pedidoItem">
@@ -566,6 +581,7 @@ async function verPedido(p, acoes = {}) {
                     <span class="arteLado">${a.lado} · ${esc(a.medidas || '')}</span>
                     ${descArte(a)}
                     ${a.qualidade ? `<small class="${/Baixa/.test(a.qualidade) ? 'alertaPedido' : ''}">Qualidade: ${esc(a.qualidade)}</small>` : ''}
+                    ${acoes.extraArte ? acoes.extraArte(a, i, k) : ''}
                   </div>
                 </li>`).join('') : `<li class="semArte">${icone('camisa', 18)} Camiseta lisa (sem estampa)</li>`}
               </ul>
@@ -574,11 +590,12 @@ async function verPedido(p, acoes = {}) {
         </section>`).join('')}
     </div>` });
   $('#dPdf', j.el).onclick = () => acoes.pdf?.();
+  acoes.aoAbrir?.(j);
   $('#dArtes', j.el) && ($('#dArtes', j.el).onclick = () => acoes.artes?.());
 
   // Vistas para a tela cheia (lados em alta resolução e cada arte sozinha)
   const vistas = [];
-  const fonteArte = async a => (a.tipo === 'texto' ? a.url : await urlDa(a.artId, 'previa'));
+  const fonteArte = acoes.fonteArte || (async a => (a.tipo === 'texto' ? a.url : await urlDa(a.artId, 'previa')));
   p.itens.forEach((it, i) => {
     Object.keys(it.imagens).forEach(l => vistas.push({ chave: `lado|${i}|${l}`, titulo: `Camiseta ${i + 1} · ${l}`, fundo: '#ffffff', src: it.imagens[l] }));
     it.artes.forEach((a, k) => vistas.push({ chave: `arte|${i}|${k}`, titulo: `Camiseta ${i + 1} · ${a.lado} · ${a.tipo === 'texto' ? 'Texto' : a.nome} · ${a.medidas || ''}`, fundo: CORES[it.cor]?.hex || '#ddd', src: null, arte: a }));
@@ -593,7 +610,7 @@ async function verPedido(p, acoes = {}) {
   // Camisetas redesenhadas em alta resolução (se as artes ainda estão no tablet)
   for (const [i, it] of p.itens.entries()) for (const l of Object.keys(it.imagens)) {
     try {
-      const hd = await imagemLado(it, l, 1800);
+      const hd = await imagemLado(it, l, 1800, { fonte: fonteArte, exigirTodas: true });
       const v = vistas.find(x => x.chave === `lado|${i}|${l}`); if (v) v.src = hd;
       const img = $(`[data-hd="${i}|${l}"]`, j.el); if (img) img.src = hd;
     } catch { /* fica a imagem salva no pedido */ }
@@ -725,7 +742,39 @@ ABAS.config = el => {
       <label class="campoPeq"><span>Voltar ao início depois de quantos minutos parado</span><input id="cIdle" type="number" min="1" max="30" value="${c.inatividadeMin}"></label>
       <label class="campoPeq"><span>Nova senha do administrador (deixe vazio para manter)</span><input id="cSenha" inputmode="numeric" maxlength="6" placeholder="4 a 6 números"></label>
       <button type="button" class="btn btnEscuro btnGrande" id="cSalvar">${icone('check')} Salvar configurações</button>
+    </div>
+    <div class="adminCaixa formConfig">
+      <h3>${icone('lista', 22)} Pedidos no computador da confecção</h3>
+      <p class="textoAjuda">Cada pedido feito aqui é enviado pela internet e aparece no computador em
+        <b class="linkPainel">${esc(location.origin + location.pathname.replace(/[^/]*$/, ''))}pedidos.html</b>
+        (com a mesma senha). Sem internet, o pedido espera e vai sozinho depois.</p>
+      <label class="checkLinha"><input type="checkbox" id="eAtivo" ${configEnvio(c).ativo ? 'checked' : ''}> <b>Enviar pedidos para a confecção</b></label>
+      <label class="campoPeq"><span>Senha da confecção (mínimo 6 caracteres; a primeira senha usada fica valendo)</span>
+        <input id="eChave" type="password" autocomplete="off" value="${esc(configEnvio(c).chave)}" placeholder="Ex.: confeccao2026"></label>
+      <div class="linhaBotoes">
+        <button type="button" class="btn btnEscuro" id="eSalvarEnvio">${icone('check', 20)} Testar e salvar</button>
+        <span class="textoAjuda" id="eEstado"></span>
+      </div>
     </div>`;
+  $('#eSalvarEnvio', el).onclick = async () => {
+    const ativo = $('#eAtivo', el).checked, chave = $('#eChave', el).value.trim();
+    const estado = $('#eEstado', el);
+    try {
+      if (ativo) {
+        if (chave.length < 6) return aviso('A senha precisa ter pelo menos 6 caracteres.', 'erro');
+        estado.textContent = 'Conferindo…';
+        const r = await testarChave(chave);
+        estado.textContent = r.criada ? 'Senha criada. Use a mesma no computador.' : 'Senha certa. Tudo pronto.';
+      } else estado.textContent = 'Envio desligado.';
+      const nova = { ...App.S.cfg, envio: { ativo, chave } };
+      await DB.salvarConfig(nova);
+      App.aplicarConfig(nova);
+      if (ativo) { const r = await enviarPendentes(nova); if (r.enviados) aviso(`${r.enviados} pedido${r.enviados > 1 ? 's' : ''} enviado${r.enviados > 1 ? 's' : ''} para a confecção.`, 'ok'); }
+    } catch (e) {
+      estado.textContent = '';
+      aviso(navigator.onLine ? e.message : 'Sem internet. Tente de novo quando conectar.', 'erro');
+    }
+  };
   $('#cSalvar', el).onclick = async () => {
     const senha = $('#cSenha', el).value.trim();
     if (senha && !/^\d{4,6}$/.test(senha)) return aviso('A senha deve ter de 4 a 6 números.', 'erro');
@@ -773,6 +822,8 @@ ABAS.ajuda = el => {
       <p>Toque em <b>Ver pedido</b> para ver as camisetas e cada arte em tela cheia (toque na imagem para ampliar).</p>
       <h3>${icone('check', 22)} Várias artes de uma vez</h3>
       <p>Em <b>Artes</b>, toque em <b>Selecionar várias</b> (ou segure o dedo numa arte). Marque as artes ou um tema inteiro e escolha: <b>Camiseta pronta</b> (tamanho, posição, cores e preço para todas), <b>Mover para tema</b>, <b>Ocultar</b>, <b>Mostrar</b> ou <b>Apagar</b>.</p>
+      <h3>${icone('lista', 22)} Pedidos no computador da confecção</h3>
+      <p>Em <b>Configurações</b>, ligue <b>Enviar pedidos para a confecção</b> e crie a senha. No computador, abra o endereço do app com <b>/pedidos.html</b> no final e entre com a mesma senha.</p>
       <h3>${icone('dinheiro', 22)} Preços</h3>
       <p>Na aba <b>Preços</b>, preencha o preço de cada modelo e malha, os acréscimos por tamanho e para frente + costas. Desligue <b>Mostrar preços para o cliente</b> para esconder os valores do app.</p>
       <p>Os pedidos ficam salvos neste tablet, na aba <b>Pedidos</b>, com o PDF para produção (imagens da frente/costas, tamanhos, nome do arquivo de cada arte e medidas em cm).</p>

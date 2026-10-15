@@ -45,13 +45,16 @@ export function maxCm(modeloId, a) {
   return Math.floor(Math.min(m.area.w, m.area.h / proporcao(a)) * 10) / 10;
 }
 
-/** Desenha um lado do item (camiseta + artes) e devolve um JPEG. */
-export async function imagemLado(item, lado, largura = 900) {
+/**
+ * Desenha um lado do item (camiseta + artes) e devolve um JPEG.
+ * @param {{fonte?: (a) => Promise<string>, exigirTodas?: boolean}} opc - de onde vem a imagem de cada arte
+ */
+export async function imagemLado(item, lado, largura = 900, { fonte, exigirTodas = false } = {}) {
   const area = areaImpressao(item.modelo, lado);
   const artes = [];
   for (const a of item.artes.filter(x => x.lado === lado)) {
-    const url = a.tipo === 'texto' ? a.url : await urlDa(a.artId, 'previa');
-    if (!url) continue;
+    const url = fonte ? await fonte(a) : a.tipo === 'texto' ? a.url : await urlDa(a.artId, 'previa');
+    if (!url) { if (exigirTodas) throw new Error('arte indisponível'); continue; }
     const img = await carregarImagem(url);
     const wu = a.cm * area.upc, hu = wu * proporcao(a);
     // fx, fy = centro da arte em frações da área de impressão
@@ -84,6 +87,7 @@ export async function salvarPedido(itens, cliente, cfg = {}) {
   const pedido = {
     id: Date.now(), numero, data: new Date().toISOString(), cliente,
     precos: { mostrar: mostrarPrecos(cfg) }, // o cliente viu os preços?
+    loja: cfg.loja || '',
     itens: [], total: 0
   };
   for (const it of itens) {

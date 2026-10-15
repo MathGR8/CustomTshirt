@@ -10,5 +10,11 @@
   "assets": {
     "directory": "./camisetas_tablet",
     "binding": "ASSETS"
-  }
+  },
+  // Pedidos enviados pelo tablet (vistos no computador em /pedidos.html).
+  // Durable Object com SQLite: incluído no plano grátis, não precisa criar nada no painel.
+  "durable_objects": {
+    "bindings": [{ "name": "PEDIDOS", "class_name": "Pedidos" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Pedidos"] }]
 }

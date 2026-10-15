@@ -157,3 +157,71 @@ export function progressoJanela(titulo) {
     fechar: () => j.fechar()
   };
 }
+
+// ---------- Teclado da tela (tablet) ----------
+/**
+ * Com o app em tela cheia o Android esconde a barra de navegação, e não há como
+ * baixar o teclado. Mostra um botão "Fechar teclado" logo acima do teclado e faz
+ * o Enter dos campos de uma linha passar para o próximo campo (ou fechar o teclado).
+ */
+export function ajudarTeclado() {
+  const ehCampo = el => el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|range|file|button|submit|color)$/i.test(el.type)));
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btnTeclado';
+  btn.innerHTML = `${icone('check', 20)}<span>Pronto</span>`;
+  btn.hidden = true;
+  const popover = 'popover' in HTMLElement.prototype; // camada de cima: fica sobre as janelas abertas
+  if (popover) btn.popover = 'manual';
+  document.body.appendChild(btn);
+  const mostrar = sim => {
+    if (sim === !btn.hidden && (!popover || sim === btn.matches(':popover-open'))) return;
+    btn.hidden = !sim;
+    if (!popover) return;
+    try { if (btn.matches(':popover-open')) btn.hidePopover(); if (sim) btn.showPopover(); } catch { /* ok */ }
+  };
+  const vv = window.visualViewport;
+  const toque = matchMedia('(pointer: coarse)');
+  /** Teclado aberto? (a área visível encolhe bem em relação à tela) */
+  const tecladoAberto = () => {
+    const deitado = matchMedia('(orientation: landscape)').matches;
+    const altTela = deitado ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+    return (vv ? vv.height : window.innerHeight) < altTela * 0.72;
+  };
+  let campoAtivo = false;
+  const atualizar = () => mostrar(campoAtivo && toque.matches && tecladoAberto());
+  const posicionar = () => {
+    atualizar();
+    if (btn.hidden) return;
+    const base = vv ? vv.offsetTop + vv.height : window.innerHeight;
+    btn.style.top = `${Math.max(8, base - btn.offsetHeight - 10)}px`;
+    btn.style.left = `${(vv ? vv.offsetLeft + vv.width : window.innerWidth) - btn.offsetWidth - 12}px`;
+  };
+  let tEsconder = null;
+  document.addEventListener('focusin', e => {
+    if (!ehCampo(e.target)) return;
+    clearTimeout(tEsconder);
+    campoAtivo = true;
+    // Mostra de novo para ficar por cima de uma janela que acabou de abrir
+    if (popover && btn.matches(':popover-open')) { btn.hidePopover(); btn.hidden = true; }
+    posicionar();
+    setTimeout(posicionar, 350); // depois que o teclado termina de abrir
+  });
+  document.addEventListener('focusout', () => { tEsconder = setTimeout(() => { if (!ehCampo(document.activeElement)) { campoAtivo = false; mostrar(false); } }, 120); });
+  vv?.addEventListener('resize', posicionar);
+  vv?.addEventListener('scroll', posicionar);
+  btn.addEventListener('pointerdown', e => e.preventDefault()); // não tira o foco antes do clique
+  btn.addEventListener('click', () => { document.activeElement?.blur(); campoAtivo = false; mostrar(false); });
+  // Enter: próximo campo ou fecha o teclado (textarea continua quebrando linha)
+  document.addEventListener('keydown', e => {
+    const el = e.target;
+    if (e.key !== 'Enter' || e.defaultPrevented || el.tagName !== 'INPUT' || !ehCampo(el) || el.form) return;
+    setTimeout(() => {
+      if (document.activeElement !== el) return; // outro código já tratou (ex.: fechou a janela)
+      const raiz = el.closest('dialog, section, main') || document;
+      const campos = $$('input, textarea', raiz).filter(c => ehCampo(c) && !c.disabled && c.offsetParent !== null);
+      const prox = campos[campos.indexOf(el) + 1];
+      if (el.enterKeyHint === 'next' && prox) prox.focus(); else el.blur();
+    }, 0);
+  });
+}
