@@ -301,7 +301,7 @@ function coresDaPronta(resumo, modeloId) {
 
 /** Arte da camiseta pronta, com tamanho e posição definidos pela loja. */
 async function arteFixa(resumo, modeloId, ladoForcado) {
-  const cfg = { ...FIXO_PADRAO, ...(resumo.fixo || {}) };
+  const cfg = { ...FIXO_PADRAO, ...(resumo.cmW ? { cm: resumo.cmW } : {}), ...(resumo.fixo || {}) };
   const lado = ladoForcado || cfg.lado;
   const url = await urlDa(resumo.id, 'previa');
   const m = modelo(modeloId), area = areaImpressao(modeloId, lado);
