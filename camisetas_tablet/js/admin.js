@@ -721,6 +721,7 @@ ABAS.config = el => {
       <label class="campoPeq"><span>Frase da tela inicial</span><input id="cSlogan" value="${esc(c.slogan)}"></label>
       <label class="checkLinha"><input type="checkbox" id="cEnvio" ${c.permitirEnvio !== false ? 'checked' : ''}> Cliente pode <b>enviar a própria arte</b></label>
       <label class="checkLinha"><input type="checkbox" id="cBusca" ${c.permitirBusca !== false ? 'checked' : ''}> Cliente pode <b>buscar imagens na internet</b> (só imagens com licença livre para uso comercial)</label>
+      <label class="checkLinha"><input type="checkbox" id="cTela" ${c.telaLigada !== false ? 'checked' : ''}> <b>Manter a tela sempre ligada</b> enquanto o app está aberto</label>
       <label class="campoPeq"><span>Voltar ao início depois de quantos minutos parado</span><input id="cIdle" type="number" min="1" max="30" value="${c.inatividadeMin}"></label>
       <label class="campoPeq"><span>Nova senha do administrador (deixe vazio para manter)</span><input id="cSenha" inputmode="numeric" maxlength="6" placeholder="4 a 6 números"></label>
       <button type="button" class="btn btnEscuro btnGrande" id="cSalvar">${icone('check')} Salvar configurações</button>
@@ -735,6 +736,7 @@ ABAS.config = el => {
       inatividadeMin: Math.max(1, Math.min(30, +$('#cIdle', el).value || 3)),
       permitirEnvio: $('#cEnvio', el).checked,
       permitirBusca: $('#cBusca', el).checked,
+      telaLigada: $('#cTela', el).checked,
       senha: senha || c.senha
     };
     await DB.salvarConfig(nova);

@@ -717,7 +717,7 @@ function caixaQualidade(a, grande = false) {
   if (!q) return '';
   return `<div class="qualidade q-${q.nivel} ${grande ? 'grande' : ''}" role="status">
     ${icone(ICONE_QUALIDADE[q.nivel], grande ? 24 : 18)}
-    <div><b>Qualidade de impressão: ${q.rotulo}</b>${grande || q.nivel !== 'boa' ? `<span>${q.texto}</span>` : ''}</div></div>`;
+    <div><b>Qualidade de impressão: ${q.rotulo}</b>${grande || q.nivel === 'media' || q.nivel === 'baixa' ? `<span>${q.texto}</span>` : ''}</div></div>`;
 }
 
 /** Buscar imagens na internet (licença livre para uso comercial). */
@@ -1301,11 +1301,24 @@ async function recarregarCatalogo() {
 
 function aplicarConfig(cfg) {
   S.cfg = cfg;
+  manterTelaLigada();
   $('#nomeLoja').textContent = cfg.loja;
   document.title = cfg.loja;
 }
 
 // ---------- Inicialização ----------
+
+// ---------- Tela sempre ligada (quiosque) ----------
+
+let travaTela = null;
+/** Pede ao navegador para não apagar a tela (some ao trocar de app; pedimos de novo ao voltar). */
+async function manterTelaLigada() {
+  try {
+    if (S.cfg.telaLigada === false) { await travaTela?.release(); travaTela = null; return; }
+    if (!('wakeLock' in navigator) || document.visibilityState !== 'visible' || (travaTela && !travaTela.released)) return;
+    travaTela = await navigator.wakeLock.request('screen');
+  } catch { /* sem suporte ou sem permissão: a tela segue a configuração do tablet */ }
+}
 
 async function iniciar() {
   montarEsqueleto();
@@ -1314,6 +1327,8 @@ async function iniciar() {
   DB.persistir();
   irPara('inicio');
   vigiarInatividade();
+  document.addEventListener('visibilitychange', manterTelaLigada);
+  document.addEventListener('pointerdown', manterTelaLigada, { passive: true }); // alguns navegadores só liberam após um toque
   // Sem zoom acidental com dois toques / gestos fora do palco
   document.addEventListener('gesturestart', e => e.preventDefault());
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});

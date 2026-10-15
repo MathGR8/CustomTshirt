@@ -4,7 +4,7 @@
  * As artes ficam no IndexedDB do tablet (não passam por aqui).
  * Ao publicar uma versão nova, troque VERSAO para os tablets baixarem os arquivos novos.
  */
-const VERSAO = 'camisetas-tablet-v8';
+const VERSAO = 'camisetas-tablet-v10';
 const APP = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/admin.js', 'js/catalog.js', 'js/config.js', 'js/db.js',
