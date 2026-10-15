@@ -1,7 +1,7 @@
 /**
  * @module order
  * @description Pedido: medidas das artes, imagens das camisetas, PDF e texto
- * do resumo (WhatsApp). Os pedidos ficam salvos no tablet para o atendente.
+ * do resumo (copiar texto). Os pedidos ficam salvos no tablet para o atendente.
  */
 
 import { modelo, areaImpressao, renderizar, carregarImagem } from './shirt.js';
@@ -111,7 +111,7 @@ export async function salvarPedido(itens, cliente, cfg = {}) {
 
 export const numeroPedido = n => String(n).padStart(4, '0');
 
-/** Texto curto do pedido (WhatsApp). */
+/** Texto curto do pedido (botão "Copiar texto" do administrador). */
 export function textoResumo(pedido, loja, comPrecos = true) {
   const linhas = [`*Pedido nº ${numeroPedido(pedido.numero)}* — ${loja}`];
   if (pedido.cliente?.nome) linhas.push(`Cliente: ${pedido.cliente.nome}${pedido.cliente.telefone ? ' · ' + pedido.cliente.telefone : ''}`);

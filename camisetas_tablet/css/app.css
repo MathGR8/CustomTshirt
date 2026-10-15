@@ -781,3 +781,32 @@ input[type="range"]::-moz-range-thumb { width: 32px; height: 32px; border-radius
 .ladoGrande { max-width: 440px; }
 .pedidoLados { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .ladoGrande { max-width: none; }
+
+/* =========================================================
+   Camiseta pronta + texto, menu de edição da revisão
+   ========================================================= */
+.ajustar .palcoSvg image.fixa { pointer-events: none; cursor: default; }
+.avisoPronta { display: flex; gap: 12px; align-items: flex-start; background: var(--branco); border: 2px solid var(--preto); border-radius: var(--raio); padding: 12px 14px; }
+.avisoPronta div { display: flex; flex-direction: column; gap: 4px; }
+.avisoPronta span { color: var(--cinza-escuro); font-size: 14px; line-height: 1.4; }
+.botoesAdicionar.soTexto { grid-template-columns: 1fr; }
+.botoesAdicionar small, .adicionarNoPalco small { font-weight: 600; opacity: .75; font-size: .8em; }
+.ofertaTexto { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 18px; background: var(--branco); border: 2px dashed var(--cinza); border-radius: var(--raio); padding: 14px 16px; margin: 10px 0 18px; }
+.ofertaTexto > span { display: flex; gap: 12px; align-items: center; }
+.ofertaTexto > span > span { display: flex; flex-direction: column; gap: 2px; }
+.ofertaTexto b { font-size: 18px; }
+.ofertaTexto small { color: var(--cinza-escuro); font-size: 14px; }
+.janelaEditarItem .verInfo { justify-content: flex-start; overflow: auto; gap: 12px; }
+.janelaEditarItem .verInfo h2 { font-size: 26px; }
+.menuEdicao { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.opcaoMenu { display: flex; align-items: center; gap: 14px; text-align: left; background: var(--branco); border: 2px solid var(--linha); border-radius: var(--raio); padding: 12px 14px; min-height: 68px; }
+.opcaoMenu:active { background: var(--fundo); }
+.opcaoMenu > span { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.opcaoMenu b { font-size: 17px; }
+.opcaoMenu small { color: var(--cinza-escuro); font-size: 14px; }
+.opcaoMenu > .ic:last-child { color: var(--cinza); }
+.janelaEditarItem .verTema { padding-right: 48px; }
+.janelaEditarItem .verInfo { padding: 24px 26px; }
+.janelaEditarItem .coresProntas { gap: 8px; }
+.janelaEditarItem .corGrande { width: 46px; height: 46px; }
+.janelaEditarItem .opcaoMenu { min-height: 60px; padding: 8px 12px; }
