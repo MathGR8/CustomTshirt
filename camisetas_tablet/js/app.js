@@ -26,8 +26,8 @@ import { urlDa, processarArquivoCliente, removerFundoDaArte } from './catalog.js
 import { qualidade, ICONE_QUALIDADE, buscarImagens, baixarImagem, credito } from './fontes.js';
 import { abrirTabela, resumoMedidas } from './medidas.js';
 import { desenharTexto, editorTexto } from './texto.js';
-import { mostrarPrecos, dinheiro, aPartirDe, precoBase, precoPeca, precoItem, acrescimoTamanho, valorItem, valorTotal } from './precos.js';
-import { maxCm, textoMedidas, medidas, totalPecas, salvarPedido, numeroPedido, textoResumo, escalaInfantil, ladosDo } from './order.js';
+import { mostrarPrecos, dinheiro, aPartirDe, precoBase, precoPeca, precoItem, precoTexto, acrescimoTamanho, valorItem, valorTotal } from './precos.js';
+import { maxCm, textoMedidas, medidas, totalPecas, salvarPedido, numeroPedido, escalaInfantil, ladosDo } from './order.js';
 
 // ---------- Estado ----------
 
@@ -53,6 +53,7 @@ const S = {
   artesCliente: new Set(),              // artes enviadas/baixadas nesta sessão (apagadas ao recomeçar)
   web: { termo: '', vetor: false, resultados: [], total: 0, pagina: 1, erro: '' },
   coachVisto: false,
+  editando: false,                      // veio do "Editar" da revisão: volta para a revisão
   ultimoPedido: null
 };
 const item = () => S.itens[S.atual];
@@ -69,6 +70,8 @@ async function previaPronta(resumo, modeloId, cor) {
 
 /** Preços visíveis para o cliente? */
 const comPreco = () => mostrarPrecos(S.cfg);
+/** " (+R$ 10,00)" do texto, quando há preço. */
+const extraTexto = (antes = ' (+', depois = ')') => (comPreco() && precoTexto(S.cfg) ? `${antes}${dinheiro(precoTexto(S.cfg))}${depois}` : '');
 /** Preço de uma camiseta pronta numa cor (preço próprio ou o do modelo/malha). */
 const precoDaPronta = (r, modeloId, cor) => +r.fixo?.preco > 0 ? +r.fixo.preco : precoBase(S.cfg, modeloId, malhaDaCor(cor));
 
@@ -81,8 +84,8 @@ const PASSOS = [
   { id: 'tamanhos',     nome: 'Tamanhos' },
   { id: 'revisar',      nome: 'Revisar' }
 ];
-/** Camiseta pronta não passa por "Personalizar". */
-const passosAtivos = () => PASSOS.filter(p => p.id !== 'personalizar' || item().modo !== 'pronta');
+/** Na camiseta pronta o passo "Personalizar" vira "Texto" (opcional: a estampa é fixa). */
+const passosAtivos = () => PASSOS.map(p => (p.id === 'personalizar' && item().modo === 'pronta' ? { ...p, nome: 'Texto' } : p));
 
 function montarEsqueleto() {
   document.body.innerHTML = `
@@ -165,7 +168,7 @@ function recomecar() {
   limparArtesCliente();
   S.fonte = 'enviar'; S.janelaImagem = null; S.web = { termo: '', vetor: false, resultados: [], total: 0, pagina: 1, erro: '' };
   S.itens = [novoItem()]; S.atual = 0; S.lado = 'Frente'; S.sel = null; S.desfazer = [];
-  S.tema = 'Todas'; S.busca = ''; S.coachVisto = false; S.ultimoPedido = null; S.cliente = null;
+  S.tema = 'Todas'; S.busca = ''; S.coachVisto = false; S.editando = false; S.ultimoPedido = null; S.cliente = null;
   $$('dialog[open]').forEach(d => d.remove());
   irPara('inicio');
 }
@@ -200,7 +203,7 @@ function palco(it, lado, { mostrarArea = false, sel = null, artesExtra = [] } = 
     ${camisetaSVG({ modelo: it.modelo, lado, cor: it.cor })}
     ${mostrarArea ? `<rect class="areaImp" x="${area.x}" y="${area.y}" width="${area.w}" height="${area.h}" rx="6"/>
       <text class="areaRotulo" x="${VB.w / 2}" y="${area.y + area.h + 30}">${rotulo}</text>` : ''}
-    <g class="artes">${artes.map(a => { const r = geom(a, it); return `<image data-uid="${a.uid}" href="${a.url}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" preserveAspectRatio="none"/>`; }).join('')}</g>
+    <g class="artes">${artes.map(a => { const r = geom(a, it); return `<image data-uid="${a.uid}" ${a.fixa ? 'class="fixa" ' : ''}href="${a.url}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" preserveAspectRatio="none"/>`; }).join('')}</g>
     ${g ? `<rect class="selecao" x="${g.x - 6}" y="${g.y - 6}" width="${g.w + 12}" height="${g.h + 12}" rx="6"/>` : ''}
   </svg>`;
 }
@@ -360,7 +363,9 @@ async function escolherModelo(id) {
   if (it.modo === 'pronta' && it.pronta) {
     const r = S.todasArtes.find(x => x.id === it.pronta);
     if (r) {
-      it.artes = await montarPronta(r, id);
+      const textos = it.artes.filter(a => a.tipo === 'texto');
+      it.artes = [...await montarPronta(r, id), ...textos];
+      textos.forEach(a => encaixar(a));
       const cores = coresDaPronta(r, id);
       if (!cores.includes(it.cor)) { it.cor = cores[0]; it.malha = malhaDaCor(it.cor); }
     }
@@ -486,7 +491,8 @@ function galeriaProntas() {
   rodape({
     voltar: { texto: 'Modelo', acao: () => irPara('modelo') },
     meio: it.pronta ? `Escolhida: <b>${esc(S.catalogo.find(a => a.id === it.pronta)?.nome || '')}</b>` : 'Toque numa arte para ver as cores',
-    avancar: it.pronta ? { texto: 'Tamanhos', acao: () => irPara('tamanhos') } : { texto: 'Tamanhos', desabilitado: true, motivo: 'Toque numa arte para escolher.' }
+    avancar: it.pronta ? (S.editando ? { texto: 'Revisar', acao: () => irPara('revisar') } : { texto: 'Tamanhos', acao: () => irPara('tamanhos') })
+      : { texto: 'Tamanhos', desabilitado: true, motivo: 'Toque numa arte para escolher.' }
   });
 }
 
@@ -507,6 +513,7 @@ async function verPronta(lista, i) {
         <div class="coresProntas" id="verCores"></div>
         <p class="verMedida" id="verMedida"></p>
         <button type="button" class="btn btnEscuro btnGrande btnLargo" id="usar">${icone('check')} Escolher esta camiseta</button>
+        <button type="button" class="btn btnClaro btnLargo" id="usarTexto">${icone('editar', 20)} Escolher e adicionar um texto${extraTexto()}</button>
         <div class="verNav">
           <button type="button" class="btn btnClaro" id="ant" aria-label="Anterior">${icone('voltar')}</button>
           <span id="verPos"></span>
@@ -549,15 +556,20 @@ async function verPronta(lista, i) {
     const d = e.clientX - inicioX; inicioX = null;
     if (Math.abs(d) > 50) passar(d < 0 ? 1 : -1);
   });
-  $('#usar', j.el).onclick = () => {
+  const escolher = comTexto => {
     const r = lista[atual];
-    it.modo = 'pronta'; it.pronta = r.id; it.artes = artes; it.cor = cor; it.malha = malhaDaCor(cor);
+    const textos = it.artes.filter(a => a.tipo === 'texto'); // textos já colocados continuam
+    it.modo = 'pronta'; it.pronta = r.id; it.artes = [...artes, ...textos]; it.cor = cor; it.malha = malhaDaCor(cor);
     it.precoPronta = +r.fixo?.preco > 0 ? +r.fixo.preco : null;
-    S.lado = 'Frente';
+    textos.forEach(a => encaixar(a));
+    S.lado = 'Frente'; S.sel = null;
     j.fechar();
+    if (comTexto) { irPara('personalizar'); adicionarTexto(); return; }
     aviso(`"${r.nome}" na cor ${CORES[cor].nome || cor}.`, 'ok');
-    irPara('tamanhos');
+    irPara(S.editando ? 'revisar' : 'tamanhos');
   };
+  $('#usar', j.el).onclick = () => escolher(false);
+  $('#usarTexto', j.el).onclick = () => escolher(true);
   await carregar();
 }
 
@@ -799,9 +811,14 @@ function salvarDesfazer() {
 
 TELAS.personalizar = () => {
   const it = item();
+  const pronta = it.modo === 'pronta';
   const doLado = it.artes.filter(a => a.lado === S.lado);
-  if (!doLado.some(a => a.uid === S.sel)) S.sel = doLado[0]?.uid || null;
-  const a = it.artes.find(x => x.uid === S.sel);
+  const editaveis = doLado.filter(a => !a.fixa); // a estampa da camiseta pronta não se mexe
+  if (!editaveis.some(a => a.uid === S.sel)) S.sel = editaveis[0]?.uid || null;
+  const a = editaveis.find(x => x.uid === S.sel);
+  const resumoPronta = pronta ? S.todasArtes.find(x => x.id === it.pronta) || {} : null;
+  const cores = pronta ? coresDaPronta(resumoPronta, it.modelo)
+    : (MALHAS.find(mm => mm.id === it.malha) || MALHAS[0]).cores.filter(c => coresDoModelo(it.modelo).includes(c));
   const m = modelo(it.modelo);
   const conta = l => it.artes.filter(x => x.lado === l).length;
   $('#tela').innerHTML = `
@@ -811,20 +828,20 @@ TELAS.personalizar = () => {
           ${['Frente', 'Costas'].map(l => `<button type="button" data-lado="${l}" aria-pressed="${S.lado === l}">${icone('virar', 18)} ${l}${conta(l) ? ` <small>${conta(l)}</small>` : ''}</button>`).join('')}
         </div>
         <div class="palcoArea" id="palcoArea">${palco(it, S.lado, { mostrarArea: true, sel: S.sel })}</div>
-        ${doLado.length ? `<p class="dicaPalco">${icone('mao', 18)} Arraste · dois dedos mudam o tamanho</p>`
+        ${doLado.length ? (editaveis.length ? `<p class="dicaPalco">${icone('mao', 18)} Arraste · dois dedos mudam o tamanho</p>` : '')
           : `<div class="adicionarNoPalco">
               <p>O que vai ${S.lado === 'Costas' ? 'nas <b>COSTAS</b>' : 'na <b>FRENTE</b>'}?</p>
               <div class="linhaBotoes centro">
-                <button type="button" class="btn btnEscuro btnGrande" data-add="imagem">${icone('arte', 24)} Imagem</button>
-                <button type="button" class="btn btnEscuro btnGrande" data-add="texto">${icone('editar', 24)} Texto</button>
+                ${pronta ? '' : `<button type="button" class="btn btnEscuro btnGrande" data-add="imagem">${icone('arte', 24)} Imagem</button>`}
+                <button type="button" class="btn btnEscuro btnGrande" data-add="texto">${icone('editar', 24)} Texto${extraTexto(' <small>+', '</small>')}</button>
               </div></div>`}
         <button type="button" class="btnFlutuante" id="btnDesfazer" ${S.desfazer.length ? '' : 'disabled'} aria-label="Desfazer">${icone('desfazer')}<span>Desfazer</span></button>
       </div>
       <div class="painel painelCompacto">
         <div class="corCompacta">
           <div class="rotuloLinha">${icone('camisa', 18)} <b>Cor da camiseta</b><span class="medidas">${esc(CORES[it.cor].nome || it.cor)}</span></div>
-          <div class="segmento segPeq" role="group" aria-label="Malha">${MALHAS.map(mm => `<button type="button" data-malha="${esc(mm.id)}" aria-pressed="${mm.id === it.malha}">${esc(mm.nome)}${comPreco() && precoBase(S.cfg, it.modelo, mm.id) ? ` <small>${dinheiro(precoBase(S.cfg, it.modelo, mm.id))}</small>` : ''}</button>`).join('')}</div>
-          <div class="coresMini">${(MALHAS.find(mm => mm.id === it.malha) || MALHAS[0]).cores.filter(c => coresDoModelo(it.modelo).includes(c)).map(c => `<button type="button" class="corMini ${CORES[c].mescla ? 'mescla' : ''}" data-cor="${c}" style="--c:${CORES[c].hex}" aria-pressed="${c === it.cor}" title="${esc(CORES[c].nome || c)}" aria-label="${esc(CORES[c].nome || c)}"></button>`).join('')}</div>
+          ${pronta ? '' : `<div class="segmento segPeq" role="group" aria-label="Malha">${MALHAS.map(mm => `<button type="button" data-malha="${esc(mm.id)}" aria-pressed="${mm.id === it.malha}">${esc(mm.nome)}${comPreco() && precoBase(S.cfg, it.modelo, mm.id) ? ` <small>${dinheiro(precoBase(S.cfg, it.modelo, mm.id))}</small>` : ''}</button>`).join('')}</div>`}
+          <div class="coresMini">${cores.map(c => `<button type="button" class="corMini ${CORES[c].mescla ? 'mescla' : ''}" data-cor="${c}" style="--c:${CORES[c].hex}" aria-pressed="${c === it.cor}" title="${esc(CORES[c].nome || c)}" aria-label="${esc(CORES[c].nome || c)}"></button>`).join('')}</div>
         </div>
         ${a ? `
           <div class="arteAtual">
@@ -846,12 +863,13 @@ TELAS.personalizar = () => {
           <div class="chipsPos">
             ${Object.entries(POSICOES).map(([k, p]) => `<button type="button" class="chipPos" data-pos="${k}">${p.nome}</button>`).join('')}
           </div>` : `
-          <div class="vazio vazioPainel">${icone('arte', 40)}<p>Nenhuma arte ${S.lado === 'Costas' ? 'nas costas' : 'na frente'} ainda.</p></div>`}
-        <div class="botoesAdicionar">
-          <button type="button" class="btn btnContorno" data-add="imagem">${icone('mais', 20)} Imagem</button>
-          <button type="button" class="btn btnContorno" data-add="texto">${icone('mais', 20)} Texto</button>
+          ${pronta ? `<div class="avisoPronta">${icone('estrela', 22)}<div><b>Camiseta pronta: ${esc(resumoPronta.nome || '')}</b><span>A estampa fica do jeito que a loja definiu. Você pode adicionar textos (nome, frase, número) e mudar a cor.</span></div></div>`
+            : `<div class="vazio vazioPainel">${icone('arte', 40)}<p>Nenhuma arte ${S.lado === 'Costas' ? 'nas costas' : 'na frente'} ainda.</p></div>`}`}
+        <div class="botoesAdicionar ${pronta ? 'soTexto' : ''}">
+          ${pronta ? '' : `<button type="button" class="btn btnContorno" data-add="imagem">${icone('mais', 20)} Imagem</button>`}
+          <button type="button" class="btn btnContorno" data-add="texto">${icone('mais', 20)} ${pronta ? 'Adicionar texto' : 'Texto'}${extraTexto(' <small>+', '</small>')}</button>
         </div>
-        ${S.lado === 'Frente' && !conta('Costas') ? `<button type="button" class="btnTexto" id="irCostas">${icone('virar', 18)} Arte nas costas também?</button>` : ''}
+        ${S.lado === 'Frente' && !conta('Costas') ? `<button type="button" class="btnTexto" id="irCostas">${icone('virar', 18)} ${pronta ? 'Texto nas costas?' : 'Arte nas costas também?'}</button>` : ''}
         ${m.infantil ? `<p class="notaInfantil">${icone('ajuda', 16)} Montada no tamanho <b>juvenil</b>; nas peças infantis (01 a 06) é reduzida automaticamente.</p>` : ''}
       </div>
     </section>`;
@@ -888,6 +906,7 @@ TELAS.personalizar = () => {
     try { svg.setPointerCapture(e.pointerId); } catch { /* ok */ }
     if (dedos.size === 1 && alvo && alvo.dataset.uid !== S.sel) { S.sel = alvo.dataset.uid; return TELAS.personalizar(); }
     if (!a) return;
+    if (pronta && dedos.size === 1 && !alvo) return; // na pronta, só arrasta tocando no texto (a estampa é fixa)
     if (dedos.size === 2) {
       const [p1, p2] = [...dedos.values()];
       pinca = { d0: Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1, cm0: a.cm };
@@ -979,7 +998,7 @@ TELAS.personalizar = () => {
     voltar: { texto: 'Estampa', acao: () => irPara('estampa') },
     meio: (it.artes.length ? `${it.artes.length} arte${it.artes.length > 1 ? 's' : ''} · ${['Frente', 'Costas'].filter(l => conta(l)).join(' e ')}` : '')
       + (comPreco() && precoItem(S.cfg, it) ? `${it.artes.length ? ' · ' : ''}<b>${dinheiro(precoItem(S.cfg, it))}</b> a peça` : ''),
-    avancar: { texto: 'Tamanhos', acao: () => irPara('tamanhos') }
+    avancar: S.editando ? { texto: 'Revisar', acao: () => irPara('revisar') } : { texto: 'Tamanhos', acao: () => irPara('tamanhos') }
   });
   if (!S.coachVisto && a) {
     S.coachVisto = true;
@@ -1006,6 +1025,11 @@ TELAS.tamanhos = () => {
         <button type="button" class="btn btnClaro" id="verMedidas">${icone('regua')} Tabela de medidas</button>
       </div>
       <p class="textoAjuda">Toque em <b>+</b> para adicionar. ${esc(m.nome)} · ${esc(CORES[it.cor].nome || it.cor)}</p>
+      ${it.modo === 'pronta' ? `<div class="ofertaTexto">
+        <span>${icone('editar', 26)}<span><b>${it.artes.some(a => a.tipo === 'texto') ? 'Texto na camiseta' : 'Quer um nome ou uma frase na camiseta?'}</b>
+          <small>${it.artes.some(a => a.tipo === 'texto') ? it.artes.filter(a => a.tipo === 'texto').map(a => `“${esc(a.texto.replace(/\s+/g, ' '))}”`).join(', ') : `Escolha a fonte, a cor e o tamanho${extraTexto(' · +', ' por peça')}`}</small></span></span>
+        <button type="button" class="btn btnEscuro" id="ofertaTexto">${it.artes.some(a => a.tipo === 'texto') ? `${icone('editar', 20)} Mudar texto` : `${icone('mais', 20)} Adicionar texto`}</button>
+      </div>` : ''}
       ${grupos.map(g => `
         ${g.nome ? `<h3 class="subtitulo">${g.nome}${g.nota ? ` <small>${g.nota}</small>` : ''}</h3>` : ''}
         <div class="gradeTamanhos">${g.tamanhos.map(t => `
@@ -1021,9 +1045,10 @@ TELAS.tamanhos = () => {
           </div>`).join('')}</div>`).join('')}
     </section>`;
   $('#verMedidas').onclick = () => abrirTabela(it.modelo);
+  $('#ofertaTexto') && ($('#ofertaTexto').onclick = () => (it.artes.some(a => a.tipo === 'texto') ? irPara('personalizar') : adicionarTexto()));
   $$('[data-medida]').forEach(b => (b.onclick = e => { e.stopPropagation(); abrirTabela(it.modelo, b.dataset.medida); }));
   const atualizarRodape = () => rodape({
-    voltar: it.modo === 'pronta' ? { texto: 'Estampa', acao: () => irPara('estampa') } : { texto: 'Personalizar', acao: () => irPara('personalizar') },
+    voltar: it.modo === 'pronta' && !it.artes.some(a => a.tipo === 'texto') ? { texto: 'Estampa', acao: () => irPara('estampa') } : { texto: it.modo === 'pronta' ? 'Texto' : 'Personalizar', acao: () => irPara('personalizar') },
     meio: `<span class="total">${total()} peça${total() === 1 ? '' : 's'}${comPreco() && valorItem(S.cfg, it).total ? ` · ${dinheiro(valorItem(S.cfg, it).total)}` : ''}</span>`,
     avancar: total() ? { texto: 'Revisar', acao: () => irPara('revisar') } : { texto: 'Revisar', desabilitado: true, motivo: 'Escolha pelo menos uma camiseta (toque em +).' }
   });
@@ -1041,6 +1066,7 @@ TELAS.tamanhos = () => {
 // ---------- 5. Revisar ----------
 
 TELAS.revisar = () => {
+  S.editando = false;
   const lados = it => ladosDo(it);
   const descr = it => `${modelo(it.modelo).nome} · ${it.malha} · ${CORES[it.cor].nome || it.cor}`;
   const tam = it => Object.entries(it.quantidades).filter(([, n]) => n > 0).map(([t, n]) => `<span class="chip">${t} <b>×${n}</b></span>`).join('') || '<span class="chip vazioChip">Sem tamanhos</span>';
@@ -1068,7 +1094,7 @@ TELAS.revisar = () => {
       </div>
       <button type="button" class="btn btnContorno btnLargo btnGrande" id="outra">${icone('mais', 24)} Adicionar outra camiseta (outro modelo, cor ou arte)</button>
     </section>`;
-  $$('[data-editar]').forEach(b => (b.onclick = () => { S.atual = +b.dataset.editar; S.lado = 'Frente'; S.sel = null; S.desfazer = []; irPara('modelo'); }));
+  $$('[data-editar]').forEach(b => (b.onclick = () => editarItem(+b.dataset.editar)));
   $$('[data-remover]').forEach(b => (b.onclick = async () => {
     if (!(await confirmar(`Remover a camiseta ${+b.dataset.remover + 1} do pedido?`, { sim: 'Remover', perigo: true }))) return;
     S.itens.splice(+b.dataset.remover, 1);
@@ -1091,6 +1117,55 @@ TELAS.revisar = () => {
       : { texto: 'Finalizar', acao: () => irPara('dados') }
   });
 };
+
+/** Menu de edição de uma camiseta do pedido (sem recomeçar a montagem). */
+function editarItem(i) {
+  S.atual = i; S.lado = 'Frente'; S.sel = null; S.desfazer = [];
+  const it = item(), pronta = it.modo === 'pronta';
+  const r = pronta ? S.todasArtes.find(x => x.id === it.pronta) || {} : null;
+  const cores = pronta ? coresDaPronta(r, it.modelo) : coresDoModelo(it.modelo);
+  const temTexto = it.artes.some(a => a.tipo === 'texto');
+  let lado = ladosDo(it)[0];
+  const opcao = (acao, ic, titulo, sub) => `<button type="button" class="opcaoMenu" data-acao="${acao}">${icone(ic, 26)}<span><b>${titulo}</b><small>${sub}</small></span>${icone('avancar', 20)}</button>`;
+  const j = janela({ classe: 'janelaArte janelaEditarItem', titulo: '', html: `
+    <div class="verArte">
+      <div class="verPalco" id="eiPalco"></div>
+      <div class="verInfo">
+        <p class="verTema">Camiseta ${i + 1} · ${pronta ? `Pronta: ${esc(r.nome || '')}` : 'Criada por você'}</p>
+        <h2>${esc(modelo(it.modelo).nome)}</h2>
+        <div class="segmento" id="eiLados" role="group" aria-label="Lado">${['Frente', 'Costas'].map(l => `<button type="button" data-lado="${l}">${l}</button>`).join('')}</div>
+        <div class="rotuloLinha"><b>Cor</b><span class="medidas" id="eiCorNome"></span></div>
+        <div class="coresProntas" id="eiCores"></div>
+        <div class="menuEdicao">
+          ${opcao('texto', 'editar', 'Adicionar texto', `Nome, frase ou número${extraTexto(' · +', ' por peça')}`)}
+          ${temTexto ? opcao('ajustar', 'mao', 'Mudar os textos', 'Editar, mudar tamanho e lugar') : ''}
+          ${pronta ? opcao('trocarPronta', 'estrela', 'Trocar a arte', 'Escolher outra camiseta pronta (os textos ficam)')
+                   : opcao('ajustar', 'arte', 'Mudar a estampa', 'Imagens, textos, tamanho e posição')}
+          ${opcao('tamanhos', 'regua', 'Tamanhos e quantidades', Object.entries(it.quantidades).filter(([, q]) => q > 0).map(([t, q]) => `${t} ×${q}`).join(' · ') || 'Nenhum tamanho escolhido')}
+        </div>
+        <button type="button" class="btn btnEscuro btnGrande btnLargo" data-fechar>${icone('check')} Pronto</button>
+        <button type="button" class="btnTexto" data-acao="modelo">${icone('camisa', 18)} Trocar o modelo da camiseta</button>
+      </div>
+    </div>` });
+  const pintar = () => {
+    $('#eiPalco', j.el).innerHTML = palco(it, lado);
+    $$('#eiLados [data-lado]', j.el).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lado === lado)));
+    $('#eiCores', j.el).innerHTML = cores.map(c => `<button type="button" class="corMini corGrande ${CORES[c].mescla ? 'mescla' : ''}" data-cor="${c}" style="--c:${CORES[c].hex}" aria-pressed="${c === it.cor}" aria-label="${esc(CORES[c].nome || c)}"></button>`).join('');
+    $('#eiCorNome', j.el).textContent = `${CORES[it.cor].nome || it.cor} · ${it.malha}${comPreco() && precoItem(S.cfg, it) ? ` · ${dinheiro(precoItem(S.cfg, it))} a peça` : ''}`;
+    $$('#eiCores [data-cor]', j.el).forEach(b => (b.onclick = () => { it.cor = b.dataset.cor; it.malha = malhaDaCor(it.cor); pintar(); }));
+  };
+  $$('#eiLados [data-lado]', j.el).forEach(b => (b.onclick = () => { lado = b.dataset.lado; pintar(); }));
+  let indo = false;
+  $$('[data-acao]', j.el).forEach(b => (b.onclick = () => {
+    indo = true; S.editando = true;
+    j.fechar();
+    const acao = b.dataset.acao;
+    if (acao === 'texto') return adicionarTexto().then(() => { if (S.tela === 'revisar') TELAS.revisar(); });
+    irPara({ ajustar: 'personalizar', trocarPronta: 'estampa', tamanhos: 'tamanhos', modelo: 'modelo' }[acao]);
+  }));
+  j.aoFechar.then(() => { if (!indo && S.tela === 'revisar') TELAS.revisar(); });
+  pintar();
+}
 
 // ---------- Seus dados ----------
 
@@ -1142,12 +1217,10 @@ TELAS.pronto = () => {
       <p class="textoAjuda">Obrigado, <b>${esc(p.cliente.nome)}</b>! Mostre este número ao atendente para concluir.<br>${p.itens.length} camiseta${p.itens.length > 1 ? 's' : ''} diferente${p.itens.length > 1 ? 's' : ''} · ${total} peça${total === 1 ? '' : 's'}</p>
       ${p.precos?.mostrar && p.total ? `<p class="prontoValor">Total: <b>${dinheiro(p.total)}</b><small>Valor estimado. O atendente confirma na hora.</small></p>` : ''}
       <div class="linhaBotoes centro">
-        ${S.cfg.whatsapp ? `<button type="button" class="btn btnClaro btnGrande" id="zap">${icone('whatsapp')} Enviar resumo pelo WhatsApp</button>` : ''}
         <button type="button" class="btn btnEscuro btnGrande" id="novo">${icone('camisa')} Fazer outro pedido</button>
       </div>
       <p class="dicaPequena" id="contagem"></p>
     </section>`;
-  $('#zap') && ($('#zap').onclick = () => window.open(`https://wa.me/${S.cfg.whatsapp}?text=${encodeURIComponent(textoResumo(p, S.cfg.loja, !!p.precos?.mostrar))}`, '_blank'));
   $('#novo').onclick = recomecar;
   let s = 90;
   clearInterval(tPronto);

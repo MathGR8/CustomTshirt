@@ -5,8 +5,9 @@
  * Preço de uma peça = preço do modelo na malha escolhida
  *                     (ou o preço próprio da camiseta pronta, se a loja definiu)
  *                   + acréscimo do tamanho (ex.: X1 a X8)
- *                   + acréscimo "frente e costas" (quando tem estampa nos dois lados;
- *                     não vale para camiseta pronta com preço próprio).
+ *                   + acréscimo "frente e costas" (quando tem imagem/arte nos dois lados;
+ *                     não vale para camiseta pronta com preço próprio)
+ *                   + acréscimo de cada texto (vale também para a camiseta pronta).
  * Preço vazio ou zero = sem preço (não aparece para o cliente).
  */
 
@@ -17,7 +18,8 @@ export const PRECOS_PADRAO = {
   mostrar: false,   // mostrar preços para o cliente
   base: {},         // { 'Masculina': { '100% algodão': 59.9, … }, … }
   tamanhos: {},     // { 'Masculina': { 'X1': 5, … }, … }  acréscimo por tamanho
-  costas: 0         // acréscimo por peça com estampa na frente e nas costas
+  costas: 0,        // acréscimo por peça com estampa na frente e nas costas
+  texto: 0          // acréscimo por texto, por peça
 };
 
 /** Configuração de preços (com os padrões). */
@@ -46,8 +48,12 @@ export function aPartirDe(cfg, modeloId) {
   return v.length ? Math.min(...v) : 0;
 }
 
-/** Tem estampa nos dois lados? */
-const doisLados = it => ['Frente', 'Costas'].every(l => (it.artes || []).some(a => a.lado === l));
+/** Tem imagem/arte nos dois lados? (os textos são cobrados à parte) */
+const doisLados = it => ['Frente', 'Costas'].every(l => (it.artes || []).some(a => a.lado === l && a.tipo !== 'texto'));
+
+/** Acréscimo de um texto, por peça. */
+export const precoTexto = cfg => n(precosDe(cfg).texto);
+const qtdTextos = it => (it.artes || []).filter(a => a.tipo === 'texto').length;
 
 /** Preço de uma peça do item no tamanho t (0 = sem preço). */
 export function precoPeca(cfg, it, t) {
@@ -55,7 +61,7 @@ export function precoPeca(cfg, it, t) {
   const base = proprio || precoBase(cfg, it.modelo, it.malha);
   if (!base) return 0;
   const costas = !proprio && doisLados(it) ? n(precosDe(cfg).costas) : 0;
-  return Math.max(0, base + costas + acrescimoTamanho(cfg, it.modelo, t));
+  return Math.max(0, base + costas + precoTexto(cfg) * qtdTextos(it) + acrescimoTamanho(cfg, it.modelo, t));
 }
 
 /** Preço "por peça" sem acréscimo de tamanho (para mostrar enquanto monta). */

@@ -13,7 +13,9 @@ tamanhos e recebe o **número do pedido** para mostrar ao atendente.
 2. **Estampa**, dois caminhos:
    - **Camiseta pronta**: as artes da loja (galeria por temas, com busca). Tamanho e posição
      da arte já vêm definidos pela loja; o cliente só escolhe a **cor** (entre as liberadas)
-     e vai direto para os tamanhos. Pode ter arte na frente e nas costas.
+     e vai para os tamanhos. Pode ter arte na frente e nas costas. O cliente também pode
+     **adicionar textos** (nome, frase, número) na pronta, pelo botão "Escolher e adicionar um
+     texto" ou em Tamanhos/Revisar: a estampa da loja continua fixa, só o texto se mexe.
    - **Criar a minha**: o cliente escolhe a malha e a cor e coloca:
      - **Imagem**: enviar a própria arte (PDF, SVG, AI, PNG, JPG — do tablet, pendrive,
        Google Drive…) ou **buscar na internet** ([Openverse](https://openverse.org), só imagens
@@ -29,7 +31,10 @@ tamanhos e recebe o **número do pedido** para mostrar ao atendente.
    - Também há "Quero camiseta lisa".
 3. **Tamanhos**: quantidades com + e −; cada tamanho mostra as medidas da peça (toque para
    abrir a tabela com o tamanho destacado).
-4. **Revisar**: dá para adicionar outras camisetas no mesmo pedido.
+4. **Revisar**: o botão **Editar** abre um menu da camiseta (sem recomeçar): ver a camiseta com
+   a estampa, mudar a cor, adicionar ou mudar textos, trocar a arte (pronta) ou mudar a estampa
+   (criada), mudar tamanhos e quantidades. Depois volta direto para a revisão.
+   Dá para adicionar outras camisetas no mesmo pedido.
 5. **Seus dados** e **Pronto**: o número do pedido aparece em destaque.
 
 Cada tela tem o botão **Ajuda** com dicas curtas. Na tela inicial há o
@@ -58,7 +63,8 @@ por 2 segundos. Senha inicial: **1234** (troque em Configurações).
   Os **textos** aparecem no PDF com o texto, a fonte e as cores, e vão no mesmo .zip como PNG
   transparente.
 - **Preços**: preço de uma peça para cada modelo e malha, acréscimo por tamanho (ex.: X1 a X8
-  mais caros) e acréscimo para estampa na frente e nas costas. A chave **Mostrar preços para o
+  mais caros), acréscimo para estampa na frente e nas costas e **acréscimo por texto** (por peça,
+  vale também nas camisetas prontas). A chave **Mostrar preços para o
   cliente** esconde todos os preços do app (os pedidos continuam com o valor no administrador).
   Camiseta pronta pode ter **preço próprio** (toque na arte, na aba Artes). Com os preços ligados
   o cliente vê "a partir de" em cada modelo, o preço de cada tamanho e o total no fim.
@@ -66,7 +72,7 @@ por 2 segundos. Senha inicial: **1234** (troque em Configurações).
   tabela de tamanhos e valores e cada arte/texto separado. Tocar numa imagem abre o visualizador:
   toque para ampliar, arraste para mover, setas para passar entre as camisetas e as artes.
 - **Configurações**: liga/desliga "Enviar minha arte" e "Buscar na internet".
-- **Configurações**: nome da loja, frase inicial, WhatsApp, senha e tempo de inatividade.
+- **Configurações**: nome da loja, frase inicial, senha e tempo de inatividade.
 
 ### Formatos das artes
 

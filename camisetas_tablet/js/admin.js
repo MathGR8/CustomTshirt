@@ -6,7 +6,7 @@
  *           exportar e importar uma cópia do catálogo (para outro tablet)
  *  - Pedidos: ver em tela cheia (camiseta e cada arte/texto), baixar o PDF, apagar
  *  - Preços: preço de cada modelo/malha, acréscimos, mostrar ou esconder do cliente
- *  - Configurações: nome da loja, frase, WhatsApp, senha, tempo de inatividade
+ *  - Configurações: nome da loja, frase, senha, tempo de inatividade
  *  - Ajuda: como preparar as artes do Corel, instalar o app e travar o tablet
  */
 
@@ -542,13 +542,15 @@ ABAS.precos = el => {
         </fieldset>`).join('')}
       <label class="campoPeq"><span>Acréscimo por peça com estampa na <b>frente e nas costas</b></span>
         <span class="campoDinheiro"><i>+R$</i><input inputmode="decimal" id="pCostas" value="${mostrarValor(pr.costas)}" placeholder="0,00"></span></label>
+      <label class="campoPeq"><span>Acréscimo por <b>texto</b> adicionado (por peça; vale também nas camisetas prontas)</span>
+        <span class="campoDinheiro"><i>+R$</i><input inputmode="decimal" id="pTexto" value="${mostrarValor(pr.texto)}" placeholder="0,00"></span></label>
       <button type="button" class="btn btnEscuro btnGrande" id="pSalvar">${icone('check')} Salvar preços</button>
     </div>`;
   $('#pSalvar', el).onclick = async () => {
     const base = {}, tamanhos = {};
     $$('[data-base]', el).forEach(i => { const [m, x] = i.dataset.base.split('|'); const v = lerValor(i.value); if (v) (base[m] ||= {})[x] = v; });
     $$('[data-tam]', el).forEach(i => { const [m, t] = i.dataset.tam.split('|'); const v = lerValor(i.value); if (v) (tamanhos[m] ||= {})[t] = v; });
-    const precos = { mostrar: $('#pMostrar', el).checked, base, tamanhos, costas: lerValor($('#pCostas', el).value) };
+    const precos = { mostrar: $('#pMostrar', el).checked, base, tamanhos, costas: lerValor($('#pCostas', el).value), texto: lerValor($('#pTexto', el).value) };
     if (precos.mostrar && !Object.keys(base).length) aviso('Preencha pelo menos um preço para o cliente ver.', 'erro');
     const nova = { ...App.S.cfg, precos };
     await DB.salvarConfig(nova);
@@ -566,7 +568,6 @@ ABAS.config = el => {
     <div class="adminCaixa formConfig">
       <label class="campoPeq"><span>Nome da loja (aparece no topo e no PDF)</span><input id="cLoja" value="${esc(c.loja)}"></label>
       <label class="campoPeq"><span>Frase da tela inicial</span><input id="cSlogan" value="${esc(c.slogan)}"></label>
-      <label class="campoPeq"><span>WhatsApp da loja (só números, com 55 e DDD). Vazio = sem botão de WhatsApp</span><input id="cZap" inputmode="numeric" value="${esc(c.whatsapp)}" placeholder="5512999999999"></label>
       <label class="checkLinha"><input type="checkbox" id="cEnvio" ${c.permitirEnvio !== false ? 'checked' : ''}> Cliente pode <b>enviar a própria arte</b></label>
       <label class="checkLinha"><input type="checkbox" id="cBusca" ${c.permitirBusca !== false ? 'checked' : ''}> Cliente pode <b>buscar imagens na internet</b> (só imagens com licença livre para uso comercial)</label>
       <label class="campoPeq"><span>Voltar ao início depois de quantos minutos parado</span><input id="cIdle" type="number" min="1" max="30" value="${c.inatividadeMin}"></label>
@@ -580,7 +581,6 @@ ABAS.config = el => {
       ...c,
       loja: $('#cLoja', el).value.trim() || PADRAO.loja,
       slogan: $('#cSlogan', el).value.trim() || PADRAO.slogan,
-      whatsapp: $('#cZap', el).value.replace(/\D/g, ''),
       inatividadeMin: Math.max(1, Math.min(30, +$('#cIdle', el).value || 3)),
       permitirEnvio: $('#cEnvio', el).checked,
       permitirBusca: $('#cBusca', el).checked,

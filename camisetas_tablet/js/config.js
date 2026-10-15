@@ -4,14 +4,13 @@
  * modelos de camiseta, malhas, cores, tamanhos e área máxima de estampa.
  *
  * As configurações que mudam no dia a dia (nome da loja, WhatsApp, senha,
- * tempo de inatividade) ficam na área do administrador, dentro do app.
+ * tempo de inatividade, preços) ficam na área do administrador, dentro do app.
  */
 
 /** Configurações padrão (o administrador pode trocar dentro do app). */
 export const PADRAO = {
   loja: 'Estúdio de Camisetas',
   slogan: 'Crie a sua camiseta em poucos toques',
-  whatsapp: '',            // só dígitos com DDI e DDD (ex.: 5512999999999). Vazio = sem botão
   senha: '1234',           // senha da área do administrador
   inatividadeMin: 3,       // minutos parado até perguntar "Ainda está aí?"
   permitirEnvio: true,     // cliente pode enviar a própria arte
