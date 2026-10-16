@@ -16,6 +16,7 @@ tamanhos e recebe o **número do pedido** para mostrar ao atendente.
      e vai para os tamanhos. Pode ter arte na frente e nas costas. O cliente também pode
      **adicionar textos** (nome, frase, número) na pronta, pelo botão "Escolher e adicionar um
      texto" ou em Tamanhos/Revisar: a estampa da loja continua fixa, só o texto se mexe.
+     O botão **Estampa nas costas / na frente** passa a estampa da loja para o outro lado.
    - **Criar a minha**: o cliente escolhe a malha e a cor e coloca:
      - **Imagem**: enviar a própria arte (PDF, SVG, AI, PNG, JPG — do tablet, pendrive,
        Google Drive…) ou **buscar na internet** ([Openverse](https://openverse.org), só imagens
@@ -23,6 +24,8 @@ tamanhos e recebe o **número do pedido** para mostrar ao atendente.
      - **Texto**: 13 fontes, 12 cores, contorno opcional e tamanhos rápidos (8, 15, 24 e 32 cm).
        Depois dá para editar (lápis) e ajustar o tamanho como uma arte.
      Arrastar com um dedo, mudar o tamanho com dois dedos ou com os botões + e −.
+     Cada imagem/texto tem o botão **Lado** (Frente / Costas) para mudar de lado. Se uma arte
+     ficar por cima de outra, o app pergunta se é isso mesmo (deixar, mudar de lado ou desfazer).
      A arte nunca passa da área máxima (38 × 42 cm na masculina, 30 × 35 na feminina e
      juvenil; no infantil a arte é reduzida automaticamente para caber em 20 × 24).
      Nas imagens o app mostra a **qualidade de impressão** (vetor = ótima; imagem: boa a partir
