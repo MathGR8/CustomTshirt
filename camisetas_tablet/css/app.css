@@ -975,6 +975,7 @@ html:has(body.paginaPainel) { font-size: 16px; }
 .situacaoPedido .segmento button[aria-pressed="true"] { background: var(--branco); color: var(--preto); }
 .situacaoPedido .btnClaro { margin-left: auto; min-height: 2.75rem; border-color: #3a3a3a; }
 .btnArquivo { min-height: 2rem; font-size: 0.875rem; padding: 0; align-self: flex-start; }
+.botoesTexto { display: flex; flex-wrap: wrap; gap: 0 1rem; }
 .seloEnvio { display: flex; align-items: center; gap: 0.25rem; color: #8a6a00 !important; font-weight: 600; }
 .seloEnvio.ok { color: #2f6b3a !important; }
 .linkPainel { overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }

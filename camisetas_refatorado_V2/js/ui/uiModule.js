@@ -234,6 +234,22 @@ export const UIModule = {
   },
 
   /**
+   * Contorno vermelho na estampa selecionada (desligado por padrão, para não
+   * poluir o preview). A escolha fica guardada no navegador.
+   * @param {boolean} [ligado] - sem valor: usa a escolha guardada.
+   */
+  toggleContornoArte(ligado) {
+    if (ligado === undefined) {
+      try { ligado = localStorage.getItem('artrock_contorno_arte') === '1'; } catch { ligado = false; }
+    } else {
+      try { localStorage.setItem('artrock_contorno_arte', ligado ? '1' : '0'); } catch { /* sem armazenamento */ }
+    }
+    document.body.classList.toggle('contornoArte', !!ligado);
+    const chk = document.getElementById('chkContornoArte');
+    if (chk) chk.checked = !!ligado;
+  },
+
+  /**
    * Garante que o elemento #shirtBoxOverlay existe no DOM.
    * Cria-o dinamicamente se não existir.
    * @returns {HTMLElement} Elemento overlay da área de impressão.

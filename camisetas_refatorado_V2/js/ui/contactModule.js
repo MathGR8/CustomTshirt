@@ -29,6 +29,7 @@ import { AppState } from '../core/appState.js';
 import { WHATSAPP } from '../core/constants.js';
 import { Logger } from '../core/logger.js';
 import { NoticeModule } from './noticeModule.js';
+import { arquivosTexto } from '../image/textoVetor.js';
 
 const PDF_NAME = 'pedido-artrock.pdf';
 const ZIP_NAME = 'artes-pedido.zip';
@@ -113,6 +114,16 @@ async function coletarArtes() {
     for (const s of (item.stamps || []).filter(x => !x.hidden)) {
       const prefixo = `modelo${i + 1}-`;
       const base = nomeSeguro((s.name || 'arte').replace(/\.[^.]+$/, ''));
+
+      // Texto: em vetor (SVG, letras em curvas, no tamanho real) + PNG 300 dpi
+      if (s.tipo === 'texto') {
+        const chave = ['texto', s.texto, s.fonte, s.cor, s.contorno, s.corContorno, s.cm].join('|');
+        if (vistos.has(chave)) continue;
+        vistos.add(chave);
+        const nome = nomeUnico(`${prefixo}texto-${nomeSeguro(s.texto).slice(0, 30) || 'texto'}`);
+        for (const f of await arquivosTexto(s, nome).catch(() => [])) arquivos.push(new File([f.blob], f.nome, { type: f.blob.type }));
+        continue;
+      }
 
       // Arquivo original (como o cliente enviou)
       const chaveOriginal = s.file || s.original?.dataURL || s.dataURL;

@@ -668,10 +668,11 @@ img#baseShirtImg.feminine-shirt {
 /* =============================================
    FEEDBACK VISUAL — ESTAMPA ATIVA
    ============================================= */
-.artOverlay.active {
+.artOverlay.active { z-index: 10; }
+/* Contorno só se o cliente ligar "Contorno na estampa selecionada" */
+body.contornoArte .artOverlay.active {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-  z-index: 10;
 }
 
 /* =============================================
@@ -1669,7 +1670,7 @@ button.txtOk:hover { background: var(--color-primary); filter: none; }
 .medTabela tbody th small { color: var(--color-text-muted); font-weight: 600; }
 .medTabela tbody tr:nth-child(even) { background: #fafafa; }
 .medTabela tr.exemplo { background: #ffe3e8 !important; }
-.medTabela tr.exemplo em { font-style: normal; font-size: 10px; font-weight: 800; color: #fff; background: var(--color-primary); border-radius: 8px; padding: 1px 6px; margin-left: 4px; text-transform: uppercase; }
+.medTabela tr.exemplo em { display: block; width: max-content; margin: 2px auto 0; font-style: normal; font-size: 9px; line-height: 1.4; font-weight: 800; color: #fff; background: var(--color-primary); border-radius: 8px; padding: 0 6px; text-transform: uppercase; }
 @media (max-width: 640px) { .medCorpo { grid-template-columns: 1fr; } .medDesenho svg { max-height: 30vh; } }
 
 /* =============================================

@@ -127,5 +127,6 @@ document.addEventListener("DOMContentLoaded", () => {
   KeyboardModule.init();
   HistoryModule.init();
   // Boas-vindas + tutorial só na primeira visita (depois, pelo botão Ajuda)
+  UIModule.toggleContornoArte();
   TutorialModule.iniciarSeNovo();
 });

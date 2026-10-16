@@ -19,7 +19,8 @@ import { importar, urlDa, urlMiniatura, limparUrls, exportarCatalogo, importarCa
 import { credito } from './fontes.js';
 import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo, imagemLado } from './order.js';
 import { precosDe, dinheiro } from './precos.js';
-import { configEnvio, testarChave, enviarPendentes } from './sync.js';
+import { configEnvio, testarChave, enviarPendentes, SENHA_INICIAL } from './sync.js';
+import { arquivosTexto } from './textoVetor.js';
 import { modelo } from './shirt.js';
 
 let App = null;
@@ -484,10 +485,11 @@ ABAS.pedidos = async el => {
       const zip = new JSZip();
       const vistos = new Set();
       for (const a of p.itens.flatMap(it => it.artes).filter(x => x.origem && x.origem !== 'catalogo')) {
-        if (a.tipo === 'texto') { // o texto vai como PNG transparente
+        if (a.tipo === 'texto') { // o texto vai em vetor (SVG) e PNG 300 dpi
           const k = `t${vistos.size + 1}`; vistos.add(k);
-          zip.file(`${String(vistos.size).padStart(2, '0')}-texto.png`, a.url.split(',')[1], { base64: true });
-          zip.file(`${String(vistos.size).padStart(2, '0')}-texto.txt`, `${a.texto}\n${a.descricao || ''}\n${a.lado} · ${a.medidas}\n`);
+          const base = `${String(vistos.size).padStart(2, '0')}-texto`;
+          for (const f of await arquivosTexto(a, base)) zip.file(f.nome, f.blob);
+          zip.file(`${base}.txt`, `${a.texto}\n${a.descricao || ''}\n${a.lado} · ${a.medidas}\n`);
           continue;
         }
         if (vistos.has(a.artId)) continue;
@@ -581,6 +583,9 @@ export async function verPedido(p, acoes = {}) {
                     <span class="arteLado">${a.lado} · ${esc(a.medidas || '')}</span>
                     ${descArte(a)}
                     ${a.qualidade ? `<small class="${/Baixa/.test(a.qualidade) ? 'alertaPedido' : ''}">Qualidade: ${esc(a.qualidade)}</small>` : ''}
+                    ${a.tipo === 'texto' && a.texto ? `<span class="botoesTexto">
+                      <button type="button" class="btnTexto btnArquivo" data-vetor="svg|${i}|${k}">${icone('baixar', 16)} Texto em vetor (SVG)</button>
+                      <button type="button" class="btnTexto btnArquivo" data-vetor="png|${i}|${k}">${icone('baixar', 16)} PNG 300 dpi</button></span>` : ''}
                     ${acoes.extraArte ? acoes.extraArte(a, i, k) : ''}
                   </div>
                 </li>`).join('') : `<li class="semArte">${icone('camisa', 18)} Camiseta lisa (sem estampa)</li>`}
@@ -592,6 +597,18 @@ export async function verPedido(p, acoes = {}) {
   $('#dPdf', j.el).onclick = () => acoes.pdf?.();
   acoes.aoAbrir?.(j);
   $('#dArtes', j.el) && ($('#dArtes', j.el).onclick = () => acoes.artes?.());
+  // Texto para a produção: vetor (SVG, letras em curvas) ou PNG 300 dpi
+  $$('[data-vetor]', j.el).forEach(b => (b.onclick = async () => {
+    const [tipo, i, k] = b.dataset.vetor.split('|');
+    b.disabled = true;
+    try {
+      const nome = `pedido-${numeroPedido(p.numero)}-texto-${+i + 1}-${+k + 1}`;
+      const f = (await arquivosTexto(p.itens[i].artes[k], nome)).find(x => x.nome.endsWith('.' + tipo));
+      if (!f) throw new Error(tipo === 'svg' ? 'não foi possível gerar o vetor' : 'não foi possível gerar a imagem');
+      baixar(f.blob, f.nome);
+    } catch (e) { aviso(e.message, 'erro'); }
+    b.disabled = false;
+  }));
 
   // Vistas para a tela cheia (lados em alta resolução e cada arte sozinha)
   const vistas = [];
@@ -749,27 +766,32 @@ ABAS.config = el => {
         <b class="linkPainel">${esc(location.origin + location.pathname.replace(/[^/]*$/, ''))}pedidos.html</b>
         (com a mesma senha). Sem internet, o pedido espera e vai sozinho depois.</p>
       <label class="checkLinha"><input type="checkbox" id="eAtivo" ${configEnvio(c).ativo ? 'checked' : ''}> <b>Enviar pedidos para a confecção</b></label>
-      <label class="campoPeq"><span>Senha da confecção (mínimo 6 caracteres; a primeira senha usada fica valendo)</span>
-        <input id="eChave" type="password" autocomplete="off" value="${esc(configEnvio(c).chave)}" placeholder="Ex.: confeccao2026"></label>
+      <label class="campoPeq"><span>Senha da confecção (a inicial é <b>${SENHA_INICIAL}</b>)</span>
+        <input id="eChave" type="password" autocomplete="off" value="${esc(configEnvio(c).chave)}" placeholder="${SENHA_INICIAL}"></label>
+      <label class="campoPeq"><span>Trocar a senha da confecção (deixe vazio para manter; mínimo 6 caracteres)</span>
+        <input id="eNova" type="password" autocomplete="new-password" placeholder="Nova senha"></label>
       <div class="linhaBotoes">
         <button type="button" class="btn btnEscuro" id="eSalvarEnvio">${icone('check', 20)} Testar e salvar</button>
         <span class="textoAjuda" id="eEstado"></span>
       </div>
     </div>`;
   $('#eSalvarEnvio', el).onclick = async () => {
-    const ativo = $('#eAtivo', el).checked, chave = $('#eChave', el).value.trim();
+    const ativo = $('#eAtivo', el).checked, nova = $('#eNova', el).value.trim();
+    let chave = $('#eChave', el).value.trim();
     const estado = $('#eEstado', el);
     try {
-      if (ativo) {
-        if (chave.length < 6) return aviso('A senha precisa ter pelo menos 6 caracteres.', 'erro');
+      if (nova && nova.length < 6) return aviso('A nova senha precisa ter pelo menos 6 caracteres.', 'erro');
+      if (ativo || nova) {
+        if (!chave) return aviso('Digite a senha da confecção.', 'erro');
         estado.textContent = 'Conferindo…';
-        const r = await testarChave(chave);
-        estado.textContent = r.criada ? 'Senha criada. Use a mesma no computador.' : 'Senha certa. Tudo pronto.';
+        const r = await testarChave(chave, nova || undefined);
+        if (r.trocada) { chave = nova; $('#eChave', el).value = nova; $('#eNova', el).value = ''; }
+        estado.textContent = r.trocada ? 'Senha trocada. Use a nova senha no computador.' : ativo ? 'Senha certa. Tudo pronto.' : 'Envio desligado.';
       } else estado.textContent = 'Envio desligado.';
-      const nova = { ...App.S.cfg, envio: { ativo, chave } };
-      await DB.salvarConfig(nova);
-      App.aplicarConfig(nova);
-      if (ativo) { const r = await enviarPendentes(nova); if (r.enviados) aviso(`${r.enviados} pedido${r.enviados > 1 ? 's' : ''} enviado${r.enviados > 1 ? 's' : ''} para a confecção.`, 'ok'); }
+      const cfgNova = { ...App.S.cfg, envio: { ativo, chave } };
+      await DB.salvarConfig(cfgNova);
+      App.aplicarConfig(cfgNova);
+      if (ativo) { const r = await enviarPendentes(cfgNova); if (r.enviados) aviso(`${r.enviados} pedido${r.enviados > 1 ? 's' : ''} enviado${r.enviados > 1 ? 's' : ''} para a confecção.`, 'ok'); }
     } catch (e) {
       estado.textContent = '';
       aviso(navigator.onLine ? e.message : 'Sem internet. Tente de novo quando conectar.', 'erro');
@@ -823,7 +845,7 @@ ABAS.ajuda = el => {
       <h3>${icone('check', 22)} Várias artes de uma vez</h3>
       <p>Em <b>Artes</b>, toque em <b>Selecionar várias</b> (ou segure o dedo numa arte). Marque as artes ou um tema inteiro e escolha: <b>Camiseta pronta</b> (tamanho, posição, cores e preço para todas), <b>Mover para tema</b>, <b>Ocultar</b>, <b>Mostrar</b> ou <b>Apagar</b>.</p>
       <h3>${icone('lista', 22)} Pedidos no computador da confecção</h3>
-      <p>Em <b>Configurações</b>, ligue <b>Enviar pedidos para a confecção</b> e crie a senha. No computador, abra o endereço do app com <b>/pedidos.html</b> no final e entre com a mesma senha.</p>
+      <p>Cada pedido novo vai sozinho para a confecção. No computador, abra o endereço do app com <b>/pedidos.html</b> no final e entre com a senha da confecção (a inicial é <b>${SENHA_INICIAL}</b>; troque em <b>Configurações</b>).</p>
       <h3>${icone('dinheiro', 22)} Preços</h3>
       <p>Na aba <b>Preços</b>, preencha o preço de cada modelo e malha, os acréscimos por tamanho e para frente + costas. Desligue <b>Mostrar preços para o cliente</b> para esconder os valores do app.</p>
       <p>Os pedidos ficam salvos neste tablet, na aba <b>Pedidos</b>, com o PDF para produção (imagens da frente/costas, tamanhos, nome do arquivo de cada arte e medidas em cm).</p>
