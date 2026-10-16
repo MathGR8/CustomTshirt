@@ -4,12 +4,15 @@
  * As artes ficam no IndexedDB do tablet (não passam por aqui).
  * Ao publicar uma versão nova, troque VERSAO para os tablets baixarem os arquivos novos.
  */
-const VERSAO = 'camisetas-tablet-v12';
+const VERSAO = 'camisetas-tablet-v13';
 const APP = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/admin.js', 'js/catalog.js', 'js/config.js', 'js/db.js',
   'js/icons.js', 'js/order.js', 'js/shirt.js', 'js/ui.js', 'js/fontes.js',
-  'js/medidas.js', 'js/texto.js', 'js/precos.js', 'js/sync.js',
+  'js/medidas.js', 'js/texto.js', 'js/precos.js', 'js/sync.js', 'js/textoVetor.js',
+  'vendor/opentype.min.js',
+  ...['montserrat', 'bebas-neue', 'anton', 'oswald', 'bangers', 'permanent-marker', 'pacifico', 'lobster',
+    'dancing-script', 'righteous', 'black-ops-one', 'rye', 'unifrakturmaguntia'].map(f => `fontes/${f}.woff`),
   'icons/icone-192.png', 'icons/icone-512.png'
 ];
 const LIBS = [

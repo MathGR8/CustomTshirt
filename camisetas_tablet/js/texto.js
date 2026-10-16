@@ -48,14 +48,20 @@ async function carregarFonte(f, texto) {
 /**
  * Desenha o texto numa imagem PNG transparente.
  * @param {{texto: string, fonte: string, cor: string, contorno: boolean, corContorno: string, alinhar?: string}} t
+ * @param {{largura?: number}} [opc] - largura desejada em px (exportar em alta resolução)
  * @returns {Promise<{url: string, w: number, h: number}>}
  */
-export async function desenharTexto(t) {
+export async function desenharTexto(t, opc = {}) {
   const f = fonte(t.fonte);
   const linhas = String(t.texto || '').replace(/\r/g, '').split('\n').map(l => l.trimEnd());
   await carregarFonte(f, linhas.join(' '));
-  const px = 220, alt = Math.round(px * 1.18);
   const medir = document.createElement('canvas').getContext('2d');
+  medir.font = css(f, 100);
+  const base = Math.max(...linhas.map(l => medir.measureText(l || ' ').width), 50);
+  // Prévia: letras de 320 px. Exportar: o tamanho pedido (máx. 9000 px de largura)
+  let px = opc.largura ? Math.round(100 * opc.largura / base) : 320;
+  px = Math.max(120, Math.min(px, Math.floor(100 * 9000 / (base * 1.5)), 2400));
+  const alt = Math.round(px * 1.18);
   medir.font = css(f, px);
   const larguras = linhas.map(l => medir.measureText(l || ' ').width);
   const borda = t.contorno ? Math.round(px * 0.09) : 0;

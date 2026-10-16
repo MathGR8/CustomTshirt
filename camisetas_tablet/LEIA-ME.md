@@ -114,10 +114,12 @@ No Mac/Linux, o comando equivalente é
 
 Os pedidos são feitos no tablet da loja e podem ser vistos em qualquer computador:
 
-1. No tablet: **Administrador → Configurações → Pedidos no computador da confecção**.
-   Marque **Enviar pedidos para a confecção**, crie uma **senha da confecção** (mínimo 6
-   caracteres) e toque em **Testar e salvar**. A primeira senha usada fica valendo.
-2. No computador: abra `https://<endereço do app>/pedidos.html` e entre com a mesma senha.
+1. O envio já vem **ligado**: cada pedido novo feito no tablet vai sozinho para a confecção.
+   A **senha inicial da confecção é `000000`**.
+2. No computador: abra `https://<endereço do app>/pedidos.html` e entre com a senha.
+3. Para trocar a senha (recomendado): no tablet, **Administrador → Configurações → Pedidos no
+   computador da confecção**, preencha **Trocar a senha da confecção** (mínimo 6 caracteres) e
+   toque em **Testar e salvar**. No computador, entre de novo com a nova senha.
 
 Cada pedido vai com as imagens das camisetas, os textos, a prévia das artes da loja e o
 **arquivo original** das artes enviadas pelo cliente. Sem internet, o pedido fica "aguardando
@@ -131,8 +133,8 @@ Abrindo o pedido: camisetas grandes (toque para ampliar), tamanhos e valores, ca
 **situação** e apagar.
 
 Os pedidos ficam guardados no próprio Worker do Cloudflare (Durable Object com SQLite, incluído
-no plano grátis; nada a criar no painel). Para trocar a senha, crie no Worker a variável secreta
-`PEDIDOS_SENHA` (ela passa a valer no lugar da senha gravada).
+no plano grátis; nada a criar no painel). Se preferir, crie no Worker a variável secreta
+`PEDIDOS_SENHA`: ela passa a valer no lugar da senha gravada.
 
 ## Teclado do tablet
 

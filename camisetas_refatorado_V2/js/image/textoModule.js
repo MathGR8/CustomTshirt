@@ -49,13 +49,22 @@ const fonte = id => FONTES.find(f => f.id === id) || FONTES[0];
 const css = (f, px) => `${f.peso} ${px}px "${f.id}"`;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-/** Desenha o texto numa imagem PNG transparente (alta resolução). */
-export async function desenharTexto(t) {
+/**
+ * Desenha o texto numa imagem PNG transparente (alta resolução).
+ * @param {Object} t - texto, fonte, cores e contorno
+ * @param {{largura?: number}} [opc] - largura desejada em px (exportar para a produção)
+ */
+export async function desenharTexto(t, opc = {}) {
   const f = fonte(t.fonte);
   const linhas = String(t.texto || '').replace(/\r/g, '').split('\n').map(l => l.trimEnd());
   try { await document.fonts.load(css(f, 100), linhas.join(' ') || 'Aa'); } catch { /* usa a fonte reserva */ }
-  const px = 320, alt = Math.round(px * 1.18);
   const medir = document.createElement('canvas').getContext('2d');
+  medir.font = css(f, 100);
+  const base = Math.max(...linhas.map(l => medir.measureText(l || ' ').width), 50);
+  // Prévia: letras de 320 px. Exportar: o tamanho pedido (máx. 9000 px de largura)
+  let px = opc.largura ? Math.round(100 * opc.largura / base) : 320;
+  px = Math.max(120, Math.min(px, Math.floor(100 * 9000 / (base * 1.5)), 2400));
+  const alt = Math.round(px * 1.18);
   medir.font = css(f, px);
   const larguras = linhas.map(l => medir.measureText(l || ' ').width);
   const borda = t.contorno ? Math.round(px * 0.09) : 0;

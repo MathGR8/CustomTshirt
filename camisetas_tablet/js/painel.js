@@ -14,6 +14,7 @@ import { verPedido } from './admin.js';
 import { pdfPedido, baixar, numeroPedido } from './order.js';
 import { dinheiro } from './precos.js';
 import { lib } from './catalog.js';
+import { arquivosTexto } from './textoVetor.js';
 
 const API = 'api/pedidos';
 const SITUACOES = [
@@ -49,7 +50,7 @@ function telaEntrar(msg = '') {
       <form class="caixaEntrar" id="formEntrar">
         <span class="marcaIcone grande">${icone('lista', 34)}</span>
         <h1>Pedidos da loja</h1>
-        <p class="textoAjuda">Use a <b>senha da confecção</b> configurada no tablet (Administrador → Configurações).</p>
+        <p class="textoAjuda">Use a <b>senha da confecção</b> (a inicial é <b>000000</b>; dá para trocar no tablet em Administrador → Configurações).</p>
         <label class="campoPeq"><span>Senha da confecção</span><input id="chave" type="password" autocomplete="current-password" required minlength="6"></label>
         <label class="checkLinha"><input type="checkbox" id="lembrar" checked> Lembrar neste computador</label>
         ${msg ? `<p class="alertaPedido">${esc(msg)}</p>` : ''}
@@ -177,9 +178,9 @@ function verPedidoPainel(p, nomeArq) {
         for (const f of p.arquivos || []) zip.file(f.nome, await blobArquivo(id, f.nome));
         let n = 0;
         for (const it of p.itens) for (const a of it.artes) {
-          if (a.tipo === 'texto' && a.url) {
+          if (a.tipo === 'texto' && a.texto) { // vetor (SVG) + PNG 300 dpi
             n++;
-            zip.file(`texto-${n}.png`, a.url.split(',')[1], { base64: true });
+            for (const f of await arquivosTexto(a, `texto-${n}`)) zip.file(f.nome, f.blob);
             zip.file(`texto-${n}.txt`, `${a.texto}\n${a.descricao || ''}\n${a.lado} · ${a.medidas}\n`);
           }
           if (a.credito) zip.file(`credito-${(a.nome || 'imagem').replace(/[\\/:*?"<>|]+/g, '_')}.txt`, `${a.nome}\n${a.credito}\n`);

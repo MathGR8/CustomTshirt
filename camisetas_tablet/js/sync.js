@@ -3,8 +3,8 @@
  * @description Envia os pedidos do tablet para a nuvem (Worker do Cloudflare),
  * para a confecção ver no computador em /pedidos.html.
  *
- * - Liga em Administrador → Configurações → "Enviar pedidos para a confecção"
- *   (com a senha da confecção).
+ * - Já vem ligado, com a senha inicial da confecção 000000 (dá para trocar ou
+ *   desligar em Administrador → Configurações).
  * - Cada pedido vai com as imagens das camisetas e os arquivos das artes
  *   (original do cliente, prévia das artes da loja). Se estiver sem internet,
  *   fica "aguardando envio" e vai sozinho quando a internet voltar.
@@ -16,14 +16,18 @@ const API = 'api/pedidos';
 let enviando = null;
 
 /** Configuração de envio (dentro das configurações da loja). */
-export const configEnvio = cfg => ({ ativo: false, chave: '', ...(cfg?.envio || {}) });
+export const SENHA_INICIAL = '000000';
+export const configEnvio = cfg => {
+  const e = { ativo: true, chave: SENHA_INICIAL, ...(cfg?.envio || {}) };
+  return e.chave ? e : { ativo: true, chave: SENHA_INICIAL }; // nunca configurado: envio ligado com a senha inicial
+};
 
-/** Cria (1ª vez) ou confere a senha da confecção no servidor. */
-export async function testarChave(chave) {
-  const r = await fetch(`${API}/chave`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chave }) });
+/** Confere a senha da confecção no servidor (e troca, se vier a nova). */
+export async function testarChave(chave, nova) {
+  const r = await fetch(`${API}/chave`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chave, nova }) });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.erro || `erro ${r.status}`);
-  return d; // { ok, criada? }
+  return d; // { ok, trocada? }
 }
 
 async function api(caminho, chave, opc = {}) {

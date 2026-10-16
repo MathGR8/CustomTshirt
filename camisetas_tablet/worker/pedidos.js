@@ -3,11 +3,12 @@
  *
  * O tablet da loja envia cada pedido para cá; na confecção os pedidos são
  * vistos no computador em /pedidos.html. Tudo protegido pela "senha da
- * confecção": a primeira senha enviada fica gravada (ou use a variável secreta
- * PEDIDOS_SENHA no Worker, que tem prioridade).
+ * confecção": a senha inicial é 000000 e pode ser trocada pelo tablet
+ * (Administrador → Configurações). A variável secreta PEDIDOS_SENHA no Worker,
+ * se existir, tem prioridade.
  *
  * Rotas (todas pedem o cabeçalho x-chave, menos a de criar/testar a senha):
- *   POST   /api/pedidos/chave                  {chave} → cria (1ª vez) ou confere
+ *   POST   /api/pedidos/chave                  {chave, nova?} → confere (e troca, com nova)
  *   GET    /api/pedidos                        lista (resumo)
  *   PUT    /api/pedidos/:id                    grava/atualiza o pedido (JSON)
  *   GET    /api/pedidos/:id                    pedido completo + lista de arquivos
@@ -22,6 +23,7 @@ import { DurableObject } from 'cloudflare:workers';
 const PEDACO = 1024 * 1024;            // o SQLite do Durable Object guarda até 2 MB por valor
 const MAX_ARQUIVO = 40 * 1024 * 1024;
 const MAX_PEDIDO = 30 * 1024 * 1024;
+const SENHA_INICIAL = '000000';
 const STATUS = ['novo', 'producao', 'pronto', 'entregue'];
 
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
@@ -73,6 +75,7 @@ export class Pedidos extends DurableObject {
     if (!chave) return false;
     if (this.env.PEDIDOS_SENHA) return chave === this.env.PEDIDOS_SENHA;
     const salvo = this.um("SELECT v FROM cfg WHERE k = 'chave'");
+    if (!salvo) return chave === SENHA_INICIAL;
     const sal = this.um("SELECT v FROM cfg WHERE k = 'sal'");
     return !!salvo && salvo.v === await sha256(sal.v + chave);
   }
@@ -84,19 +87,19 @@ export class Pedidos extends DurableObject {
     try {
       if (this.bloqueado(ip)) return json({ erro: 'Muitas tentativas com a senha errada. Espere 15 minutos.' }, 429);
 
-      // Criar (1ª vez) ou testar a senha
+      // Testar (e trocar) a senha
       if (partes[0] === 'chave' && req.method === 'POST') {
-        const { chave } = await req.json().catch(() => ({}));
-        if (!chave || String(chave).length < 6) return json({ erro: 'A senha precisa ter pelo menos 6 caracteres.' }, 400);
-        const existe = this.env.PEDIDOS_SENHA || this.um("SELECT v FROM cfg WHERE k = 'chave'");
-        if (!existe) {
-          const sal = crypto.randomUUID();
-          this.sql.exec("INSERT OR REPLACE INTO cfg (k, v) VALUES ('sal', ?), ('chave', ?)", sal, await sha256(sal + chave));
-          return json({ ok: true, criada: true });
+        const { chave, nova } = await req.json().catch(() => ({}));
+        if (!(await this.confere(String(chave || '')))) {
+          this.errou(ip);
+          return json({ erro: 'Senha da confecção errada.' }, 401);
         }
-        if (await this.confere(String(chave))) return json({ ok: true });
-        this.errou(ip);
-        return json({ erro: 'Senha da confecção errada.' }, 401);
+        if (nova == null || String(nova) === String(chave)) return json({ ok: true });
+        if (this.env.PEDIDOS_SENHA) return json({ erro: 'A senha está fixa no Worker (PEDIDOS_SENHA). Troque por lá.' }, 400);
+        if (String(nova).length < 6) return json({ erro: 'A nova senha precisa ter pelo menos 6 caracteres.' }, 400);
+        const sal = crypto.randomUUID();
+        this.sql.exec("INSERT OR REPLACE INTO cfg (k, v) VALUES ('sal', ?), ('chave', ?)", sal, await sha256(sal + nova));
+        return json({ ok: true, trocada: true });
       }
 
       if (!(await this.confere(req.headers.get('x-chave') || ''))) {
