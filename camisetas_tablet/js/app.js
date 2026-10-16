@@ -242,6 +242,76 @@ function abaixoDasOutras(a, it = item()) {
   return encaixar(a, it);
 }
 
+// ---------- Lado da arte e sobreposição ----------
+
+/** Outras artes do mesmo lado que ficam por cima/baixo de "a". */
+function sobrepostas(a, it = item()) {
+  const g = geom(a, it);
+  return it.artes.filter(o => o !== a && o.lado === a.lado).filter(o => {
+    const h = geom(o, it);
+    const iw = Math.min(g.x + g.w, h.x + h.w) - Math.max(g.x, h.x), ih = Math.min(g.y + g.h, h.y + h.h) - Math.max(g.y, h.y);
+    return iw > 0 && ih > 0 && iw * ih > 0.03 * Math.min(g.w * g.h, h.w * h.h);
+  });
+}
+
+/** Passa uma arte (ou texto) para o outro lado da camiseta, no mesmo lugar. */
+function moverLado(a, it = item()) {
+  a.lado = outroLado(a.lado);
+  encaixar(a, it);
+  S.lado = a.lado; S.sel = a.uid;
+}
+
+/**
+ * Se a arte ficou por cima de outra, pergunta se o cliente quer assim.
+ * Pode deixar (não pergunta de novo para o mesmo par), mudar de lado ou desfazer.
+ */
+async function conferirSobreposicao(a) {
+  const it = item();
+  if (!a || !it.artes.includes(a)) return;
+  if (!sobrepostas(a, it).length) return;
+  // Espera a dica animada (primeira vez) fechar, para não abrir duas coisas juntas
+  for (let i = 0; i < 300 && document.querySelector('.coach'); i++) await new Promise(ok => setTimeout(ok, 200));
+  const novas = sobrepostas(a, it).filter(o => !(a.okCom || []).includes(o.uid));
+  if (!novas.length || !it.artes.includes(a)) return;
+  const nomeDe = o => (o.tipo === 'texto' ? `o texto “${o.texto.replace(/\s+/g, ' ').slice(0, 24)}”` : o.fixa ? 'a estampa da camiseta' : `a imagem “${o.nome}”`);
+  const j = janela({ titulo: `${icone('ajuda')} Uma arte está por cima da outra`, classe: 'janelaPequena', fechar: false, html: `
+    <div class="sobreposicao">
+      <div class="sobrePalco">${palco(it, a.lado, { sel: a.uid })}</div>
+      <p class="textoConfirmar">${a.tipo === 'texto' ? 'Este texto' : 'Esta imagem'} está em cima ${nomeDe(novas[0]).replace(/^a /, 'da ').replace(/^o /, 'do ')}. Na camiseta vai sair assim, um por cima do outro. <b>Tem certeza?</b></p>
+      <div class="linhaBotoes colunaBotoes">
+        <button type="button" class="btn btnEscuro btnLargo" data-r="ok">${icone('check', 20)} Sim, quero assim</button>
+        <button type="button" class="btn btnClaro btnLargo" data-r="lado">${icone('virar', 20)} Colocar ${a.lado === 'Frente' ? 'nas costas' : 'na frente'}</button>
+        <button type="button" class="btn btnClaro btnLargo" data-r="desfazer">${icone('desfazer', 20)} Desfazer</button>
+      </div>
+    </div>` });
+  $$('[data-r]', j.el).forEach(b => (b.onclick = () => j.fechar(b.dataset.r)));
+  const r = await j.aoFechar;
+  if (r === 'ok') {
+    a.okCom = [...new Set([...(a.okCom || []), ...novas.map(o => o.uid)])];
+    novas.forEach(o => { o.okCom = [...new Set([...(o.okCom || []), a.uid])]; });
+  } else if (r === 'lado') {
+    moverLado(a, it);
+    if (S.tela === 'personalizar') TELAS.personalizar();
+    aviso(`Agora está ${a.lado === 'Costas' ? 'nas costas' : 'na frente'}.`, 'ok');
+    return conferirSobreposicao(a);
+  } else if (r === 'desfazer' && S.desfazer.length) {
+    it.artes = JSON.parse(S.desfazer.pop());
+    if (!it.artes.some(x => x.uid === S.sel)) S.sel = null;
+  }
+  if (S.tela === 'personalizar') TELAS.personalizar();
+}
+
+/** Camiseta pronta: passa a estampa da loja para o outro lado (tamanho e posição continuam os da loja). */
+async function virarPronta(it = item()) {
+  const r = S.todasArtes.find(x => x.id === it.pronta);
+  if (!r) return;
+  it.ladoInvertido = !it.ladoInvertido;
+  const textos = it.artes.filter(a => !a.fixa);
+  it.artes = [...await montarPronta(r, it.modelo, it.ladoInvertido), ...textos];
+  S.lado = it.artes[0].lado;
+  aviso(`Estampa ${S.lado === 'Costas' ? 'nas costas' : 'na frente'}.`, 'ok');
+}
+
 // ---------- Início ----------
 
 TELAS.inicio = () => {
@@ -318,8 +388,12 @@ async function arteFixa(resumo, modeloId, ladoForcado) {
 }
 
 /** Todas as artes de uma camiseta pronta (frente e, se houver, costas). */
-async function montarPronta(resumo, modeloId) {
-  const artes = [await arteFixa(resumo, modeloId)];
+const outroLado = l => (l === 'Costas' ? 'Frente' : 'Costas');
+
+/** Artes da camiseta pronta; "invertido" troca frente ↔ costas (escolha do cliente). */
+async function montarPronta(resumo, modeloId, invertido = false) {
+  const lado = { ...FIXO_PADRAO, ...(resumo.fixo || {}) }.lado;
+  const artes = [await arteFixa(resumo, modeloId, invertido ? outroLado(lado) : null)];
   const par = resumo.fixo?.costas && S.todasArtes.find(x => x.id === resumo.fixo.costas);
   if (par) artes.push(await arteFixa(par, modeloId, artes[0].lado === 'Costas' ? 'Frente' : 'Costas'));
   return artes;
@@ -365,7 +439,7 @@ async function escolherModelo(id) {
     const r = S.todasArtes.find(x => x.id === it.pronta);
     if (r) {
       const textos = it.artes.filter(a => a.tipo === 'texto');
-      it.artes = [...await montarPronta(r, id), ...textos];
+      it.artes = [...await montarPronta(r, id, it.ladoInvertido), ...textos];
       textos.forEach(a => encaixar(a));
       const cores = coresDaPronta(r, id);
       if (!cores.includes(it.cor)) { it.cor = cores[0]; it.malha = malhaDaCor(it.cor); }
@@ -561,6 +635,7 @@ async function verPronta(lista, i) {
     const r = lista[atual];
     const textos = it.artes.filter(a => a.tipo === 'texto'); // textos já colocados continuam
     it.modo = 'pronta'; it.pronta = r.id; it.artes = [...artes, ...textos]; it.cor = cor; it.malha = malhaDaCor(cor);
+    it.ladoInvertido = false;
     it.precoPronta = +r.fixo?.preco > 0 ? +r.fixo.preco : null;
     textos.forEach(a => encaixar(a));
     S.lado = 'Frente'; S.sel = null;
@@ -617,6 +692,7 @@ async function adicionarTexto(existente = null) {
     S.sel = a.uid;
   }
   if (S.tela === 'personalizar') TELAS.personalizar(); else irPara('personalizar');
+  await conferirSobreposicao(existente || it.artes.find(x => x.uid === S.sel));
 }
 
 /** Quadro com o que é uma arte boa para estampar. */
@@ -709,6 +785,7 @@ async function revisarArteCliente(resumo) {
     j.fechar();
     S.janelaImagem?.fechar();
     if (S.tela === 'personalizar') TELAS.personalizar(); else irPara('personalizar');
+    conferirSobreposicao(a);
   };
 }
 
@@ -844,6 +921,7 @@ TELAS.personalizar = () => {
           ${pronta ? '' : `<div class="segmento segPeq" role="group" aria-label="Malha">${MALHAS.map(mm => `<button type="button" data-malha="${esc(mm.id)}" aria-pressed="${mm.id === it.malha}">${esc(mm.nome)}${comPreco() && precoBase(S.cfg, it.modelo, mm.id) ? ` <small>${dinheiro(precoBase(S.cfg, it.modelo, mm.id))}</small>` : ''}</button>`).join('')}</div>`}
           <div class="coresMini">${cores.map(c => `<button type="button" class="corMini ${CORES[c].mescla ? 'mescla' : ''}" data-cor="${c}" style="--c:${CORES[c].hex}" aria-pressed="${c === it.cor}" title="${esc(CORES[c].nome || c)}" aria-label="${esc(CORES[c].nome || c)}"></button>`).join('')}</div>
         </div>
+        ${pronta ? `<button type="button" class="btn btnClaro btnPeq virarPronta" id="virarPronta">${icone('virar', 18)} Estampa ${it.artes.some(x => x.fixa && x.lado === 'Frente') && !it.artes.some(x => x.fixa && x.lado === 'Costas') ? 'nas costas' : it.artes.some(x => x.fixa && x.lado === 'Costas') && !it.artes.some(x => x.fixa && x.lado === 'Frente') ? 'na frente' : ': trocar frente e costas'}</button>` : ''}
         ${a ? `
           <div class="arteAtual">
             <span class="arteAtualImg" style="--fundo:${CORES[it.cor].hex}"><img src="${a.url}" alt=""></span>
@@ -860,11 +938,13 @@ TELAS.personalizar = () => {
             <button type="button" class="btnRedondo" data-tam="1" aria-label="Aumentar">${icone('mais', 24)}</button>
           </div>
           <div id="qualidadeAjuste"></div>
+          <div class="rotuloLinha">${icone('virar', 18)} <b>Lado</b><span class="medidas">${a.tipo === 'texto' ? 'deste texto' : 'desta imagem'}</span></div>
+          <div class="segmento segPeq" id="ladoArte" role="group" aria-label="Lado da arte">${['Frente', 'Costas'].map(l => `<button type="button" data-lado-arte="${l}" aria-pressed="${a.lado === l}">${l}</button>`).join('')}</div>
           <div class="rotuloLinha">${icone('centro', 18)} <b>Posição</b></div>
           <div class="chipsPos">
             ${Object.entries(POSICOES).map(([k, p]) => `<button type="button" class="chipPos" data-pos="${k}">${p.nome}</button>`).join('')}
           </div>` : `
-          ${pronta ? `<div class="avisoPronta">${icone('estrela', 22)}<div><b>Camiseta pronta: ${esc(resumoPronta.nome || '')}</b><span>A estampa fica do jeito que a loja definiu. Você pode adicionar textos (nome, frase, número) e mudar a cor.</span></div></div>`
+          ${pronta ? `<div class="avisoPronta">${icone('estrela', 22)}<div><b>Camiseta pronta: ${esc(resumoPronta.nome || '')}</b><span>A estampa fica do jeito que a loja definiu. Você pode adicionar textos (nome, frase, número), mudar a cor e o lado.</span></div></div>`
             : `<div class="vazio vazioPainel">${icone('arte', 40)}<p>Nenhuma arte ${S.lado === 'Costas' ? 'nas costas' : 'na frente'} ainda.</p></div>`}`}
         <div class="botoesAdicionar ${pronta ? 'soTexto' : ''}">
           ${pronta ? '' : `<button type="button" class="btn btnContorno" data-add="imagem">${icone('mais', 20)} Imagem</button>`}
@@ -876,6 +956,9 @@ TELAS.personalizar = () => {
     </section>`;
 
   const svg = $('#palcoArea svg');
+  /** Depois de mexer: confere (com um pequeno atraso, para não atrapalhar os toques seguidos). */
+  let tConferir = null;
+  const conferirDepois = () => { clearTimeout(tConferir); tConferir = setTimeout(() => { if (S.tela === 'personalizar' && !document.querySelector('dialog[open]')) conferirSobreposicao(a); }, 700); };
   const pintarMedidas = () => {
     if (!a) return;
     const linhas = a.tipo === 'texto' ? a.texto.split('\n').length : 0;
@@ -902,6 +985,7 @@ TELAS.personalizar = () => {
   const dedos = new Map();
   let arraste = null, pinca = null, mudou = false;
   svg.addEventListener('pointerdown', e => {
+    clearTimeout(tConferir);
     const alvo = e.target.closest('image[data-uid]');
     dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { svg.setPointerCapture(e.pointerId); } catch { /* ok */ }
@@ -936,7 +1020,7 @@ TELAS.personalizar = () => {
   const soltar = e => {
     dedos.delete(e.pointerId);
     if (dedos.size < 2) pinca = null;
-    if (!dedos.size) { arraste = null; if (mudou) { mudou = false; $('#btnDesfazer').disabled = false; } }
+    if (!dedos.size) { arraste = null; if (mudou) { mudou = false; $('#btnDesfazer').disabled = false; conferirDepois(); } }
   };
   svg.addEventListener('pointerup', soltar);
   svg.addEventListener('pointercancel', soltar);
@@ -958,17 +1042,32 @@ TELAS.personalizar = () => {
   }));
   $$('.corCompacta [data-cor]').forEach(b => (b.onclick = () => { it.cor = b.dataset.cor; it.malha = malhaDaCor(it.cor); TELAS.personalizar(); }));
   $('#irCostas') && ($('#irCostas').onclick = () => { S.lado = 'Costas'; S.sel = null; TELAS.personalizar(); });
+  $('#virarPronta') && ($('#virarPronta').onclick = async () => {
+    salvarDesfazer();
+    await virarPronta(it);
+    TELAS.personalizar();
+    for (const t of it.artes.filter(x => !x.fixa)) if (sobrepostas(t, it).some(o => o.fixa)) { S.sel = t.uid; S.lado = t.lado; TELAS.personalizar(); await conferirSobreposicao(t); }
+  });
   if (a) {
     const tam = $('#tamanho');
     tam.addEventListener('pointerdown', () => salvarDesfazer(), { once: true });
     tam.oninput = () => { a.cm = +tam.value; encaixar(a); redesenhar(); };
-    tam.onchange = () => { $('#btnDesfazer').disabled = false; };
+    tam.onchange = () => { $('#btnDesfazer').disabled = false; conferirDepois(); };
+    $$('[data-lado-arte]').forEach(b => (b.onclick = () => {
+      if (b.dataset.ladoArte === a.lado) return;
+      salvarDesfazer();
+      moverLado(a, it);
+      TELAS.personalizar();
+      aviso(`${a.tipo === 'texto' ? 'Texto' : 'Imagem'} ${a.lado === 'Costas' ? 'nas costas' : 'na frente'}.`, 'ok');
+      conferirSobreposicao(a);
+    }));
     $$('[data-tam]').forEach(b => (b.onclick = () => {
       salvarDesfazer();
       a.cm = Math.round(a.cm) + +b.dataset.tam;
       const max = maxCm(it.modelo, a);
       if (a.cm > max) aviso(`Este é o tamanho máximo para esta arte: ${num(max)} cm.`);
       encaixar(a); redesenhar(); $('#btnDesfazer').disabled = false;
+      conferirDepois();
     }));
     $$('[data-pos]').forEach(b => (b.onclick = () => {
       salvarDesfazer();
@@ -978,6 +1077,7 @@ TELAS.personalizar = () => {
       const meiaH = (a.cm * area.upc * a.h / a.w) / 2 / area.h;
       a.fy = p.topo == null ? 0.5 : p.topo + meiaH;
       encaixar(a); redesenhar(); $('#btnDesfazer').disabled = false;
+      conferirDepois();
     }));
     $('#trocar') && ($('#trocar').onclick = () => {
       salvarDesfazer();
@@ -1140,6 +1240,7 @@ function editarItem(i) {
         <div class="menuEdicao">
           ${opcao('texto', 'editar', 'Adicionar texto', `Nome, frase ou número${extraTexto(' · +', ' por peça')}`)}
           ${temTexto ? opcao('ajustar', 'mao', 'Mudar os textos', 'Editar, mudar tamanho e lugar') : ''}
+          ${pronta ? opcao('virar', 'virar', 'Estampa na frente / nas costas', 'Passar a estampa da loja para o outro lado') : ''}
           ${pronta ? opcao('trocarPronta', 'estrela', 'Trocar a arte', 'Escolher outra camiseta pronta (os textos ficam)')
                    : opcao('ajustar', 'arte', 'Mudar a estampa', 'Imagens, textos, tamanho e posição')}
           ${opcao('tamanhos', 'regua', 'Tamanhos e quantidades', Object.entries(it.quantidades).filter(([, q]) => q > 0).map(([t, q]) => `${t} ×${q}`).join(' · ') || 'Nenhum tamanho escolhido')}
@@ -1157,7 +1258,8 @@ function editarItem(i) {
   };
   $$('#eiLados [data-lado]', j.el).forEach(b => (b.onclick = () => { lado = b.dataset.lado; pintar(); }));
   let indo = false;
-  $$('[data-acao]', j.el).forEach(b => (b.onclick = () => {
+  $$('[data-acao="virar"]', j.el).forEach(b => (b.onclick = async () => { await virarPronta(it); lado = S.lado; pintar(); }));
+  $$('[data-acao]:not([data-acao="virar"])', j.el).forEach(b => (b.onclick = () => {
     indo = true; S.editando = true;
     j.fechar();
     const acao = b.dataset.acao;

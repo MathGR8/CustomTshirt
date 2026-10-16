@@ -261,6 +261,7 @@ export const StampModule = {
       s.pendingRel = null;
     }
     this.updateStampRel(s);
+    UIModule.atualizarLimite?.();
   },
 
   /**
@@ -478,6 +479,7 @@ export const StampModule = {
       thumb.className = 'stampThumb';
       thumb.src = s.previewDataURL || s.dataURL;
       thumb.alt = s.name || 'Estampa';
+      if (s.tipo === 'texto') thumb.classList.add('thumbTexto');
 
       // Metadados da estampa
       const meta = document.createElement('div');
@@ -544,7 +546,7 @@ export const StampModule = {
       const btns = document.createElement('div');
       btns.className = 'stampRowBtns';
       const dupBtn = _mkBtn('Duplicar', () => this.duplicateStamp(s.id));
-      const editBtn = _mkBtn('Editar', () => window._modules.EditModule.open(s.id));
+      const editBtn = _mkBtn('Editar', () => (s.tipo === 'texto' ? window._modules.TextoModule.editar(s.id) : window._modules.EditModule.open(s.id)));
       const delBtn = _mkBtn('Remover',  () => this.removeStamp(s.id));
       delBtn.classList.add('btn-danger');
       btns.append(dupBtn, editBtn, delBtn);

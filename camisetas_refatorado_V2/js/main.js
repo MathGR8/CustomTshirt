@@ -38,6 +38,9 @@ import { PDFModule }       from './pdf/pdfModule.js';
 import { AlignModule }     from './preview/alignModule.js';
 import { PreviewGeom }     from './preview/previewGeometry.js';
 import { DragModule }      from './events/dragModule.js';
+import { TextoModule }     from './image/textoModule.js';
+import { TabelaMedidasModule } from './ui/tabelaMedidasModule.js';
+import { TutorialModule }  from './ui/tutorialModule.js';
 import { registerGlobalEvents, initConfigurator } from './events/globalEvents.js';
 
 // ============================================================
@@ -60,7 +63,10 @@ window._modules = {
   PDFModule,
   AlignModule,
   PreviewGeom,
-  DragModule
+  DragModule,
+  TextoModule,
+  TabelaMedidasModule,
+  TutorialModule
 };
 
 // ============================================================
@@ -81,6 +87,9 @@ window.AlignModule      = AlignModule;
 window.NoticeModule     = NoticeModule;
 window.PreviewGeom      = PreviewGeom;
 window.DragModule       = DragModule;
+window.TextoModule      = TextoModule;
+window.TabelaMedidasModule = TabelaMedidasModule;
+window.TutorialModule   = TutorialModule;
 
 // ValidationModule exposto para compatibilidade (lógica inline no HTML original)
 window.ValidationModule = {
@@ -117,4 +126,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // Atalhos de teclado e histórico de desfazer (a partir do estado inicial)
   KeyboardModule.init();
   HistoryModule.init();
+  // Boas-vindas + tutorial só na primeira visita (depois, pelo botão Ajuda)
+  TutorialModule.iniciarSeNovo();
 });

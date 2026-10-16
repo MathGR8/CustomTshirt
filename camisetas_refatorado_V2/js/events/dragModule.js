@@ -45,8 +45,9 @@ export const DragModule = {
     node.style.top  = (shirtRect.top  + top  - previewBox.top)  + 'px';
 
     // Atualiza a posição relativa para uso no PDF
-    const { StampModule, HistoryModule } = window._modules || {};
+    const { StampModule, HistoryModule, UIModule } = window._modules || {};
     if (StampModule) StampModule.updateStampRel(s);
+    UIModule?.atualizarLimite?.(); // borda vermelha quando encosta no limite
     // Arrastos, setas e alinhamentos seguidos viram um único passo de desfazer
     HistoryModule?.commit('pos-' + s.id);
   },

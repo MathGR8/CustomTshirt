@@ -18,7 +18,8 @@
  */
 
 import { AppState } from '../core/appState.js';
-import { SHIRT_PRINT_BOX, AREA_IMPRESSAO } from '../core/constants.js';
+import { AREA_IMPRESSAO } from '../core/constants.js';
+import { areaNaImagem, medidaPronta } from './medidaCamiseta.js';
 
 /** Arredonda para 1 casa decimal. */
 const um = v => Math.round(v * 10) / 10;
@@ -78,12 +79,14 @@ export const PreviewGeom = {
     const base = document.getElementById("baseShirtImg");
     if (!previewEl || !base || !base.naturalWidth || !base.naturalHeight) return null;
 
-    const prev = previewEl.getBoundingClientRect();
+    // Caixa da imagem como aparece na tela (já com o "scale"/"translate" do CSS)
+    const prev = base.getBoundingClientRect();
+    const k    = base.offsetWidth ? prev.width / base.offsetWidth : 1;
     const cs   = window.getComputedStyle(base);
-    const padL = parseFloat(cs.paddingLeft)   || 0;
-    const padR = parseFloat(cs.paddingRight)  || 0;
-    const padT = parseFloat(cs.paddingTop)    || 0;
-    const padB = parseFloat(cs.paddingBottom) || 0;
+    const padL = (parseFloat(cs.paddingLeft)   || 0) * k;
+    const padR = (parseFloat(cs.paddingRight)  || 0) * k;
+    const padT = (parseFloat(cs.paddingTop)    || 0) * k;
+    const padB = (parseFloat(cs.paddingBottom) || 0) * k;
 
     const innerW = prev.width  - (padL + padR);
     const innerH = prev.height - (padT + padB);
@@ -117,14 +120,15 @@ export const PreviewGeom = {
     const baseRect = this.getRenderedBaseRect();
     if (!baseRect) return null;
     const view = AppState.currentView || "Frente";
-    const box  = SHIRT_PRINT_BOX[view] || { x: 0, y: 0, w: 1, h: 1 };
-    const a    = this.area();
-    const width = box.w * baseRect.width;
+    const base = document.getElementById("baseShirtImg");
+    const cat  = document.getElementById('category')?.value || 'Masculina';
+    // Área em escala real sobre a camiseta do exemplo (ex.: 38 × 42 cm numa G de 55 cm)
+    const box  = areaNaImagem(cat, view, medidaPronta(base?.currentSrc || base?.src), baseRect.width / baseRect.height);
     return {
       left:   baseRect.left + box.x * baseRect.width,
       top:    baseRect.top  + box.y * baseRect.height,
-      width,
-      height: width * a.h / a.w // altura na proporção da área máxima (ex.: 38 × 42 cm)
+      width:  box.w * baseRect.width,
+      height: box.h * baseRect.height
     };
   },
 

@@ -10,6 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Fontes dos textos na camiseta (TextoModule) -->
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Bebas+Neue&family=Black+Ops+One&family=Creepster&family=Dancing+Script:wght@700&family=Lobster&family=Metal+Mania&family=Oswald:wght@700&family=Pacifico&family=Permanent+Marker&family=Righteous&family=Rye&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
 
   <!-- Folha de estilos externa (extraída do HTML original) -->
   <link rel="stylesheet" href="css/styles.css" />
@@ -44,6 +46,8 @@
       <button type="button" id="btnUndo" class="hdrIcon" onclick="HistoryModule.undo()" title="Desfazer (Ctrl+Z)" aria-label="Desfazer" disabled>↶</button>
       <button type="button" id="btnRedo" class="hdrIcon" onclick="HistoryModule.redo()" title="Refazer (Ctrl+Y)" aria-label="Refazer" disabled>↷</button>
       <button type="button" id="btnShortcuts" class="hdrIcon" onclick="KeyboardModule.showHelp()" title="Atalhos de teclado (?)" aria-label="Atalhos de teclado">⌨</button>
+      <!-- Tutorial (aparece sozinho só na primeira visita) -->
+      <button type="button" id="btnAjuda" class="hdrAjuda" onclick="TutorialModule.abrir()" title="Ver o tutorial" aria-label="Ajuda: ver o tutorial">❔ Ajuda</button>
       <!-- Atalho: leva até a lista "Seu pedido" (útil no celular, onde ela fica embaixo) -->
       <button type="button" id="orderSummaryBadge" title="Ver itens do pedido"
               onclick="document.getElementById('orderPanel').scrollIntoView({ behavior: 'smooth', block: 'start' })">
@@ -97,7 +101,7 @@
         <p class="sectionTitle">Estampa</p>
 
         <div class="seletor" id="enviaEstampa">
-          <span class="fieldLabel">Envie sua Arte</span>
+          <span class="fieldLabel">Envie sua arte ou escreva um texto</span>
           <!-- Ao escolher o arquivo a estampa já é adicionada (sem 2º clique) -->
           <label class="uploadBtn" for="stampFile">
             <span>＋ Adicionar estampa</span>
@@ -105,6 +109,11 @@
           </label>
           <input type="file" id="stampFile" class="visuallyHidden" accept=".svg,.png,.jpg,.jpeg,.pdf"
                  aria-label="Selecionar arquivo de estampa" onchange="StampModule.updateStampPreview()" />
+          <!-- Texto (nome, frase, número) com várias fontes -->
+          <button type="button" id="btnAddTexto" class="textoBtn" onclick="TextoModule.adicionar()">
+            <span>Aa Adicionar texto</span>
+            <small>Nome, frase ou número</small>
+          </button>
         </div>
 
         <div id="locationSection" class="seletor">
@@ -131,6 +140,10 @@
           <input type="range" id="stampSize" min="5" max="38" value="22" aria-label="Largura da estampa em centímetros" />
         </div>
 
+        <button type="button" id="btnTabelaMedidas" class="btn-outline medidasBtn" onclick="TabelaMedidasModule.abrir()">
+          📏 Tabela de medidas
+        </button>
+
         <button type="button" id="btnDefineQuantities" onclick="SizeModule.showSizeSection(); SizeModule.updateSizeTable()">
           📋 Definir Quantidades
         </button>
@@ -140,6 +153,7 @@
       <div id="sizeSection" style="display:none;">
         <div class="sizeSectionHeader">
           <h2>Tamanhos e Quantidades</h2>
+          <button type="button" class="btn-outline" onclick="TabelaMedidasModule.abrir()">📏 Medidas</button>
           <button type="button" class="btn-outline" onclick="SizeModule.backToConfig()">← Voltar</button>
         </div>
         <table id="sizeTable" class="tableSizes"></table>
@@ -201,6 +215,8 @@
         </div>
 
         <!-- Opções abaixo do preview -->
+        <!-- Tamanho da camiseta do exemplo (o preview é em escala real) -->
+        <p id="infoExemplo" class="infoExemplo"></p>
         <div class="previewOptions">
           <label>
             <input type="checkbox" id="chkShowShirtBox" checked onchange="UIModule.toggleShirtBox(this.checked)">
