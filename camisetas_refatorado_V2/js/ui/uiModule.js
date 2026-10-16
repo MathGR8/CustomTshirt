@@ -23,6 +23,7 @@ import { BASE_IMAGES, CHEST_PRESET } from '../core/constants.js';
 import { Logger } from '../core/logger.js';
 import { Utils } from '../utils/helpers.js';
 import { PreviewGeom } from '../preview/previewGeometry.js';
+import { medirUrl, textoExemplo } from '../preview/medidaCamiseta.js';
 
 export const UIModule = {
   /**
@@ -267,10 +268,39 @@ export const UIModule = {
     el.style.display = "block";
     // Etiqueta com a área máxima (Infantil/Juvenil: as duas medidas)
     const a = PreviewGeom.area();
+    this.atualizarExemplo();
+    this.atualizarLimite();
     const txt = a.infantil
       ? `Máx. ${a.nome} ${a.w}×${a.h} cm · ${a.infantil.nome} ${a.infantil.w}×${a.infantil.h} cm`
       : `Área máx. ${a.w} × ${a.h} cm`;
     if (el.dataset.txt !== txt) { el.dataset.txt = txt; el.innerHTML = `<span class="shirtBoxLabel">${txt}</span>`; }
+  },
+
+  /** Mostra o tamanho e as medidas da camiseta do exemplo (escala do preview). */
+  atualizarExemplo() {
+    const el = document.getElementById('infoExemplo');
+    if (!el) return;
+    const cat = document.getElementById('category')?.value || 'Masculina';
+    const ex = textoExemplo(cat), a = PreviewGeom.area(cat);
+    el.innerHTML = `👕 Camiseta do exemplo: <b>tamanho ${ex.tamanho}</b> (${ex.largura} × ${ex.altura} cm) · área máxima de estampa <b>${a.w} × ${a.h} cm</b>`;
+  },
+
+  /**
+   * Deixa a área de impressão VERMELHA quando alguma estampa encosta nas bordas
+   * (o cliente vê que chegou ao limite).
+   */
+  atualizarLimite() {
+    const el = document.getElementById('shirtBoxOverlay');
+    const rect = PreviewGeom.getRenderedShirtRect();
+    if (!el || !rect) return;
+    const tol = 1.5;
+    const noLimite = AppState.stamps.some(s => {
+      if (s.hidden || s.side !== AppState.currentView || !s.node?.parentNode || !s.node.offsetWidth) return false;
+      const r = s.node.getBoundingClientRect();
+      return r.left <= rect.left + tol || r.top <= rect.top + tol ||
+             r.right >= rect.left + rect.width - tol || r.bottom >= rect.top + rect.height - tol;
+    });
+    el.classList.toggle('noLimite', noLimite);
   },
 
   /**
@@ -308,6 +338,16 @@ export const UIModule = {
       }
 
       baseImgEl.addEventListener("load", () => {
+        // Mede a camiseta para a área de impressão ficar em escala real
+        medirUrl(baseImgEl.currentSrc || baseImgEl.src).then(m => {
+          if (!m || document.getElementById('baseShirtImg') !== baseImgEl) return;
+          this.updateShirtBoxOverlay();
+          AppState.stamps.forEach(s => {
+            if (s.side !== AppState.currentView || !StampModule) return;
+            if (s.rel) s.pendingRel = { ...s.rel };
+            StampModule.applyStampCmToNode(s);
+          });
+        });
         this.updateShirtBoxOverlay();
         if (StampModule) {
           AppState.stamps.forEach(s => {

@@ -1588,3 +1588,126 @@ button.pickCard[aria-pressed="true"] .pickCheck { opacity: 1; transform: none; }
   .pickFoot button { flex: 1 1 auto; }
   .pickFoot span { display: none; }
 }
+
+/* =============================================
+   ÁREA DE IMPRESSÃO NO LIMITE (vermelha) e camiseta do exemplo
+   ============================================= */
+#shirtBoxOverlay.noLimite { border-color: var(--color-primary) !important; border-width: 3px !important; box-shadow: 0 0 0 3px rgba(237, 48, 81, 0.18); }
+#shirtBoxOverlay.noLimite .shirtBoxLabel { background: var(--color-primary); color: #fff; }
+#shirtBoxOverlay.noLimite .shirtBoxLabel::after { content: " · no limite"; font-weight: 800; }
+.infoExemplo { margin: 8px 12px 0; font-size: 12px; color: var(--color-text-muted); text-align: center; line-height: 1.4; }
+.infoExemplo b { color: var(--color-text); }
+
+/* =============================================
+   BOTÕES NOVOS: Ajuda, Adicionar texto, Tabela de medidas
+   ============================================= */
+button.hdrAjuda {
+  height: 32px; padding: 0 12px; border-radius: 16px;
+  background: #fff; color: var(--color-primary-dk);
+  border: 0; font-weight: 800; font-size: 13px; white-space: nowrap;
+}
+button.hdrAjuda:hover { background: #ffe3e8; filter: none; }
+.textoBtn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%;
+  margin-top: 8px; padding: 10px 12px;
+  border: 2px solid #111; border-radius: var(--radius-md);
+  background: #111; color: #fff; font-weight: 800; font-size: 14px; cursor: pointer;
+}
+.textoBtn span { font-family: "Montserrat", sans-serif; letter-spacing: .3px; }
+.textoBtn small { font-weight: 400; font-size: 11px; color: #cfcfcf; }
+.textoBtn:hover { background: var(--color-primary); border-color: var(--color-primary); filter: none; }
+.textoBtn:hover small { color: #fff; }
+button.medidasBtn { width: 100%; margin-top: 8px; padding: 9px; font-weight: 700; }
+
+/* =============================================
+   JANELA DE TEXTO
+   ============================================= */
+.textoDlg { width: min(640px, 96vw); }
+.textoCorpo { gap: 10px; }
+.txtPrevia { background: var(--fundo, #1b1b1b); border-radius: var(--radius-lg); min-height: 120px; display: grid; place-items: center; padding: 16px; border: 1px solid var(--color-border); }
+#txtPreviaTexto { font-size: clamp(28px, 5vw, 46px); line-height: 1.15; text-align: center; white-space: pre-line; overflow-wrap: anywhere; }
+.textoCorpo textarea { width: 100%; resize: none; border: 2px solid var(--color-border); border-radius: var(--radius-md); padding: 8px 10px; font: inherit; font-size: 18px; }
+.textoCorpo textarea:focus { outline: none; border-color: var(--color-primary); }
+.txtFontes { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 6px; }
+.txtFonte { display: flex; flex-direction: column; align-items: center; padding: 6px 4px; border: 2px solid var(--color-border); border-radius: var(--radius-md); background: #fff; color: #111; cursor: pointer; }
+.txtFonte span { font-size: 24px; line-height: 1.1; }
+.txtFonte small { font-family: "Montserrat", sans-serif; font-weight: 600; font-size: 10px; color: var(--color-text-muted); }
+.txtFonte[aria-pressed="true"] { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary) inset; }
+.txtCores { display: flex; flex-wrap: wrap; gap: 6px; }
+.txtCores[hidden] { display: none; }
+.txtCor { width: 30px; height: 30px; border-radius: 50%; background: var(--c); border: 2px solid rgba(0,0,0,.2); padding: 0; cursor: pointer; }
+.txtCor[aria-pressed="true"] { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--color-primary); }
+.txtCheck { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.txtTamanhos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.txtTamanhos button { display: flex; flex-direction: column; align-items: center; padding: 6px; border: 2px solid var(--color-border); border-radius: var(--radius-md); background: #fff; color: #111; font-weight: 700; font-size: 13px; cursor: pointer; }
+.txtTamanhos button small { font-weight: 500; font-size: 11px; color: var(--color-text-muted); }
+.txtTamanhos button[aria-pressed="true"] { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.txtTamanhos button[aria-pressed="true"] small { color: #fff; }
+button.txtOk { width: 100%; padding: 12px; font-size: 15px; font-weight: 800; margin-top: 4px; }
+button.txtOk:hover { background: var(--color-primary); filter: none; }
+
+/* =============================================
+   TABELA DE MEDIDAS
+   ============================================= */
+.medidasDlg { width: min(900px, 96vw); }
+.medAbas { display: flex; gap: 6px; flex-wrap: wrap; }
+.medAbas button { padding: 8px 14px; border-radius: 20px; border: 2px solid #111; background: #fff; color: #111; font-weight: 800; font-size: 13px; cursor: pointer; }
+.medAbas button[aria-pressed="true"] { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.medCorpo { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 16px; align-items: start; }
+.medDesenho { background: var(--color-bg); border-radius: var(--radius-lg); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.medDesenho svg { width: 100%; height: auto; max-height: 46vh; }
+.medDesenho figcaption { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; font-weight: 700; font-size: 13px; }
+.medDesenho figcaption b, .medTabela thead b { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #111; color: #fff; font-size: 11px; margin-right: 3px; }
+.medTabelas { display: flex; flex-direction: column; gap: 12px; }
+.medTabela { width: 100%; border-collapse: collapse; font-size: 14px; border-radius: var(--radius-md); overflow: hidden; box-shadow: 0 0 0 1px var(--color-border); }
+.medTabela caption { text-align: left; font-weight: 900; font-size: 15px; padding: 2px 4px 6px; color: var(--color-primary); }
+.medTabela thead tr { background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-dk) 100%); }
+.medTabela thead th { background: transparent; color: #fff; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; padding: 8px 6px; }
+.medTabela thead b { background: #fff; color: #111; }
+.medTabela td, .medTabela tbody th { padding: 6px; text-align: center; border-top: 1px solid var(--color-border); }
+.medTabela tbody th { font-weight: 900; }
+.medTabela tbody th small { color: var(--color-text-muted); font-weight: 600; }
+.medTabela tbody tr:nth-child(even) { background: #fafafa; }
+.medTabela tr.exemplo { background: #ffe3e8 !important; }
+.medTabela tr.exemplo em { font-style: normal; font-size: 10px; font-weight: 800; color: #fff; background: var(--color-primary); border-radius: 8px; padding: 1px 6px; margin-left: 4px; text-transform: uppercase; }
+@media (max-width: 640px) { .medCorpo { grid-template-columns: 1fr; } .medDesenho svg { max-height: 30vh; } }
+
+/* =============================================
+   BOAS-VINDAS E TUTORIAL
+   ============================================= */
+.tutorial { position: fixed; inset: 0; z-index: 3000; font-family: var(--font-base); }
+.tutBoasVindas { background: rgba(0, 0, 0, 0.72); display: grid; place-items: center; padding: 16px; overflow: auto; }
+.bvCaixa { width: min(520px, 100%); background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.4); text-align: center; padding-bottom: 18px; }
+.bvTopo { background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dk) 100%); padding: 18px; }
+.bvTopo img { height: 56px; object-fit: contain; }
+.bvCaixa h2 { font-size: 21px; font-weight: 900; padding: 16px 20px 4px; line-height: 1.25; }
+.bvSub { color: var(--color-text-muted); font-size: 14px; }
+.bvLista { list-style: none; text-align: left; padding: 12px 22px; display: flex; flex-direction: column; gap: 10px; }
+.bvLista li { display: flex; gap: 12px; align-items: flex-start; }
+.bvLista li > span { font-size: 22px; width: 36px; height: 36px; flex-shrink: 0; border-radius: 10px; background: #ffe3e8; display: grid; place-items: center; }
+.bvLista b { display: block; font-size: 14px; }
+.bvLista small { color: var(--color-text-muted); font-size: 12px; }
+button.bvProsseguir { width: calc(100% - 44px); padding: 13px; font-size: 16px; font-weight: 900; border-radius: 10px; }
+button.bvProsseguir:hover { background: var(--color-primary); filter: none; }
+button.bvPular { background: none; border: 0; color: var(--color-text-muted); text-decoration: underline; font-size: 13px; margin-top: 10px; cursor: pointer; }
+.tutFoco { position: fixed; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.74), 0 0 0 3px var(--color-primary) inset, 0 0 24px 4px rgba(237, 48, 81, .55); transition: all .25s ease; pointer-events: none; }
+.tutorial:not(.tutBoasVindas) { pointer-events: auto; }
+.tutCartao { position: fixed; background: #fff; border-radius: 14px; padding: 14px 16px 12px; box-shadow: 0 16px 40px rgba(0,0,0,.45); border-top: 5px solid var(--color-primary); transition: top .25s ease, left .25s ease; }
+.tutSeta { position: absolute; width: 18px; height: 18px; background: #fff; transform: translateX(-50%) rotate(45deg); }
+.tutCartao[data-lado="baixo"] .tutSeta { top: -12px; background: var(--color-primary); }
+.tutCartao[data-lado="cima"] .tutSeta { bottom: -9px; }
+.tutTopo { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+.tutConta { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--color-primary); }
+button.tutPular { background: none; border: 0; padding: 4px 0; color: var(--color-text-muted); font-size: 12px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.tutTitulo { display: block; font-size: 18px; font-weight: 900; margin-bottom: 4px; }
+.tutTexto { font-size: 14px; line-height: 1.45; }
+.tutPontos { display: flex; gap: 5px; justify-content: center; margin: 10px 0 8px; }
+.tutPontos i { width: 7px; height: 7px; border-radius: 50%; background: #ddd; }
+.tutPontos i.ativo { width: 20px; border-radius: 4px; background: var(--color-primary); }
+.tutNav { display: flex; gap: 8px; }
+button.tutBtn { flex: 1; padding: 10px; border-radius: 10px; border: 2px solid #111; background: #fff; color: #111; font-weight: 800; font-size: 15px; cursor: pointer; }
+button.tutBtn:disabled { opacity: .35; cursor: default; }
+button.tutBtnPrincipal { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+
+/* Miniatura de texto na lista: fundo escuro para o texto branco aparecer */
+.stampThumb.thumbTexto { background: #3a3a3a; object-fit: contain; }

@@ -34,6 +34,7 @@ import { UIModule } from '../ui/uiModule.js';
 import { ContactModule } from '../ui/contactModule.js';
 import { LoadingModule } from '../ui/loadingModule.js';
 import { PreviewGeom } from '../preview/previewGeometry.js';
+import { areaNaImagem, medirSilhueta } from '../preview/medidaCamiseta.js';
 
 export const PDFModule = {
 
@@ -397,17 +398,11 @@ export const PDFModule = {
    * @param {'Frente'|'Costas'} view - Lado da camiseta.
    * @returns {{ x: number, y: number, w: number, h: number }} Retângulo em mm.
    */
-  getPdfShirtRect(ox, oy, drawW, drawH, view, categoria) {
+  getPdfShirtRect(ox, oy, drawW, drawH, view, categoria, medida = null) {
     const side = (view === 'Costas') ? 'Costas' : 'Frente';
-    const b    = SHIRT_PRINT_BOX[side];
-    const a    = PreviewGeom.area(categoria);
-    // Mesma regra do preview: altura na proporção da área máxima da categoria
-    return {
-      x: ox + b.x * drawW,
-      y: oy + b.y * drawH,
-      w: b.w * drawW,
-      h: b.w * drawW * a.h / a.w
-    };
+    // Mesma regra do preview: área em escala real sobre a camiseta medida na imagem
+    const b = areaNaImagem(categoria || 'Masculina', side, medida, drawW / drawH);
+    return { x: ox + b.x * drawW, y: oy + b.y * drawH, w: b.w * drawW, h: b.h * drawH };
   },
 
   // ----------------------------------------------------------
@@ -500,7 +495,7 @@ export const PDFModule = {
     pdf.addImage(tinted, 'PNG', ox, oy, drawW, drawH);
 
     // Estampas visíveis deste lado, posicionadas pela posição relativa (rel)
-    const pdfRect = this.getPdfShirtRect(ox, oy, drawW, drawH, side, orderData.category);
+    const pdfRect = this.getPdfShirtRect(ox, oy, drawW, drawH, side, orderData.category, medirSilhueta(shirtImg));
     for (const s of orderData.stamps.filter(x => !x.hidden && x.side === side)) {
       if (!s.rel) continue;
       const src = s.pdfRenderDataURL || s.previewDataURL || s.dataURL;

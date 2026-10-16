@@ -79,6 +79,50 @@ export const AREA_IMPRESSAO = {
 };
 
 // ============================================================
+//  CAMISETA DO EXEMPLO (escala real do preview)
+//  >>> A camiseta do preview representa este tamanho <<<
+//  largura e altura em cm (da tabela de medidas). O app mede a camiseta na
+//  imagem e desenha a área de impressão na mesma proporção.
+// ============================================================
+export const CAMISETA_EXEMPLO = {
+  'Masculina':        { tamanho: 'G',  largura: 55, altura: 74 },
+  'Feminina':         { tamanho: 'G',  largura: 49, altura: 63 },
+  'Infantil/Juvenil': { tamanho: '12', largura: 43, altura: 58 }
+};
+
+/**
+ * Distância (cm) do alto do ombro até o começo da área de impressão.
+ * Na frente a gola é mais funda; nas costas, mais rasa.
+ */
+export const TOPO_AREA_CM = {
+  'Masculina':        { Frente: 9, Costas: 6 },
+  'Feminina':         { Frente: 9, Costas: 6 },
+  'Infantil/Juvenil': { Frente: 7, Costas: 5 }
+};
+
+/**
+ * TABELAS DE MEDIDAS (cm). Cada linha: [tamanho, ...valores na ordem de "colunas"].
+ * >>> Para atualizar as medidas, altere aqui <<<
+ */
+export const TABELAS_MEDIDAS = {
+  'Masculina': [{
+    nome: 'Masculina', colunas: ['Largura', 'Altura', 'Manga'],
+    linhas: [['P', 49, 69, 20], ['M', 52, 72, 22], ['G', 55, 74, 23], ['GG', 58, 77, 23],
+             ['X1', 60, 79, 23], ['X2', 64, 81, 23], ['X3', 68, 81, 24], ['X4', 71, 81, 25],
+             ['X5', 74, 83, 26], ['X6', 79, 86, 28], ['X7', 83, 88, 28], ['X8', 86, 90, 28]],
+    apelidos: { X1: 'G1', X2: 'G2', X3: 'G3', X4: 'G4', X5: 'G5', X6: 'G6', X7: 'G7', X8: 'G8' }
+  }],
+  'Feminina': [{
+    nome: 'Feminina', colunas: ['Altura', 'Largura', 'Cintura'],
+    linhas: [['P', 59, 44, 40], ['M', 61, 46, 42], ['G', 63, 49, 45], ['GG', 65, 51, 48]]
+  }],
+  'Infantil/Juvenil': [
+    { nome: 'Infantil', colunas: ['Altura', 'Largura'], linhas: [['01', 37, 28], ['02', 41, 30], ['04', 45, 32], ['06', 49, 34]] },
+    { nome: 'Juvenil',  colunas: ['Altura', 'Largura'], linhas: [['08', 53, 36], ['10', 54, 40], ['12', 58, 43], ['14', 63, 46]] }
+  ]
+};
+
+// ============================================================
 //  LIMITES DE NEGÓCIO
 // ============================================================
 
