@@ -87,25 +87,47 @@ export function ajuda(titulo, dicas) {
 }
 
 /** Teclado de senha numérica. @returns {Promise<string|null>} */
-export function pedirSenha(titulo = 'Área do administrador') {
+export function pedirSenha(titulo = 'Acesso da equipe', ajuda = 'Digite a senha para continuar.') {
   const j = janela({ titulo: `${icone('cadeado')} ${titulo}`, classe: 'janelaSenha', html: `
-    <p class="textoAjuda">Digite a senha para continuar.</p>
-    <div class="pontosSenha" aria-live="polite"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <p class="textoAjuda">${ajuda}</p>
+    <div class="pontosSenha" aria-live="polite"></div>
     <div class="tecladoSenha">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button type="button" data-n="${n}">${n}</button>`).join('')}
       <button type="button" data-n="x" aria-label="Apagar">${icone('voltar')}</button><button type="button" data-n="0">0</button>
-      <button type="button" data-n="ok" class="ok" aria-label="Confirmar">${icone('check')}</button></div>` });
+      <button type="button" data-n="ok" class="ok" aria-label="Confirmar">${icone('check')}</button></div>
+    <form class="senhaLetras" hidden><input type="password" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" placeholder="Senha" aria-label="Senha">
+      <button type="submit" class="btn btnEscuro">${icone('check', 20)} Entrar</button></form>
+    <button type="button" class="btnTexto senhaAbc">Senha com letras? Toque aqui</button>` });
   let valor = '';
-  const pontos = $$('.pontosSenha i', j.el);
-  const pintar = () => pontos.forEach((p, i) => p.classList.toggle('cheio', i < valor.length));
+  const pintar = () => {
+    $('.pontosSenha', j.el).innerHTML = Array.from({ length: Math.max(6, Math.min(valor.length, 16)) }, (_, i) => `<i class="${i < valor.length ? 'cheio' : ''}"></i>`).join('');
+  };
+  pintar();
+  const fechar = v => { document.removeEventListener('keydown', teclas, true); j.fechar(v); };
+  j.aoFechar.then(() => document.removeEventListener('keydown', teclas, true));
   j.el.addEventListener('click', e => {
+    if (e.target.closest('.senhaAbc')) {
+      const f = $('.senhaLetras', j.el); f.hidden = false;
+      $('.tecladoSenha', j.el).hidden = $('.pontosSenha', j.el).hidden = e.target.closest('.senhaAbc').hidden = true;
+      $('input', f).focus();
+      return;
+    }
     const b = e.target.closest('[data-n]');
     if (!b) return;
     const n = b.dataset.n;
     if (n === 'x') valor = valor.slice(0, -1);
-    else if (n === 'ok') return j.fechar(valor);
-    else if (valor.length < 6) valor += n;
+    else if (n === 'ok') return fechar(valor);
+    else if (valor.length < 32) valor += n;
     pintar();
   });
+  $('.senhaLetras', j.el).onsubmit = e => { e.preventDefault(); fechar($('.senhaLetras input', j.el).value.trim()); };
+  // No computador: dá para digitar a senha direto no teclado
+  function teclas(e) {
+    if (!$('.senhaLetras', j.el).hidden || !j.el.isConnected) return;
+    if (e.key === 'Enter') { e.preventDefault(); fechar(valor); }
+    else if (e.key === 'Backspace') { e.preventDefault(); valor = valor.slice(0, -1); pintar(); }
+    else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && valor.length < 32) { e.preventDefault(); valor += e.key; pintar(); }
+  }
+  document.addEventListener('keydown', teclas, true);
   return j.aoFechar;
 }
 

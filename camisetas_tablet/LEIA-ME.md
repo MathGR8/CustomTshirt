@@ -116,7 +116,12 @@ Os pedidos são feitos no tablet da loja e podem ser vistos em qualquer computad
 
 1. O envio já vem **ligado**: cada pedido novo feito no tablet vai sozinho para a confecção.
    A **senha inicial da confecção é `000000`**.
-2. No computador: abra `https://<endereço do app>/pedidos.html` e entre com a senha.
+2. No computador: abra **o mesmo endereço do app** (`https://<endereço do app>/`), clique em
+   **Acesso da equipe** (canto de baixo) e digite a senha da confecção. A mesma janela serve para
+   as duas senhas: a do **administrador** abre o Administrador e a da **confecção** abre os pedidos.
+   No computador a senha fica lembrada (abre direto nos pedidos); **Sair** volta para o app da loja.
+   No tablet, a janela abre com 5 toques no nome da loja, e a senha da confecção vale só até
+   fechar o app. O endereço antigo `/pedidos.html` continua funcionando.
    A senha que vale é sempre a que aparece no tablet em **Administrador → Configurações →
    Senha da confecção**. Depois de 10 tentativas erradas, o acesso fica bloqueado por 15 minutos.
 3. Para trocar a senha (recomendado): no tablet, **Administrador → Configurações → Pedidos no

@@ -1,6 +1,8 @@
 /**
  * @module painel
- * @description Pedidos no computador da confecção (pedidos.html).
+ * @description Pedidos no computador da confecção.
+ * Abre no próprio app: "Acesso da equipe" (ou 5 toques no nome da loja) com a
+ * senha da confecção. O endereço antigo pedidos.html leva para cá.
  *
  * Mostra os pedidos que o tablet da loja enviou: lista com filtro por situação,
  * busca, e o pedido em tela cheia (camisetas, tamanhos, cada arte e texto),
@@ -26,7 +28,7 @@ const E = { chave: '', pedidos: [], filtro: 'abertos', busca: '', vistos: new Se
 
 // ---------- Acesso ----------
 
-const guardada = () => localStorage.getItem('chaveConfeccao') || sessionStorage.getItem('chaveConfeccao') || '';
+const guardada = () => { try { return localStorage.getItem('chaveConfeccao') || sessionStorage.getItem('chaveConfeccao') || ''; } catch { return ''; } };
 
 async function api(caminho = '', opc = {}) {
   const r = await fetch(`${API}${caminho ? '/' + caminho : ''}`, { ...opc, headers: { 'x-chave': E.chave, ...(opc.headers || {}) } });
@@ -38,10 +40,16 @@ async function api(caminho = '', opc = {}) {
   return r;
 }
 
-function sair() {
-  localStorage.removeItem('chaveConfeccao'); sessionStorage.removeItem('chaveConfeccao');
+function esquecer() {
+  try { localStorage.removeItem('chaveConfeccao'); sessionStorage.removeItem('chaveConfeccao'); } catch { /* ok */ }
   E.chave = '';
-  telaEntrar();
+}
+function sair() { esquecer(); telaEntrar(); }
+/** Volta para o app da loja (mesmo endereço, sem a confecção). */
+function voltarLoja() {
+  esquecer();
+  history.replaceState(null, '', location.pathname.replace(/pedidos\.html$/, ''));
+  location.reload();
 }
 
 function telaEntrar(msg = '') {
@@ -53,12 +61,14 @@ function telaEntrar(msg = '') {
         <p class="textoAjuda">Use a <b>senha da confecção</b> (a inicial é <b>000000</b>; dá para trocar no tablet em Administrador → Configurações).</p>
         <label class="campoPeq"><span>Senha da confecção</span><input id="chave" type="password" autocomplete="off" required minlength="6" inputmode="text"></label>
         <label class="checkLinha"><input type="checkbox" id="mostrar"> Mostrar a senha</label>
-        <label class="checkLinha"><input type="checkbox" id="lembrar" checked> Lembrar neste computador</label>
+        <label class="checkLinha"><input type="checkbox" id="lembrar" ${matchMedia('(pointer: coarse)').matches ? '' : 'checked'}> Lembrar neste aparelho</label>
         ${msg ? `<p class="alertaPedido">${esc(msg)}</p>` : ''}
         <button type="submit" class="btn btnEscuro btnGrande btnLargo">${icone('check')} Entrar</button>
+        <button type="button" class="btnTexto" id="voltarLoja">${icone('voltar', 18)} Voltar para o app da loja</button>
       </form>
     </main>`;
   $('#chave').focus();
+  $('#voltarLoja').onclick = voltarLoja;
   $('#mostrar').onchange = e => { $('#chave').type = e.target.checked ? 'text' : 'password'; };
   $('#formEntrar').onsubmit = async e => {
     e.preventDefault();
@@ -96,7 +106,7 @@ function iniciarPainel() {
   let t;
   $('#busca').oninput = e => { clearTimeout(t); t = setTimeout(() => { E.busca = e.target.value; pintarLista(); }, 200); };
   $('#atualizar').onclick = () => carregar(true);
-  $('#sair').onclick = async () => { if (await confirmar('Sair deste computador? Vai precisar da senha de novo.', { sim: 'Sair' })) sair(); };
+  $('#sair').onclick = async () => { if (await confirmar('Sair dos pedidos da confecção e voltar para o app da loja? Vai precisar da senha de novo.', { sim: 'Sair' })) voltarLoja(); };
   carregar();
   setInterval(() => { if (!document.querySelector('dialog[open]')) carregar(); }, 30000);
 }
@@ -222,6 +232,11 @@ function verPedidoPainel(p, nomeArq) {
 
 // ---------- Início ----------
 
-ajudarTeclado();
-E.chave = guardada();
-if (E.chave) iniciarPainel(); else telaEntrar();
+/** Abre a área da confecção (chamado pelo app quando o endereço tem #confeccao ou a senha está lembrada). */
+export function iniciar() {
+  document.body.className = 'paginaPainel';
+  document.title = 'Pedidos · Confecção';
+  ajudarTeclado();
+  E.chave = guardada();
+  if (E.chave) iniciarPainel(); else telaEntrar();
+}

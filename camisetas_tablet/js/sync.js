@@ -1,7 +1,7 @@
 /**
  * @module sync
  * @description Envia os pedidos do tablet para a nuvem (Worker do Cloudflare),
- * para a confecção ver no computador em /pedidos.html.
+ * para a confecção ver no computador (no próprio app, com a senha da confecção).
  *
  * - Já vem ligado, com a senha inicial da confecção 000000 (dá para trocar ou
  *   desligar em Administrador → Configurações).
