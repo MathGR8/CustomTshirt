@@ -329,6 +329,7 @@ TELAS.inicio = () => {
         </ol>
         <button type="button" class="btn btnEscuro btnEnorme" id="btnComecar">Toque para começar ${icone('avancar', 28)}</button>
         <button type="button" class="btnTexto" id="btnComoFunciona">${icone('olho', 20)} Ver como funciona</button>
+        <button type="button" class="btnTexto acessoEquipe" id="acessoEquipe">${icone('cadeado', 18)} Acesso da equipe</button>
         ${vazio ? `<p class="avisoLoja">${icone('cadeado', 18)} Catálogo vazio. Atendente: toque 5 vezes no nome da loja para importar as artes.</p>` : ''}
       </div>
       <div class="inicioVitrine" aria-hidden="true">
@@ -338,6 +339,7 @@ TELAS.inicio = () => {
   $('#btnComecar').onclick = () => irPara('modelo');
   $('#btnComoFunciona').onclick = tutorial;
   ativarAdminSecreto($('#marcaInicio'));
+  $('#acessoEquipe').onclick = () => import('./admin.js').then(m => m.abrirAdmin(App));
   rodape();
 };
 
@@ -1439,7 +1441,17 @@ async function manterTelaLigada() {
   } catch { /* sem suporte ou sem permissão: a tela segue a configuração do tablet */ }
 }
 
+/** Este aparelho abre a área da confecção? (#confeccao no endereço ou senha lembrada) */
+function modoConfeccao() {
+  if (location.hash === '#confeccao') return true;
+  try { return !!(localStorage.getItem('chaveConfeccao') || sessionStorage.getItem('chaveConfeccao')); } catch { return false; }
+}
+
 async function iniciar() {
+  if (modoConfeccao()) {
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+    return (await import('./painel.js')).iniciar();
+  }
   montarEsqueleto();
   aplicarConfig(await DB.config(PADRAO));
   await recarregarCatalogo();
