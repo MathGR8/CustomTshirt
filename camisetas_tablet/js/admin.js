@@ -19,7 +19,7 @@ import { importar, urlDa, urlMiniatura, limparUrls, exportarCatalogo, importarCa
 import { credito } from './fontes.js';
 import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo, imagemLado } from './order.js';
 import { precosDe, dinheiro } from './precos.js';
-import { configEnvio, testarChave, enviarPendentes, SENHA_INICIAL } from './sync.js';
+import { configEnvio, testarChave, enviarPendentes, SENHA_INICIAL, VERSAO_ENVIO } from './sync.js';
 import { arquivosTexto } from './textoVetor.js';
 import { modelo } from './shirt.js';
 
@@ -767,7 +767,7 @@ ABAS.config = el => {
         (com a mesma senha). Sem internet, o pedido espera e vai sozinho depois.</p>
       <label class="checkLinha"><input type="checkbox" id="eAtivo" ${configEnvio(c).ativo ? 'checked' : ''}> <b>Enviar pedidos para a confecção</b></label>
       <label class="campoPeq"><span>Senha da confecção (a inicial é <b>${SENHA_INICIAL}</b>)</span>
-        <input id="eChave" type="password" autocomplete="off" value="${esc(configEnvio(c).chave)}" placeholder="${SENHA_INICIAL}"></label>
+        <input id="eChave" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(configEnvio(c).chave)}" placeholder="${SENHA_INICIAL}"></label>
       <label class="campoPeq"><span>Trocar a senha da confecção (deixe vazio para manter; mínimo 6 caracteres)</span>
         <input id="eNova" type="password" autocomplete="new-password" placeholder="Nova senha"></label>
       <div class="linhaBotoes">
@@ -814,7 +814,7 @@ ABAS.config = el => {
         if (r.trocada) { chave = nova; $('#eChave', el).value = nova; $('#eNova', el).value = ''; }
         estado.textContent = r.trocada ? 'Senha trocada. Use a nova senha no computador.' : ativo ? 'Senha certa. Tudo pronto.' : 'Envio desligado.';
       } else estado.textContent = 'Envio desligado.';
-      const cfgNova = { ...App.S.cfg, envio: { ativo, chave } };
+      const cfgNova = { ...App.S.cfg, envio: { ativo, chave, versao: VERSAO_ENVIO } };
       await DB.salvarConfig(cfgNova);
       App.aplicarConfig(cfgNova);
       if (ativo) { const r = await enviarPendentes(cfgNova); if (r.enviados) aviso(`${r.enviados} pedido${r.enviados > 1 ? 's' : ''} enviado${r.enviados > 1 ? 's' : ''} para a confecção.`, 'ok'); } await situacao();

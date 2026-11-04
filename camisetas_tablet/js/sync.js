@@ -17,9 +17,13 @@ let enviando = null;
 
 /** Configuração de envio (dentro das configurações da loja). */
 export const SENHA_INICIAL = '000000';
+export const VERSAO_ENVIO = 2;
 export const configEnvio = cfg => {
-  const e = { ativo: true, chave: SENHA_INICIAL, ...(cfg?.envio || {}) };
-  return e.chave ? e : { ativo: true, chave: SENHA_INICIAL }; // nunca configurado: envio ligado com a senha inicial
+  const e = cfg?.envio || {};
+  // Nunca configurado, ou configurado numa versão antiga (o servidor voltou
+  // para a senha inicial): envio ligado com 000000
+  if (!e.chave || e.versao !== VERSAO_ENVIO) return { ativo: true, chave: SENHA_INICIAL, versao: VERSAO_ENVIO };
+  return { ativo: true, ...e };
 };
 
 /** Confere a senha da confecção no servidor (e troca, se vier a nova). */
@@ -117,8 +121,17 @@ function avisar(r) {
  * (assim o pedido recém-finalizado nunca fica para trás).
  * @returns {Promise<{enviados: number, pendentes: number, erro?: string}>}
  */
-export function enviarPendentes(cfg) {
-  if (enviando) return enviando.then(() => enviarPendentes(cfg));
+// Depois de "senha errada" ou "muitas tentativas", as tentativas automáticas
+// param (para não bloquear o acesso da confecção); o envio manual e um pedido
+// novo continuam tentando.
+let pausa = null; // { chave, ate }
+
+export function enviarPendentes(cfg, { auto = false } = {}) {
+  if (enviando) return enviando.then(() => enviarPendentes(cfg, { auto }));
+  const envCfg = configEnvio(cfg);
+  if (auto && pausa && pausa.chave === envCfg.chave && Date.now() < pausa.ate) {
+    return Promise.resolve(ultimo || { enviados: 0, pendentes: 0, erro: 'senha da confecção errada' });
+  }
   enviando = (async () => {
     const env = configEnvio(cfg);
     const pendentes = (await DB.todos('pedidos')).filter(p => !p.enviado).sort((a, b) => a.id - b.id);
@@ -134,11 +147,13 @@ export function enviarPendentes(cfg) {
         p.erroEnvio = e.message;
         erro = e.message;
         await DB.salvar('pedidos', p);
+        if (e.status === 401 || e.status === 429) pausa = { chave: env.chave, ate: Date.now() + (e.status === 401 ? 6 * 3600e3 : 16 * 60e3) };
         if (e.status === 401 || e.status === 429 || e.status === 501) break; // senha errada / servidor sem pedidos: não insiste
         continue;
       }
       await DB.salvar('pedidos', p);
     }
+    if (enviados) pausa = null;
     return avisar({ enviados, pendentes: pendentes.length - enviados, erro });
   })().catch(e => avisar({ enviados: 0, pendentes: 0, erro: e.message }))
     .finally(() => { enviando = null; });
@@ -147,7 +162,7 @@ export function enviarPendentes(cfg) {
 
 /** Tenta enviar ao abrir, quando a internet volta e a cada minuto (se houver pendentes). */
 export function vigiarEnvio(pegarCfg) {
-  const tentar = () => enviarPendentes(pegarCfg()).catch(() => {});
+  const tentar = () => enviarPendentes(pegarCfg(), { auto: true }).catch(() => {});
   window.addEventListener('online', tentar);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tentar(); });
   setInterval(tentar, 60 * 1000);
