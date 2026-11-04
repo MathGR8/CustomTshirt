@@ -19,7 +19,7 @@ import { importar, urlDa, urlMiniatura, limparUrls, exportarCatalogo, importarCa
 import { credito } from './fontes.js';
 import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo, imagemLado } from './order.js';
 import { precosDe, dinheiro } from './precos.js';
-import { configEnvio, testarChave, enviarPendentes, SENHA_INICIAL } from './sync.js';
+import { configEnvio, testarChave, enviarPendentes, SENHA_INICIAL, VERSAO_ENVIO } from './sync.js';
 import { arquivosTexto } from './textoVetor.js';
 import { modelo } from './shirt.js';
 
@@ -767,14 +767,40 @@ ABAS.config = el => {
         (com a mesma senha). Sem internet, o pedido espera e vai sozinho depois.</p>
       <label class="checkLinha"><input type="checkbox" id="eAtivo" ${configEnvio(c).ativo ? 'checked' : ''}> <b>Enviar pedidos para a confecção</b></label>
       <label class="campoPeq"><span>Senha da confecção (a inicial é <b>${SENHA_INICIAL}</b>)</span>
-        <input id="eChave" type="password" autocomplete="off" value="${esc(configEnvio(c).chave)}" placeholder="${SENHA_INICIAL}"></label>
+        <input id="eChave" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(configEnvio(c).chave)}" placeholder="${SENHA_INICIAL}"></label>
       <label class="campoPeq"><span>Trocar a senha da confecção (deixe vazio para manter; mínimo 6 caracteres)</span>
         <input id="eNova" type="password" autocomplete="new-password" placeholder="Nova senha"></label>
       <div class="linhaBotoes">
         <button type="button" class="btn btnEscuro" id="eSalvarEnvio">${icone('check', 20)} Testar e salvar</button>
+        <button type="button" class="btn btnClaro" id="eAtualizar">${icone('virar', 20)} Atualizar e enviar agora</button>
         <span class="textoAjuda" id="eEstado"></span>
       </div>
+      <p class="estadoEnvio" id="eSituacao"></p>
     </div>`;
+  // Situação dos pedidos no tablet (enviados / aguardando) e botão de atualizar
+  const situacao = async () => {
+    const caixa = $('#eSituacao', el); if (!caixa) return;
+    const todos = await DB.todos('pedidos');
+    const pend = todos.filter(p => !p.enviado);
+    const erro = pend.find(p => p.erroEnvio)?.erroEnvio;
+    const ultimoEnviado = Math.max(0, ...todos.map(p => p.enviado || 0));
+    caixa.classList.toggle('erro', !!erro); caixa.classList.toggle('ok', !pend.length && !!todos.length);
+    caixa.innerHTML = !configEnvio(App.S.cfg).ativo ? 'Envio desligado: os pedidos ficam só no tablet.'
+      : `${todos.length - pend.length} de ${todos.length} pedido${todos.length === 1 ? '' : 's'} na confecção` +
+        (pend.length ? ` · <b>${pend.length} aguardando envio</b>${erro ? ` (${esc(erro.replace(/\.$/, ''))})` : ''}` : ' · tudo enviado') +
+        (ultimoEnviado ? ` · último envio ${new Date(ultimoEnviado).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '');
+  };
+  situacao();
+  $('#eAtualizar', el).onclick = async () => {
+    const b = $('#eAtualizar', el); b.disabled = true;
+    $('#eSituacao', el).innerHTML = 'Enviando…';
+    const r = await enviarPendentes(App.S.cfg).catch(e => ({ erro: e.message }));
+    await situacao();
+    b.disabled = false;
+    if (r.desligado) aviso('Ligue "Enviar pedidos para a confecção" para enviar.', 'erro');
+    else if (r.erro) aviso(`Não foi possível enviar: ${r.erro}`, 'erro');
+    else aviso(r.enviados ? `${r.enviados} pedido${r.enviados === 1 ? '' : 's'} enviado${r.enviados === 1 ? '' : 's'} para a confecção.` : 'Tudo em dia: nenhum pedido aguardando envio.', 'ok');
+  };
   $('#eSalvarEnvio', el).onclick = async () => {
     const ativo = $('#eAtivo', el).checked, nova = $('#eNova', el).value.trim();
     let chave = $('#eChave', el).value.trim();
@@ -788,10 +814,10 @@ ABAS.config = el => {
         if (r.trocada) { chave = nova; $('#eChave', el).value = nova; $('#eNova', el).value = ''; }
         estado.textContent = r.trocada ? 'Senha trocada. Use a nova senha no computador.' : ativo ? 'Senha certa. Tudo pronto.' : 'Envio desligado.';
       } else estado.textContent = 'Envio desligado.';
-      const cfgNova = { ...App.S.cfg, envio: { ativo, chave } };
+      const cfgNova = { ...App.S.cfg, envio: { ativo, chave, versao: VERSAO_ENVIO } };
       await DB.salvarConfig(cfgNova);
       App.aplicarConfig(cfgNova);
-      if (ativo) { const r = await enviarPendentes(cfgNova); if (r.enviados) aviso(`${r.enviados} pedido${r.enviados > 1 ? 's' : ''} enviado${r.enviados > 1 ? 's' : ''} para a confecção.`, 'ok'); }
+      if (ativo) { const r = await enviarPendentes(cfgNova); if (r.enviados) aviso(`${r.enviados} pedido${r.enviados > 1 ? 's' : ''} enviado${r.enviados > 1 ? 's' : ''} para a confecção.`, 'ok'); } await situacao();
     } catch (e) {
       estado.textContent = '';
       aviso(navigator.onLine ? e.message : 'Sem internet. Tente de novo quando conectar.', 'erro');

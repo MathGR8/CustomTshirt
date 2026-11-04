@@ -56,6 +56,13 @@ export class Pedidos extends DurableObject {
       CREATE TABLE IF NOT EXISTS arquivo_partes (pedido TEXT, nome TEXT, idx INTEGER, dados BLOB, PRIMARY KEY (pedido, nome, idx));
       CREATE TABLE IF NOT EXISTS tentativas (ip TEXT PRIMARY KEY, n INTEGER, ate INTEGER);
     `);
+    // Uma vez só: apaga a senha gravada pelas versões antigas (a 1ª senha usada
+    // ficava valendo) e volta para a senha inicial 000000. Os pedidos ficam.
+    if (!this.um("SELECT v FROM cfg WHERE k = 'senha_inicial_v2'")) {
+      this.sql.exec("DELETE FROM cfg WHERE k IN ('chave', 'sal')");
+      this.sql.exec('DELETE FROM tentativas');
+      this.sql.exec("INSERT OR REPLACE INTO cfg (k, v) VALUES ('senha_inicial_v2', '1')");
+    }
   }
 
   um(q, ...p) { return this.sql.exec(q, ...p).toArray()[0]; }
@@ -71,6 +78,7 @@ export class Pedidos extends DurableObject {
     const n = t && t.ate > Date.now() ? t.n + 1 : 1;
     this.sql.exec('INSERT OR REPLACE INTO tentativas (ip, n, ate) VALUES (?, ?, ?)', ip, n, Date.now() + 15 * 60 * 1000);
   }
+  acertou(ip) { this.sql.exec('DELETE FROM tentativas WHERE ip = ?', ip); }
   async confere(chave) {
     if (!chave) return false;
     if (this.env.PEDIDOS_SENHA) return chave === this.env.PEDIDOS_SENHA;
@@ -94,6 +102,7 @@ export class Pedidos extends DurableObject {
           this.errou(ip);
           return json({ erro: 'Senha da confecção errada.' }, 401);
         }
+        this.acertou(ip);
         if (nova == null || String(nova) === String(chave)) return json({ ok: true });
         if (this.env.PEDIDOS_SENHA) return json({ erro: 'A senha está fixa no Worker (PEDIDOS_SENHA). Troque por lá.' }, 400);
         if (String(nova).length < 6) return json({ erro: 'A nova senha precisa ter pelo menos 6 caracteres.' }, 400);
@@ -106,6 +115,7 @@ export class Pedidos extends DurableObject {
         this.errou(ip);
         return json({ erro: 'Senha da confecção errada.' }, 401);
       }
+      this.acertou(ip);
 
       const [id, sub, nome] = partes;
       if (!id && req.method === 'GET') return this.lista(url);

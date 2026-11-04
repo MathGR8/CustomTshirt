@@ -17,24 +17,38 @@ let enviando = null;
 
 /** Configuração de envio (dentro das configurações da loja). */
 export const SENHA_INICIAL = '000000';
+export const VERSAO_ENVIO = 2;
 export const configEnvio = cfg => {
-  const e = { ativo: true, chave: SENHA_INICIAL, ...(cfg?.envio || {}) };
-  return e.chave ? e : { ativo: true, chave: SENHA_INICIAL }; // nunca configurado: envio ligado com a senha inicial
+  const e = cfg?.envio || {};
+  // Nunca configurado, ou configurado numa versão antiga (o servidor voltou
+  // para a senha inicial): envio ligado com 000000
+  if (!e.chave || e.versao !== VERSAO_ENVIO) return { ativo: true, chave: SENHA_INICIAL, versao: VERSAO_ENVIO };
+  return { ativo: true, ...e };
 };
 
 /** Confere a senha da confecção no servidor (e troca, se vier a nova). */
 export async function testarChave(chave, nova) {
-  const r = await fetch(`${API}/chave`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chave, nova }) });
+  const r = await buscar(`${API}/chave`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chave, nova }) });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.erro || `erro ${r.status}`);
   return d; // { ok, trocada? }
 }
 
+/** fetch com tempo máximo (internet lenta não trava o envio para sempre). */
+async function buscar(url, opc = {}, ms = 90000) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms);
+  try { return await fetch(url, { ...opc, signal: ctl.signal, cache: 'no-store' }); }
+  catch (e) { throw new Error(e.name === 'AbortError' ? 'internet lenta (tempo esgotado)' : 'sem conexão com o servidor'); }
+  finally { clearTimeout(t); }
+}
+
 async function api(caminho, chave, opc = {}) {
-  const r = await fetch(`${API}/${caminho}`, { ...opc, headers: { 'x-chave': chave, ...(opc.headers || {}) } });
+  const ms = opc.method === 'PUT' ? 5 * 60000 : 60000; // arquivos grandes têm mais tempo
+  const r = await buscar(`${API}/${caminho}`, { ...opc, headers: { 'x-chave': chave, ...(opc.headers || {}) } }, ms);
   if (!r.ok) {
     const d = await r.json().catch(() => ({}));
-    const e = new Error(d.erro || `erro ${r.status}`);
+    const e = new Error(d.erro || (r.status === 404 ? 'servidor de pedidos não encontrado' : `erro ${r.status}`));
     e.status = r.status;
     throw e;
   }
@@ -92,17 +106,37 @@ async function enviarPedido(p, chave) {
   await api(encodeURIComponent(p.id), chave, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) });
 }
 
+/** Último resultado do envio (para mostrar no tablet). */
+let ultimo = null;
+export const estadoEnvio = () => ultimo;
+function avisar(r) {
+  ultimo = { ...r, quando: Date.now() };
+  window.dispatchEvent(new CustomEvent('envio-pedidos', { detail: ultimo }));
+  return r;
+}
+
 /**
  * Envia os pedidos que ainda não foram (um de cada vez).
+ * Se já houver um envio acontecendo, roda de novo assim que ele terminar
+ * (assim o pedido recém-finalizado nunca fica para trás).
  * @returns {Promise<{enviados: number, pendentes: number, erro?: string}>}
  */
-export function enviarPendentes(cfg) {
-  if (enviando) return enviando;
+// Depois de "senha errada" ou "muitas tentativas", as tentativas automáticas
+// param (para não bloquear o acesso da confecção); o envio manual e um pedido
+// novo continuam tentando.
+let pausa = null; // { chave, ate }
+
+export function enviarPendentes(cfg, { auto = false } = {}) {
+  if (enviando) return enviando.then(() => enviarPendentes(cfg, { auto }));
+  const envCfg = configEnvio(cfg);
+  if (auto && pausa && pausa.chave === envCfg.chave && Date.now() < pausa.ate) {
+    return Promise.resolve(ultimo || { enviados: 0, pendentes: 0, erro: 'senha da confecção errada' });
+  }
   enviando = (async () => {
     const env = configEnvio(cfg);
     const pendentes = (await DB.todos('pedidos')).filter(p => !p.enviado).sort((a, b) => a.id - b.id);
-    if (!env.ativo || !env.chave || !pendentes.length) return { enviados: 0, pendentes: pendentes.length };
-    if (!navigator.onLine) return { enviados: 0, pendentes: pendentes.length, erro: 'sem internet' };
+    if (!env.ativo) return avisar({ enviados: 0, pendentes: pendentes.length, desligado: true });
+    if (!pendentes.length) return avisar({ enviados: 0, pendentes: 0 });
     let enviados = 0, erro;
     for (const p of pendentes) {
       try {
@@ -113,21 +147,25 @@ export function enviarPendentes(cfg) {
         p.erroEnvio = e.message;
         erro = e.message;
         await DB.salvar('pedidos', p);
+        if (e.status === 401 || e.status === 429) pausa = { chave: env.chave, ate: Date.now() + (e.status === 401 ? 6 * 3600e3 : 16 * 60e3) };
         if (e.status === 401 || e.status === 429 || e.status === 501) break; // senha errada / servidor sem pedidos: não insiste
         continue;
       }
       await DB.salvar('pedidos', p);
     }
-    return { enviados, pendentes: pendentes.length - enviados, erro };
-  })().finally(() => { enviando = null; });
+    if (enviados) pausa = null;
+    return avisar({ enviados, pendentes: pendentes.length - enviados, erro });
+  })().catch(e => avisar({ enviados: 0, pendentes: 0, erro: e.message }))
+    .finally(() => { enviando = null; });
   return enviando;
 }
 
-/** Tenta enviar ao abrir, quando a internet volta e a cada 2 minutos. */
+/** Tenta enviar ao abrir, quando a internet volta e a cada minuto (se houver pendentes). */
 export function vigiarEnvio(pegarCfg) {
-  const tentar = () => enviarPendentes(pegarCfg()).catch(() => {});
+  const tentar = () => enviarPendentes(pegarCfg(), { auto: true }).catch(() => {});
   window.addEventListener('online', tentar);
-  setInterval(tentar, 2 * 60 * 1000);
-  setTimeout(tentar, 4000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tentar(); });
+  setInterval(tentar, 60 * 1000);
+  setTimeout(tentar, 3000);
   return tentar;
 }

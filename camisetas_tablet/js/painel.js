@@ -51,20 +51,22 @@ function telaEntrar(msg = '') {
         <span class="marcaIcone grande">${icone('lista', 34)}</span>
         <h1>Pedidos da loja</h1>
         <p class="textoAjuda">Use a <b>senha da confecção</b> (a inicial é <b>000000</b>; dá para trocar no tablet em Administrador → Configurações).</p>
-        <label class="campoPeq"><span>Senha da confecção</span><input id="chave" type="password" autocomplete="current-password" required minlength="6"></label>
+        <label class="campoPeq"><span>Senha da confecção</span><input id="chave" type="password" autocomplete="off" required minlength="6" inputmode="text"></label>
+        <label class="checkLinha"><input type="checkbox" id="mostrar"> Mostrar a senha</label>
         <label class="checkLinha"><input type="checkbox" id="lembrar" checked> Lembrar neste computador</label>
         ${msg ? `<p class="alertaPedido">${esc(msg)}</p>` : ''}
         <button type="submit" class="btn btnEscuro btnGrande btnLargo">${icone('check')} Entrar</button>
       </form>
     </main>`;
   $('#chave').focus();
+  $('#mostrar').onchange = e => { $('#chave').type = e.target.checked ? 'text' : 'password'; };
   $('#formEntrar').onsubmit = async e => {
     e.preventDefault();
     E.chave = $('#chave').value.trim();
     try {
       const r = await fetch(`${API}`, { headers: { 'x-chave': E.chave } });
-      if (r.status === 401) return telaEntrar('Senha errada.');
-      if (r.status === 429) return telaEntrar('Muitas tentativas. Espere 15 minutos.');
+      if (r.status === 401) return telaEntrar('Senha errada. Confira a senha no tablet: Administrador → Configurações → "Senha da confecção".');
+      if (r.status === 429) return telaEntrar('Muitas tentativas com a senha errada (deste computador ou do tablet, se estiverem na mesma internet). Espere 15 minutos e tente de novo.');
       if (!r.ok) return telaEntrar((await r.json().catch(() => ({}))).erro || 'Servidor indisponível.');
       ($('#lembrar').checked ? localStorage : sessionStorage).setItem('chaveConfeccao', E.chave);
       iniciarPainel();
@@ -96,7 +98,7 @@ function iniciarPainel() {
   $('#atualizar').onclick = () => carregar(true);
   $('#sair').onclick = async () => { if (await confirmar('Sair deste computador? Vai precisar da senha de novo.', { sim: 'Sair' })) sair(); };
   carregar();
-  setInterval(() => { if (!document.querySelector('dialog[open]')) carregar(); }, 60000);
+  setInterval(() => { if (!document.querySelector('dialog[open]')) carregar(); }, 30000);
 }
 
 async function carregar(avisar = false) {

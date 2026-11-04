@@ -117,9 +117,16 @@ Os pedidos são feitos no tablet da loja e podem ser vistos em qualquer computad
 1. O envio já vem **ligado**: cada pedido novo feito no tablet vai sozinho para a confecção.
    A **senha inicial da confecção é `000000`**.
 2. No computador: abra `https://<endereço do app>/pedidos.html` e entre com a senha.
+   A senha que vale é sempre a que aparece no tablet em **Administrador → Configurações →
+   Senha da confecção**. Depois de 10 tentativas erradas, o acesso fica bloqueado por 15 minutos.
 3. Para trocar a senha (recomendado): no tablet, **Administrador → Configurações → Pedidos no
    computador da confecção**, preencha **Trocar a senha da confecção** (mínimo 6 caracteres) e
    toque em **Testar e salvar**. No computador, entre de novo com a nova senha.
+
+O pedido é enviado na hora em que o cliente toca em **Enviar pedido**; a tela final mostra
+"Enviado para a confecção" (ou o motivo, se não deu). Em **Configurações** aparece quantos pedidos
+já estão na confecção e quantos aguardam, e o botão **Atualizar e enviar agora**. No computador, o
+botão **Atualizar** recarrega a lista na hora (ela também se atualiza sozinha a cada 30 segundos).
 
 Cada pedido vai com as imagens das camisetas, os textos, a prévia das artes da loja e o
 **arquivo original** das artes enviadas pelo cliente. Sem internet, o pedido fica "aguardando
