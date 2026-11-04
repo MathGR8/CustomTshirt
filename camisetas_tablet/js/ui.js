@@ -50,13 +50,26 @@ export function janela({ titulo = '', html, classe = '', fechar = true }) {
   const fecharJanela = valor => {
     if (!d.isConnected) return;
     d.classList.add('saindo');
-    setTimeout(() => { d.close(); d.remove(); resolver(valor); }, 160);
+    setTimeout(() => {
+      const t = d.querySelector('.btnTeclado'); // botão Pronto volta para a página
+      if (t) { try { t.hidePopover?.(); } catch { /* ok */ } t.hidden = true; document.body.appendChild(t); }
+      d.close(); d.remove(); resolver(valor);
+    }, 160);
   };
+  // Toque fora fecha só se o dedo começou E terminou fora da janela, e não logo
+  // depois do teclado abrir/fechar (a tela muda de tamanho no meio do toque)
+  let comecouFora = false;
+  d.addEventListener('pointerdown', e => { comecouFora = e.target === d && !tecladoMexeu(); });
   d.addEventListener('click', e => {
     if (e.target.closest('[data-fechar]')) fecharJanela(null);
-    else if (e.target === d && fechar) fecharJanela(null); // toque fora
+    else if (e.target === d && fechar && comecouFora && !tecladoMexeu()) fecharJanela(null); // toque fora
   });
-  d.addEventListener('cancel', e => { e.preventDefault(); if (fechar) fecharJanela(null); });
+  // Voltar do Android / Esc: com o teclado aberto, só baixa o teclado
+  d.addEventListener('cancel', e => {
+    e.preventDefault();
+    if (campoDeTexto(document.activeElement) && d.contains(document.activeElement)) { document.activeElement.blur(); return; }
+    if (fechar && !tecladoMexeu()) fecharJanela(null);
+  });
   d.showModal();
   return { el: d, fechar: fecharJanela, aoFechar };
 }
@@ -186,8 +199,16 @@ export function progressoJanela(titulo) {
  * baixar o teclado. Mostra um botão "Fechar teclado" logo acima do teclado e faz
  * o Enter dos campos de uma linha passar para o próximo campo (ou fechar o teclado).
  */
+/** Campo que abre o teclado virtual. */
+const campoDeTexto = el => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|range|file|button|submit|color)$/i.test(el.type)));
+
+/** O teclado virtual abriu/fechou há pouco? (a tela muda de tamanho) */
+let ultimoTeclado = 0;
+const tecladoMexeu = () => Date.now() - ultimoTeclado < 700;
+window.visualViewport?.addEventListener('resize', () => { ultimoTeclado = Date.now(); });
+
 export function ajudarTeclado() {
-  const ehCampo = el => el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|range|file|button|submit|color)$/i.test(el.type)));
+  const ehCampo = campoDeTexto;
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'btnTeclado';
@@ -196,7 +217,16 @@ export function ajudarTeclado() {
   const popover = 'popover' in HTMLElement.prototype; // camada de cima: fica sobre as janelas abertas
   if (popover) btn.popover = 'manual';
   document.body.appendChild(btn);
+  // Com uma janela aberta, o botão precisa ficar DENTRO dela: fora, o navegador
+  // trata o toque como "fora da janela" (e a janela fechava em vez de só baixar o teclado)
+  const lugar = () => [...document.querySelectorAll('dialog[open]')].filter(x => x.isConnected && !x.classList.contains('saindo')).pop() || document.body;
   const mostrar = sim => {
+    const alvo = sim ? lugar() : btn.parentElement;
+    if (sim && alvo !== btn.parentElement) {
+      try { if (popover && btn.matches(':popover-open')) btn.hidePopover(); } catch { /* ok */ }
+      btn.hidden = true;
+      alvo.appendChild(btn);
+    }
     if (sim === !btn.hidden && (!popover || sim === btn.matches(':popover-open'))) return;
     btn.hidden = !sim;
     if (!popover) return;
@@ -232,8 +262,9 @@ export function ajudarTeclado() {
   document.addEventListener('focusout', () => { tEsconder = setTimeout(() => { if (!ehCampo(document.activeElement)) { campoAtivo = false; mostrar(false); } }, 120); });
   vv?.addEventListener('resize', posicionar);
   vv?.addEventListener('scroll', posicionar);
-  btn.addEventListener('pointerdown', e => e.preventDefault()); // não tira o foco antes do clique
-  btn.addEventListener('click', () => { document.activeElement?.blur(); campoAtivo = false; mostrar(false); });
+  // Botão Pronto: só baixa o teclado (nunca fecha a janela que está aberta)
+  btn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); ultimoTeclado = Date.now(); });
+  btn.addEventListener('click', e => { e.stopPropagation(); ultimoTeclado = Date.now(); document.activeElement?.blur(); campoAtivo = false; mostrar(false); });
   // Enter: próximo campo ou fecha o teclado (textarea continua quebrando linha)
   document.addEventListener('keydown', e => {
     const el = e.target;
