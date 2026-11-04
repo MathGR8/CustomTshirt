@@ -772,9 +772,35 @@ ABAS.config = el => {
         <input id="eNova" type="password" autocomplete="new-password" placeholder="Nova senha"></label>
       <div class="linhaBotoes">
         <button type="button" class="btn btnEscuro" id="eSalvarEnvio">${icone('check', 20)} Testar e salvar</button>
+        <button type="button" class="btn btnClaro" id="eAtualizar">${icone('virar', 20)} Atualizar e enviar agora</button>
         <span class="textoAjuda" id="eEstado"></span>
       </div>
+      <p class="estadoEnvio" id="eSituacao"></p>
     </div>`;
+  // Situação dos pedidos no tablet (enviados / aguardando) e botão de atualizar
+  const situacao = async () => {
+    const caixa = $('#eSituacao', el); if (!caixa) return;
+    const todos = await DB.todos('pedidos');
+    const pend = todos.filter(p => !p.enviado);
+    const erro = pend.find(p => p.erroEnvio)?.erroEnvio;
+    const ultimoEnviado = Math.max(0, ...todos.map(p => p.enviado || 0));
+    caixa.classList.toggle('erro', !!erro); caixa.classList.toggle('ok', !pend.length && !!todos.length);
+    caixa.innerHTML = !configEnvio(App.S.cfg).ativo ? 'Envio desligado: os pedidos ficam só no tablet.'
+      : `${todos.length - pend.length} de ${todos.length} pedido${todos.length === 1 ? '' : 's'} na confecção` +
+        (pend.length ? ` · <b>${pend.length} aguardando envio</b>${erro ? ` (${esc(erro.replace(/\.$/, ''))})` : ''}` : ' · tudo enviado') +
+        (ultimoEnviado ? ` · último envio ${new Date(ultimoEnviado).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '');
+  };
+  situacao();
+  $('#eAtualizar', el).onclick = async () => {
+    const b = $('#eAtualizar', el); b.disabled = true;
+    $('#eSituacao', el).innerHTML = 'Enviando…';
+    const r = await enviarPendentes(App.S.cfg).catch(e => ({ erro: e.message }));
+    await situacao();
+    b.disabled = false;
+    if (r.desligado) aviso('Ligue "Enviar pedidos para a confecção" para enviar.', 'erro');
+    else if (r.erro) aviso(`Não foi possível enviar: ${r.erro}`, 'erro');
+    else aviso(r.enviados ? `${r.enviados} pedido${r.enviados === 1 ? '' : 's'} enviado${r.enviados === 1 ? '' : 's'} para a confecção.` : 'Tudo em dia: nenhum pedido aguardando envio.', 'ok');
+  };
   $('#eSalvarEnvio', el).onclick = async () => {
     const ativo = $('#eAtivo', el).checked, nova = $('#eNova', el).value.trim();
     let chave = $('#eChave', el).value.trim();
@@ -791,7 +817,7 @@ ABAS.config = el => {
       const cfgNova = { ...App.S.cfg, envio: { ativo, chave } };
       await DB.salvarConfig(cfgNova);
       App.aplicarConfig(cfgNova);
-      if (ativo) { const r = await enviarPendentes(cfgNova); if (r.enviados) aviso(`${r.enviados} pedido${r.enviados > 1 ? 's' : ''} enviado${r.enviados > 1 ? 's' : ''} para a confecção.`, 'ok'); }
+      if (ativo) { const r = await enviarPendentes(cfgNova); if (r.enviados) aviso(`${r.enviados} pedido${r.enviados > 1 ? 's' : ''} enviado${r.enviados > 1 ? 's' : ''} para a confecção.`, 'ok'); } await situacao();
     } catch (e) {
       estado.textContent = '';
       aviso(navigator.onLine ? e.message : 'Sem internet. Tente de novo quando conectar.', 'erro');

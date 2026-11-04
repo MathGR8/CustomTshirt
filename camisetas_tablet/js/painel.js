@@ -96,7 +96,7 @@ function iniciarPainel() {
   $('#atualizar').onclick = () => carregar(true);
   $('#sair').onclick = async () => { if (await confirmar('Sair deste computador? Vai precisar da senha de novo.', { sim: 'Sair' })) sair(); };
   carregar();
-  setInterval(() => { if (!document.querySelector('dialog[open]')) carregar(); }, 60000);
+  setInterval(() => { if (!document.querySelector('dialog[open]')) carregar(); }, 30000);
 }
 
 async function carregar(avisar = false) {

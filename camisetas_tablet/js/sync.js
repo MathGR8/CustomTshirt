@@ -24,17 +24,27 @@ export const configEnvio = cfg => {
 
 /** Confere a senha da confecção no servidor (e troca, se vier a nova). */
 export async function testarChave(chave, nova) {
-  const r = await fetch(`${API}/chave`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chave, nova }) });
+  const r = await buscar(`${API}/chave`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chave, nova }) });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.erro || `erro ${r.status}`);
   return d; // { ok, trocada? }
 }
 
+/** fetch com tempo máximo (internet lenta não trava o envio para sempre). */
+async function buscar(url, opc = {}, ms = 90000) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms);
+  try { return await fetch(url, { ...opc, signal: ctl.signal, cache: 'no-store' }); }
+  catch (e) { throw new Error(e.name === 'AbortError' ? 'internet lenta (tempo esgotado)' : 'sem conexão com o servidor'); }
+  finally { clearTimeout(t); }
+}
+
 async function api(caminho, chave, opc = {}) {
-  const r = await fetch(`${API}/${caminho}`, { ...opc, headers: { 'x-chave': chave, ...(opc.headers || {}) } });
+  const ms = opc.method === 'PUT' ? 5 * 60000 : 60000; // arquivos grandes têm mais tempo
+  const r = await buscar(`${API}/${caminho}`, { ...opc, headers: { 'x-chave': chave, ...(opc.headers || {}) } }, ms);
   if (!r.ok) {
     const d = await r.json().catch(() => ({}));
-    const e = new Error(d.erro || `erro ${r.status}`);
+    const e = new Error(d.erro || (r.status === 404 ? 'servidor de pedidos não encontrado' : `erro ${r.status}`));
     e.status = r.status;
     throw e;
   }
@@ -92,17 +102,28 @@ async function enviarPedido(p, chave) {
   await api(encodeURIComponent(p.id), chave, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) });
 }
 
+/** Último resultado do envio (para mostrar no tablet). */
+let ultimo = null;
+export const estadoEnvio = () => ultimo;
+function avisar(r) {
+  ultimo = { ...r, quando: Date.now() };
+  window.dispatchEvent(new CustomEvent('envio-pedidos', { detail: ultimo }));
+  return r;
+}
+
 /**
  * Envia os pedidos que ainda não foram (um de cada vez).
+ * Se já houver um envio acontecendo, roda de novo assim que ele terminar
+ * (assim o pedido recém-finalizado nunca fica para trás).
  * @returns {Promise<{enviados: number, pendentes: number, erro?: string}>}
  */
 export function enviarPendentes(cfg) {
-  if (enviando) return enviando;
+  if (enviando) return enviando.then(() => enviarPendentes(cfg));
   enviando = (async () => {
     const env = configEnvio(cfg);
     const pendentes = (await DB.todos('pedidos')).filter(p => !p.enviado).sort((a, b) => a.id - b.id);
-    if (!env.ativo || !env.chave || !pendentes.length) return { enviados: 0, pendentes: pendentes.length };
-    if (!navigator.onLine) return { enviados: 0, pendentes: pendentes.length, erro: 'sem internet' };
+    if (!env.ativo) return avisar({ enviados: 0, pendentes: pendentes.length, desligado: true });
+    if (!pendentes.length) return avisar({ enviados: 0, pendentes: 0 });
     let enviados = 0, erro;
     for (const p of pendentes) {
       try {
@@ -118,16 +139,18 @@ export function enviarPendentes(cfg) {
       }
       await DB.salvar('pedidos', p);
     }
-    return { enviados, pendentes: pendentes.length - enviados, erro };
-  })().finally(() => { enviando = null; });
+    return avisar({ enviados, pendentes: pendentes.length - enviados, erro });
+  })().catch(e => avisar({ enviados: 0, pendentes: 0, erro: e.message }))
+    .finally(() => { enviando = null; });
   return enviando;
 }
 
-/** Tenta enviar ao abrir, quando a internet volta e a cada 2 minutos. */
+/** Tenta enviar ao abrir, quando a internet volta e a cada minuto (se houver pendentes). */
 export function vigiarEnvio(pegarCfg) {
   const tentar = () => enviarPendentes(pegarCfg()).catch(() => {});
   window.addEventListener('online', tentar);
-  setInterval(tentar, 2 * 60 * 1000);
-  setTimeout(tentar, 4000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tentar(); });
+  setInterval(tentar, 60 * 1000);
+  setTimeout(tentar, 3000);
   return tentar;
 }

@@ -25,7 +25,7 @@ import { camisetaSVG, areaImpressao, modelo, VB } from './shirt.js';
 import { urlDa, processarArquivoCliente, removerFundoDaArte } from './catalog.js';
 import { qualidade, ICONE_QUALIDADE, buscarImagens, baixarImagem, credito } from './fontes.js';
 import { abrirTabela, resumoMedidas } from './medidas.js';
-import { enviarPendentes, vigiarEnvio } from './sync.js';
+import { enviarPendentes, vigiarEnvio, configEnvio } from './sync.js';
 import { desenharTexto, editorTexto } from './texto.js';
 import { mostrarPrecos, dinheiro, aPartirDe, precoBase, precoPeca, precoItem, precoTexto, acrescimoTamanho, valorItem, valorTotal } from './precos.js';
 import { maxCm, textoMedidas, medidas, totalPecas, salvarPedido, numeroPedido, escalaInfantil, ladosDo } from './order.js';
@@ -1295,7 +1295,7 @@ TELAS.dados = () => {
       const b = $('#rAvancar'); b.disabled = true; b.innerHTML = 'Salvando…';
       try {
         S.ultimoPedido = await salvarPedido(S.itens, S.cliente, S.cfg);
-        enviarPendentes(S.cfg).catch(() => {}); // manda para a confecção (se ligado)
+        S.envioPedido = enviarPendentes(S.cfg).catch(e => ({ erro: e.message })); // manda para a confecção na hora
         irPara('pronto');
       } catch (e) {
         b.disabled = false; b.innerHTML = `Enviar pedido ${icone('avancar')}`;
@@ -1323,9 +1323,24 @@ TELAS.pronto = () => {
       <div class="linhaBotoes centro">
         <button type="button" class="btn btnEscuro btnGrande" id="novo">${icone('camisa')} Fazer outro pedido</button>
       </div>
+      <p class="envioConfeccao" id="envioStatus" hidden></p>
       <p class="dicaPequena" id="contagem"></p>
     </section>`;
   $('#novo').onclick = recomecar;
+  // Situação do envio para a confecção (para o atendente conferir)
+  const st = $('#envioStatus');
+  if (configEnvio(S.cfg).ativo && S.envioPedido) {
+    st.hidden = false;
+    st.innerHTML = `<span class="girando"></span> Enviando para a confecção…`;
+    S.envioPedido.then(async r => {
+      const reg = await DB.pegar('pedidos', p.id).catch(() => null);
+      if (!st.isConnected) return;
+      const ok = !!reg?.enviado;
+      st.classList.toggle('ok', ok); st.classList.toggle('erro', !ok);
+      st.innerHTML = ok ? `${icone('check', 18)} Enviado para a confecção`
+        : `Ainda não foi para a confecção (${esc(String(reg?.erroEnvio || r?.erro || 'tentando').replace(/\.$/, ''))}). Vai tentar de novo sozinho.`;
+    });
+  }
   let s = 90;
   clearInterval(tPronto);
   tPronto = setInterval(() => {
