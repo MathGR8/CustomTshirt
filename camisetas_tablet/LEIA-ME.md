@@ -94,6 +94,22 @@ As artes ficam guardadas **no próprio tablet** (não vão para a internet).
 No PDF o app também lê o **tamanho real do desenho** (em cm). Esse tamanho vira a largura padrão da
 camiseta pronta (até 38 cm), e aparece na edição da arte com o botão "usar este tamanho".
 
+### PDF de catálogo (código em cima de cada arte)
+
+Para cadastrar muitas estampas de uma vez: um PDF (ex.: exportado do CorelDRAW) com uma ou mais
+artes por página, cada uma com um **selo branco com o código em cima** (ex.: `COD: ROCK-1`) e a
+página no **fundo da cor da camiseta**. Com a opção **PDF de catálogo** marcada (vem marcada):
+
+- cada arte é separada pelo seu selo (várias por página), sem o selo e sem as linhas de corte;
+- o **código vira o nome** da arte (lido por OCR; precisa de internet na importação). Se algum
+  código não der para ler, ele é deduzido pela sequência e aparece nos avisos para conferir;
+- o **fundo vira a cor da camiseta**: a arte fica como **camiseta pronta só nessa cor** (ex.:
+  fundo preto → Preto). Dá para mudar as cores depois em cada arte ou em **Selecionar várias →
+  Camiseta pronta**.
+
+Em **Catálogo**, o botão **Apagar todas** apaga todas as artes do tablet (pede confirmação duas
+vezes; os pedidos já feitos não são afetados).
+
 ### Converter .cdr em PDF sem o CorelDRAW
 
 O arquivo `ferramentas/converter-cdr-para-pdf.bat` (também em Administrador → Ajuda) converte todos

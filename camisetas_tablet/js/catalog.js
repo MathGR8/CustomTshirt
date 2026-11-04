@@ -19,7 +19,8 @@
  */
 
 import { DB } from './db.js';
-import { LIBS, IMAGENS } from './config.js';
+import { LIBS, IMAGENS, CORES } from './config.js';
+import { separarPorCodigo, lerCodigo, completarSequencia, encerrarOcr } from './codigoArtes.js';
 
 // ---------- Bibliotecas (carregadas só quando precisa) ----------
 
@@ -220,16 +221,21 @@ async function bitmapDeBlob(blob) {
 
 // ---------- Leitores por tipo ----------
 
-/** PDF → um canvas por página (fundo transparente). */
-async function lerPdf(file, aoPagina) {
+/**
+ * PDF → um canvas por página (fundo transparente), entregue uma de cada vez
+ * para não guardar todas na memória (PDFs com muitas páginas).
+ * @param {(c: HTMLCanvasElement, n: number, total: number) => Promise<void>} porPagina
+ * @param {number} lado - tamanho do lado maior da página renderizada (px)
+ */
+async function lerPdf(file, porPagina, lado = IMAGENS.previa * 1.25, maxPaginas = 300) {
   const pdfjs = await lib('pdfjs');
   const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
   try {
-    const paginas = [];
-    for (let n = 1; n <= Math.min(doc.numPages, 60); n++) {
+    const total = Math.min(doc.numPages, maxPaginas);
+    for (let n = 1; n <= total; n++) {
       const page = await doc.getPage(n);
       const v1 = page.getViewport({ scale: 1 });
-      const viewport = page.getViewport({ scale: IMAGENS.previa * 1.25 / Math.max(v1.width, v1.height) });
+      const viewport = page.getViewport({ scale: lado / Math.max(v1.width, v1.height) });
       const c = canvas(viewport.width, viewport.height);
       // background transparente: sem isso o PDF.js pinta a página de branco
       await page.render({ canvasContext: c.getContext('2d'), viewport, background: 'rgba(0,0,0,0)' }).promise;
@@ -242,10 +248,10 @@ async function lerPdf(file, aoPagina) {
       } catch { /* sem essa informação */ }
       c.temImagem = temImagem;
       c.cmPorPx = 2.54 / 72 / (viewport.width / v1.width); // 1 pt do PDF = 1/72 polegada
-      paginas.push(c);
-      aoPagina?.(n, doc.numPages);
+      page.cleanup();
+      await porPagina(c, n, total);
+      c.width = c.height = 1; // libera a memória da página
     }
-    return paginas;
   } finally { try { await doc.destroy(); } catch { /* ok */ } }
 }
 
@@ -287,26 +293,70 @@ async function lerCdr(file) {
 
 // ---------- Processamento de um arquivo ----------
 
-/** Lê um arquivo e devolve as páginas (canvas). */
-async function lerArquivo(file, ext) {
-  if (ext === 'pdf' || ext === 'ai') return { paginas: await lerPdf(file), tipo: 'pdf' };
-  if (ext === 'cdr') return { paginas: [await lerCdr(file)], tipo: 'cdr' };
+/** Lê um arquivo e entrega as páginas (canvas), uma de cada vez. */
+async function lerArquivo(file, ext, porPagina, opc = {}) {
+  if (ext === 'pdf' || ext === 'ai') { await lerPdf(file, porPagina, opc.codigos ? 2800 : undefined, opc.maxPaginas || 300); return 'pdf'; }
+  if (ext === 'cdr') { await porPagina(await lerCdr(file), 1, 1); return 'cdr'; }
   const tipoMime = file.type || (ext === 'svg' ? 'image/svg+xml' : 'image/' + ext.replace('jpg', 'jpeg'));
-  return { paginas: [await bitmapDeBlob(file.type ? file : new Blob([file], { type: tipoMime }))], tipo: ext === 'svg' ? 'svg' : 'imagem' };
+  await porPagina(await bitmapDeBlob(file.type ? file : new Blob([file], { type: tipoMime })), 1, 1);
+  return ext === 'svg' ? 'svg' : 'imagem';
+}
+
+/** Cores de camiseta mais parecidas com a cor de fundo da arte. */
+function coresParecidas(rgb) {
+  const dist = hex => { const n = parseInt(hex.slice(1), 16); return Math.hypot((n >> 16) - rgb[0], ((n >> 8) & 255) - rgb[1], (n & 255) - rgb[2]); };
+  const lista = Object.entries(CORES).map(([nome, c]) => [nome, dist(c.hex)]).sort((a, b) => a[1] - b[1]);
+  const perto = lista.filter(([, d]) => d < 45).map(([n]) => n);
+  return perto.length ? perto : [lista[0][0]];
 }
 
 /**
  * Transforma um arquivo em artes (registros prontos para o banco).
  * Guarda a resolução original (pxW/pxH) e se é vetor, para avaliar a qualidade.
+ * PDF de catálogo (selo "COD: …" em cima de cada arte): separa as artes, lê o
+ * código (nome da arte) e o fundo vira a cor da camiseta.
  */
-async function gerarArtes(file, caminho, opc, base = {}) {
+async function gerarArtes(file, caminho, opc, base = {}, aoPagina) {
   const ext = (caminho.split('.').pop() || '').toLowerCase();
-  const { paginas, tipo } = await lerArquivo(file, ext);
-  const baixaRes = tipo === 'cdr' && Math.max(paginas[0].width, paginas[0].height) < 900;
-  const lista = [];
-  const maxPag = opc.maxPaginas || paginas.length;
-  for (let pg = 0; pg < Math.min(paginas.length, maxPag); pg++) {
-    const c = paginas[pg];
+  const lista = [], avisos = [];
+  let baixaRes = false, total = 0, comCodigo = 0;
+  const registro = async (arte, pg, pt, c, tipo, extra = {}) => {
+    const previa = reduzir(arte, IMAGENS.previa);
+    const mini = reduzir(arte, IMAGENS.miniatura);
+    const vetor = tipo === 'svg' || (tipo === 'pdf' && !c.temImagem);
+    lista.push({
+      ...base, arquivo: caminho, pagina: pg, parte: pt, tipo: ext,
+      w: previa.width, h: previa.height, baixaRes,
+      vetor, pdfComImagem: tipo === 'pdf' && !!c.temImagem, pxW: arte.width, pxH: arte.height,
+      miniatura: await paraBlob(mini, 0.85),
+      previa: await paraBlob(previa, 0.92),
+      ...extra
+    });
+  };
+  const tipoArq = ext === 'pdf' || ext === 'ai' ? 'pdf' : ext === 'cdr' ? 'cdr' : ext === 'svg' ? 'svg' : 'imagem';
+  await lerArquivo(file, ext, async (c, pg, tot) => {
+    total = tot;
+    aoPagina?.(pg, tot);
+    if (tipoArq === 'cdr' && Math.max(c.width, c.height) < 900) baixaRes = true;
+    // PDF de catálogo: um selo com o código em cima de cada arte
+    const doCatalogo = tipoArq === 'pdf' && opc.codigos ? separarPorCodigo(c) : null;
+    if (doCatalogo) {
+      for (let pt = 0; pt < doCatalogo.length; pt++) {
+        const it = doCatalogo[pt];
+        const arte = aparar(it.arte, 0.005);
+        if (!arte) continue;
+        let codigo = '', confianca = 0;
+        try { ({ codigo, confianca } = await lerCodigo(it.selo)); }
+        catch (e) { if (!avisos.includes(e.message)) avisos.push(e.message); }
+        comCodigo++;
+        await registro(arte, pg, pt + 1, c, tipoArq, {
+          codigo, confianca, sufixo: '',
+          corFundo: it.fundo.map(Math.round),
+          fixoSugerido: { lado: 'Frente', cm: 28, pos: 'alto', cores: coresParecidas(it.fundo), costas: null }
+        });
+      }
+      return;
+    }
     // Fundo de cor única (JPG, prévia do Corel, PDF com fundo pintado)
     if (opc.removerFundo && ext !== 'png' && ext !== 'svg') removerFundo(c);
     const partes = opc.separar ? acharArtes(c) : [];
@@ -314,23 +364,28 @@ async function gerarArtes(file, caminho, opc, base = {}) {
     for (let pt = 0; pt < pedacos.length; pt++) {
       const arte = aparar(pedacos[pt]);
       if (!arte) continue; // página em branco
-      const previa = reduzir(arte, IMAGENS.previa);
-      const mini = reduzir(arte, IMAGENS.miniatura);
-      const vetor = tipo === 'svg' || (tipo === 'pdf' && !c.temImagem);
-      lista.push({
-        ...base, arquivo: caminho, pagina: pg + 1, parte: pt + 1, tipo: ext,
-        sufixo: (paginas.length > 1 ? ` · pág. ${pg + 1}` : '') + (pedacos.length > 1 ? ` · ${pt + 1}` : ''),
-        w: previa.width, h: previa.height, baixaRes,
-        // Qualidade: tamanho real da imagem (raster) ou vetor
-        vetor, pdfComImagem: tipo === 'pdf' && !!c.temImagem, pxW: arte.width, pxH: arte.height,
+      await registro(arte, pg, pt + 1, c, tipoArq, {
+        sufixo: (tot > 1 ? ` · pág. ${pg}` : '') + (pedacos.length > 1 ? ` · ${pt + 1}` : ''),
         // Tamanho real do desenho no arquivo (só PDF), em cm
-        ...(c.cmPorPx ? { cmW: Math.round(arte.width * c.cmPorPx * 10) / 10, cmH: Math.round(arte.height * c.cmPorPx * 10) / 10 } : {}),
-        miniatura: await paraBlob(mini, 0.85),
-        previa: await paraBlob(previa, 0.92)
+        ...(c.cmPorPx ? { cmW: Math.round(arte.width * c.cmPorPx * 10) / 10, cmH: Math.round(arte.height * c.cmPorPx * 10) / 10 } : {})
       });
     }
+  }, opc);
+  // Códigos que o OCR não leu: completa pela sequência (ex.: ROCK-4 → ROCK-5)
+  if (comCodigo) {
+    const comCod = lista.filter(a => 'codigo' in a);
+    for (const a of comCod) if (a.confianca < 50) a.codigo = '';
+    const ded = completarSequencia(comCod);
+    if (ded) avisos.push(`${ded} código${ded > 1 ? 's' : ''} não deu para ler e ${ded > 1 ? 'foram deduzidos' : 'foi deduzido'} pela sequência: confira ${comCod.filter(a => a.deduzido).map(a => a.codigo).join(', ')}.`);
+    // Código repetido: acrescenta (2), (3)…
+    const vistos = new Map();
+    for (const a of comCod) {
+      if (!a.codigo) continue;
+      const n = (vistos.get(a.codigo) || 0) + 1; vistos.set(a.codigo, n);
+      if (n > 1) { avisos.push(`Código ${a.codigo} aparece mais de uma vez.`); a.codigo += ` (${n})`; }
+    }
   }
-  return { artes: lista, baixaRes, paginas: paginas.length };
+  return { artes: lista, baixaRes, paginas: total, avisos, comCodigo };
 }
 
 /**
@@ -432,18 +487,22 @@ export async function importar(lista, opc, progresso, sinal = {}) {
     progresso?.({ feitos: i, total: arquivos.length, arquivo: caminho });
     const tema = (temaDoCaminho(caminho) || opc.temaPadrao || 'Diversos').trim();
     try {
-      const { artes, baixaRes } = await gerarArtes(file, caminho, opc);
+      const { artes, baixaRes, avisos: av, comCodigo } = await gerarArtes(file, caminho, opc, {},
+        (pg, tot) => tot > 1 && progresso?.({ feitos: i, total: arquivos.length, arquivo: `${caminho} · página ${pg} de ${tot}`, fracao: (i + pg / tot) / arquivos.length }));
+      av.forEach(x => avisos.push(`${caminho}: ${x}`));
+      if (comCodigo) avisos.push(`${caminho}: ${comCodigo} arte${comCodigo > 1 ? 's' : ''} separada${comCodigo > 1 ? 's' : ''} pelo código; o fundo virou a cor da camiseta.`);
       // PDF que substitui uma arte importada antes do .cdr (mesma pasta e nome): herda nome, ordem e configuração
       const idCdr = /\.pdf$/i.test(caminho) ? `${tema}/${caminho.replace(/\.pdf$/i, '.cdr')}#1#1` : null;
       const doCdr = idCdr && existentes.get(idCdr);
-      const novos = artes.map(({ sufixo, ...a }) => {
+      const novos = artes.map(({ sufixo, fixoSugerido, confianca, deduzido, ...a }) => {
         const id = `${tema}/${caminho}#${a.pagina}#${a.parte}`;
         const antigo = existentes.get(id) || (a.pagina === 1 && a.parte === 1 ? doCdr : null);
         return {
           ...a, id, tema, origem: 'catalogo',
-          nome: antigo?.nome || nomeBonito(caminho) + sufixo,
+          nome: antigo?.nome || a.codigo || nomeBonito(caminho) + (sufixo || ''),
           oculto: antigo?.oculto || false,
-          ...(antigo?.fixo ? { fixo: antigo.fixo } : {}),
+          // Arte de catálogo com fundo: camiseta pronta só na cor do fundo (dá para mudar depois)
+          ...(antigo?.fixo ? { fixo: antigo.fixo } : fixoSugerido ? { fixo: fixoSugerido } : {}),
           ordem: antigo?.ordem ?? ordem++,
           criado: antigo?.criado || Date.now()
         };
@@ -464,6 +523,7 @@ export async function importar(lista, opc, progresso, sinal = {}) {
       avisos.push(`${caminho}: ${e.message}`);
     }
   }
+  await encerrarOcr();
   progresso?.({ feitos: arquivos.length, total: arquivos.length, arquivo: '' });
   return { importadas, avisos, total: arquivos.length };
 }

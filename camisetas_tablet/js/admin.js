@@ -82,6 +82,7 @@ ABAS.artes = async el => {
       </div>
       <label class="checkLinha"><input type="checkbox" id="optFundo" checked> Remover fundo branco/de cor única (JPG e prévias do Corel)</label>
       <label class="checkLinha"><input type="checkbox" id="optSeparar"> Separar artes que estão lado a lado na mesma página</label>
+      <label class="checkLinha"><input type="checkbox" id="optCodigos" checked> <span><b>PDF de catálogo</b>: separa cada arte pelo selo com o código em cima (ex.: <i>COD: ROCK-1</i>), dá o código como nome e usa a cor do fundo como cor da camiseta</span></label>
       <div class="linhaBotoes">
         <label class="btn btnEscuro btnGrande">${icone('upload')} Escolher arquivos<input type="file" id="inArquivos" multiple hidden></label>
         ${pasta ? `<label class="btn btnClaro btnGrande">${icone('pasta')} Escolher uma pasta<input type="file" id="inPasta" webkitdirectory multiple hidden></label>` : ''}
@@ -93,6 +94,7 @@ ABAS.artes = async el => {
         <div class="linhaBotoes">
           ${lista.length ? `<button type="button" class="btn ${selecao ? 'btnEscuro' : 'btnClaro'}" id="modoSelecao">${icone('check', 20)} ${selecao ? 'Concluir seleção' : 'Selecionar várias'}</button>` : ''}
           <button type="button" class="btn btnClaro" id="exportar" ${lista.length ? '' : 'disabled'}>${icone('baixar', 20)} Exportar cópia</button>
+          ${lista.length ? `<button type="button" class="btn btnClaro btnPerigoTexto" id="apagarTodasArtes">${icone('lixo', 20)} Apagar todas</button>` : ''}
           <label class="btn btnClaro">${icone('upload', 20)} Importar cópia<input type="file" id="inCopia" accept=".zip,application/zip" hidden></label>
         </div>
       </div>
@@ -137,8 +139,9 @@ ABAS.artes = async el => {
       const r = await importar(itens, {
         temaPadrao: $('#temaPadrao', el).value.trim() || 'Diversos',
         separar: $('#optSeparar', el).checked,
+        codigos: $('#optCodigos', el).checked,
         removerFundo: $('#optFundo', el).checked
-      }, ({ feitos, total, arquivo }) => p.atualizar(total ? feitos / total : 0, arquivo ? `${feitos + 1} de ${total}: ${arquivo}` : 'Concluído'), p.sinal);
+      }, ({ feitos, total, arquivo, fracao }) => p.atualizar(fracao ?? (total ? feitos / total : 0), arquivo ? `${feitos + 1} de ${total}: ${arquivo}` : 'Concluído'), p.sinal);
       p.fechar();
       limparUrls();
       await App.recarregarCatalogo();
@@ -156,6 +159,19 @@ ABAS.artes = async el => {
   $('#inArquivos', el).onchange = e => rodarImportacao(e.target.files, false);
   $('#inPasta', el) && ($('#inPasta', el).onchange = e => rodarImportacao(e.target.files, true));
 
+  $('#apagarTodasArtes', el) && ($('#apagarTodasArtes', el).onclick = async () => {
+    if (!(await confirmar(`Apagar TODAS as ${lista.length} artes do catálogo deste tablet? Os pedidos já feitos continuam com as artes deles. Os arquivos originais no computador não são apagados.`, { sim: 'Continuar', perigo: true }))) return;
+    if (!(await confirmar('Tem certeza? Isso não pode ser desfeito. (Dica: use "Exportar cópia" antes, se quiser guardar.)', { sim: 'Apagar todas', perigo: true }))) return;
+    const p = progressoJanela('Apagando as artes');
+    for (const [i, a] of lista.entries()) {
+      await DB.apagar('artes', a.id);
+      if (i % 20 === 0) p.atualizar(i / lista.length, `${i} de ${lista.length}`);
+    }
+    p.fechar(); selecao = null; limparUrls();
+    await App.recarregarCatalogo();
+    aviso(`${lista.length} artes apagadas.`, 'ok');
+    ABAS.artes(el);
+  });
   $('#exportar', el).onclick = async () => {
     const p = progressoJanela('Gerando a cópia do catálogo');
     try {
@@ -892,6 +908,8 @@ ABAS.ajuda = el => {
       <p>Toque <b>5 vezes</b> no nome da loja (canto superior esquerdo) ou segure o dedo nele por 2 segundos. Troque a senha em <b>Configurações</b>.</p>
       <h3>${icone('lista', 22)} Pedidos</h3>
       <p>Toque em <b>Ver pedido</b> para ver as camisetas e cada arte em tela cheia (toque na imagem para ampliar).</p>
+      <h3>${icone('upload', 22)} PDF de catálogo (código em cima da arte)</h3>
+      <p>Com <b>PDF de catálogo</b> marcado, cada arte do PDF é separada pelo selo com o código (ex.: <i>COD: ROCK-1</i>), recebe o código como nome e vira camiseta pronta na cor do fundo da página. Precisa de internet para ler os códigos. <b>Apagar todas</b> (em Catálogo) limpa todas as artes do tablet.</p>
       <h3>${icone('check', 22)} Várias artes de uma vez</h3>
       <p>Em <b>Artes</b>, toque em <b>Selecionar várias</b> (ou segure o dedo numa arte). Marque as artes ou um tema inteiro e escolha: <b>Camiseta pronta</b> (tamanho, posição, cores e preço para todas), <b>Mover para tema</b>, <b>Ocultar</b>, <b>Mostrar</b> ou <b>Apagar</b>.</p>
       <h3>${icone('lista', 22)} Pedidos no computador da confecção</h3>
