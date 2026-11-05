@@ -21,8 +21,8 @@ import { PADRAO, CORES, MALHAS, MODELOS, POSICOES } from './config.js';
 import { DB } from './db.js';
 import { icone } from './icons.js';
 import { $, $$, esc, num, aviso, janela, confirmar, ajuda, coach, ajudarTeclado } from './ui.js';
-import { camisetaSVG, areaImpressao, modelo, VB } from './shirt.js';
-import { urlDa, processarArquivoCliente, removerFundoDaArte } from './catalog.js';
+import { camisetaSVG, areaImpressao, modelo, VB, limiteCamiseta, dentroDaCamiseta } from './shirt.js';
+import { urlDa, processarArquivoCliente, removerFundoDaArte, lib } from './catalog.js';
 import { qualidade, ICONE_QUALIDADE, buscarImagens, baixarImagem, credito } from './fontes.js';
 import { abrirTabela, resumoMedidas } from './medidas.js';
 import { enviarPendentes, vigiarEnvio, configEnvio } from './sync.js';
@@ -179,7 +179,7 @@ function recomecar() {
   limparArtesCliente();
   S.fonte = 'enviar'; S.janelaImagem = null; S.web = { termo: '', vetor: false, resultados: [], total: 0, pagina: 1, erro: '' };
   S.itens = [novoItem()]; S.atual = 0; S.lado = 'Frente'; S.sel = null; S.desfazer = [];
-  S.tema = 'Todas'; S.grupo = 'Todos'; S.busca = ''; S.coachVisto = false; S.editando = false; S.ultimoPedido = null; S.cliente = null;
+  S.tema = 'Todas'; S.grupo = 'Todos'; S.busca = ''; S.zoom = null; S.coachVisto = false; S.editando = false; S.ultimoPedido = null; S.cliente = null;
   $$('dialog[open]').forEach(d => d.remove());
   irPara('inicio');
 }
@@ -187,9 +187,39 @@ function recomecar() {
 // ---------- Desenho da camiseta com as artes ----------
 
 /** Mantém a arte dentro da área e do tamanho máximo. */
+/**
+ * Mantém a arte em cima da camiseta. A estampa pode ir para qualquer lugar da
+ * camiseta (a área tracejada é só a recomendada) e ter até o tamanho dela,
+ * sempre em escala real (cm).
+ */
 function encaixar(a, it = item()) {
+  const area = areaImpressao(it.modelo, a.lado), L = limiteCamiseta(it.modelo);
+  a.cm = Math.max(3, Math.min(a.cm, maxCmLivre(it.modelo, a)));
+  const w = a.cm * area.upc, h = w * a.h / a.w;
+  const cx = Math.min(L.x1 - w / 2, Math.max(L.x0 + w / 2, area.x + a.fx * area.w));
+  const cy = Math.min(L.y1 - h / 2, Math.max(L.y0 + h / 2, area.y + a.fy * area.h));
+  a.fx = (cx - area.x) / area.w; a.fy = (cy - area.y) / area.h;
+  return a;
+}
+
+/** Maior largura (cm) que a arte pode ter na camiseta inteira. */
+function maxCmLivre(modeloId, a) {
+  const area = areaImpressao(modeloId, a.lado || 'Frente'), L = limiteCamiseta(modeloId);
+  // Largura: a do corpo da camiseta (sem as mangas, ~62% do desenho); altura: ~80% do comprimento
+  const corpoW = (L.x1 - L.x0) * 0.62, corpoH = (L.y1 - L.y0) * 0.8;
+  return Math.floor(Math.min(corpoW, corpoH * a.w / a.h) / area.upc * 10) / 10;
+}
+
+/** A arte saiu da área recomendada (tracejado)? */
+function foraDaArea(a, it = item()) {
+  const area = areaImpressao(it.modelo, a.lado), g = geom(a, it), t = 1.5;
+  return g.x < area.x - t || g.y < area.y - t || g.x + g.w > area.x + area.w + t || g.y + g.h > area.y + area.h + t;
+}
+
+/** Leva a arte de volta para dentro da área recomendada. */
+function paraAreaRecomendada(a, it = item()) {
   const area = areaImpressao(it.modelo, a.lado);
-  a.cm = Math.max(3, Math.min(a.cm, maxCm(it.modelo, a)));
+  a.cm = Math.min(a.cm, maxCm(it.modelo, a));
   const meiaW = (a.cm * area.upc) / 2 / area.w, meiaH = (a.cm * area.upc * a.h / a.w) / 2 / area.h;
   a.fx = Math.min(1 - meiaW, Math.max(meiaW, a.fx));
   a.fy = Math.min(1 - meiaH, Math.max(meiaH, a.fy));
@@ -209,7 +239,7 @@ function palco(it, lado, { mostrarArea = false, sel = null, artesExtra = [] } = 
   const m = modelo(it.modelo);
   const artes = [...it.artes.filter(a => a.lado === lado), ...artesExtra];
   const g = sel && artes.find(a => a.uid === sel) ? geom(artes.find(a => a.uid === sel), it) : null;
-  const rotulo = m.infantil ? `Máx. ${m.area.nome} ${m.area.w}×${m.area.h} · ${m.infantil.nome} ${m.infantil.w}×${m.infantil.h} cm` : `Área máxima ${m.area.w} × ${m.area.h} cm`;
+  const rotulo = m.infantil ? `Máx. ${m.area.nome} ${m.area.w}×${m.area.h} · ${m.infantil.nome} ${m.infantil.w}×${m.infantil.h} cm` : `Área recomendada ${m.area.w} × ${m.area.h} cm`;
   return `<svg class="palcoSvg" viewBox="0 0 ${VB.w} ${VB.h}" role="img" aria-label="Camiseta ${esc(m.nome)} ${esc(lado)}">
     ${camisetaSVG({ modelo: it.modelo, lado, cor: it.cor })}
     ${mostrarArea ? `<rect class="areaImp" x="${area.x}" y="${area.y}" width="${area.w}" height="${area.h}" rx="6"/>
@@ -437,11 +467,23 @@ TELAS.modelo = () => {
   $('#verMedidas').onclick = () => abrirTabela(it.modelo);
   $$('[data-modelo]').forEach(b => (b.onclick = async () => { await escolherModelo(b.dataset.modelo); irPara('estampa'); }));
   rodape({
-    voltar: { texto: 'Início', acao: async () => { if (!temAlgo() || await confirmar('Voltar ao início? O que você montou será apagado.', { sim: 'Voltar ao início', perigo: true })) recomecar(); } },
+    voltar: S.editando ? { texto: 'Revisar', acao: () => irPara('revisar') }
+      : S.itens.length > 1 ? { texto: 'Meu pedido', acao: voltarAoPedido }
+      : { texto: 'Início', acao: async () => { if (!temAlgo() || await confirmar('Voltar ao início? O que você montou será apagado.', { sim: 'Voltar ao início', perigo: true })) recomecar(); } },
     meio: `${esc(modelo(it.modelo).nome)}`,
     avancar: { texto: 'Escolher a estampa', acao: () => irPara('estampa') }
   });
 };
+
+/** Desistiu da camiseta nova: volta para o pedido com as que já estavam prontas. */
+async function voltarAoPedido() {
+  const it = item();
+  const vazio = !it.artes.length && !it.pronta && !totalPecas(it);
+  if (!vazio && !(await confirmar('Deixar de lado esta camiseta nova e voltar ao pedido? As outras continuam.', { sim: 'Voltar ao pedido' }))) return;
+  S.itens.splice(S.atual, 1);
+  S.atual = S.itens.length - 1; S.lado = 'Frente'; S.sel = null; S.desfazer = [];
+  irPara('revisar');
+}
 
 /** Troca o modelo mantendo o que dá (artes reencaixadas, camiseta pronta recalculada). */
 async function escolherModelo(id) {
@@ -485,7 +527,7 @@ TELAS.estampa = () => {
         <button type="button" class="caminho" id="caminhoCriar" aria-pressed="${it.modo === 'criar'}">
           <span class="caminhoIcones">${icone('upload', 44)}${icone('editar', 44)}${icone('busca', 44)}</span>
           <strong>${icone('editar', 24)} Criar a minha</strong>
-          <span>Envie a sua arte ou busque uma imagem na internet, escreva textos com várias fontes e ajuste do seu jeito.</span>
+          <span>${S.cfg.permitirEnvio !== false ? 'Envie a sua arte ou busque uma imagem na internet, escreva textos' : 'Escreva nomes, frases e números'} com várias fontes e ajuste do seu jeito.</span>
           <em>Você escolhe cor, tamanho e posição</em>
         </button>
       </div>
@@ -547,6 +589,10 @@ function galeriaProntas() {
       </div>
       <div class="galeriaTopo">
         <label class="busca">${icone('busca')}<input type="search" id="busca" placeholder="Procurar arte…" value="${esc(S.busca)}" autocomplete="off" enterkeyhint="search"></label>
+        <div class="segmento segVista" role="group" aria-label="Como ver as estampas">
+          <button type="button" data-vista="grade" aria-pressed="${S.vista !== 'cheia'}">${icone('arte', 20)} Grade</button>
+          <button type="button" data-vista="cheia" aria-pressed="${S.vista === 'cheia'}">${icone('expandir', 20)} Tela cheia</button>
+        </div>
       </div>
       <div class="temas" id="temas" role="tablist">
         <button type="button" class="tema" data-tema="Todas" aria-pressed="${S.tema === 'Todas'}">Todas <small>${S.catalogo.length}</small></button>
@@ -586,10 +632,16 @@ function galeriaProntas() {
     }).join('')
       : `<div class="vazio">${icone(S.catalogo.length ? 'busca' : 'arte', 48)}<p>${S.catalogo.length ? 'Nenhuma arte encontrada. Tente outra palavra ou outro tema.' : 'Ainda não há artes cadastradas neste tablet. Chame o atendente.'}</p></div>`;
     carregarMiniaturas($('#grade'));
-    $$('#grade [data-i]').forEach(b => (b.onclick = () => verPronta(lista, +b.dataset.i)));
+    $$('#grade [data-i]').forEach(b => (b.onclick = () => verPronta(lista, +b.dataset.i, { cheia: S.vista === 'cheia' })));
+    S.listaGaleria = lista;
   };
   pintarSub();
   pintarGrade();
+  $$('[data-vista]').forEach(b => (b.onclick = () => {
+    S.vista = b.dataset.vista;
+    $$('[data-vista]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    if (S.vista === 'cheia' && S.listaGaleria?.length) verPronta(S.listaGaleria, 0, { cheia: true });
+  }));
   let tBusca;
   $('#busca').oninput = e => { clearTimeout(tBusca); tBusca = setTimeout(() => { S.busca = e.target.value; pintarGrade(); }, 180); };
   $$('#temas [data-tema]').forEach(b => (b.onclick = () => {
@@ -612,12 +664,15 @@ function galeriaProntas() {
 }
 
 /** Janela da camiseta pronta: ver na camiseta, escolher a cor. */
-async function verPronta(lista, i) {
+async function verPronta(lista, i, opc = {}) {
   const it = item();
   let atual = i, cor = it.cor, lado = 'Frente', artes = [], inicioX = null;
-  const j = janela({ classe: 'janelaArte', titulo: '', html: `
+  const j = janela({ classe: `janelaArte${opc.cheia ? ' telaCheia' : ''}`, titulo: '', html: `
     <div class="verArte">
-      <div class="verPalco" id="verPalco"></div>
+      <div class="verPalcoBox"><div class="verPalco" id="verPalco"></div>
+        ${opc.cheia && lista.length > 1 ? `<button type="button" class="setaCheia esq" data-passo="-1" aria-label="Estampa anterior">${icone('voltar', 30)}</button>
+          <button type="button" class="setaCheia dir" data-passo="1" aria-label="Próxima estampa">${icone('avancar', 30)}</button>
+          <p class="dicaSwipe">${icone('mao', 16)} Deslize para o lado para ver outras estampas</p>` : ''}</div>
       <div class="verInfo">
         <p class="verTema" id="verTema"></p>
         <h2 id="verNome"></h2>
@@ -660,7 +715,14 @@ async function verPronta(lista, i) {
     $('#verLados', j.el).hidden = artes.length < 2;
     pintar();
   };
-  const passar = d => { atual = (atual + d + lista.length) % lista.length; carregar(); };
+  const passar = async d => {
+    atual = (atual + d + lista.length) % lista.length;
+    await carregar();
+    const pal = $('#verPalco', j.el);
+    pal.style.setProperty('--de', d > 0 ? '3rem' : '-3rem');
+    pal.classList.remove('entra'); void pal.offsetWidth; pal.classList.add('entra');
+  };
+  $$('[data-passo]', j.el).forEach(b => (b.onclick = () => passar(+b.dataset.passo)));
   $('#ant', j.el).onclick = () => passar(-1);
   $('#prox', j.el).onclick = () => passar(1);
   $$('#verLados [data-lado]', j.el).forEach(b => (b.onclick = () => { lado = b.dataset.lado; pintar(); }));
@@ -693,11 +755,12 @@ async function verPronta(lista, i) {
 
 /** Janela para colocar uma imagem: enviar a própria ou buscar na internet. */
 function janelaImagem() {
+  const enviarOk = S.cfg.permitirEnvio !== false;
+  // Com o envio desligado, a aba "Minha própria arte" explica e oferece outros caminhos
   const fontes = [
-    S.cfg.permitirEnvio !== false && { id: 'enviar', nome: 'Enviar minha arte', ic: 'upload' },
+    { id: 'enviar', nome: enviarOk ? 'Enviar minha arte' : 'Minha própria arte', ic: 'upload' },
     S.cfg.permitirBusca !== false && { id: 'buscar', nome: 'Buscar na internet', ic: 'busca' }
   ].filter(Boolean);
-  if (!fontes.length) return aviso('A loja desativou o envio de imagens. Use um texto ou uma camiseta pronta.');
   if (!fontes.some(f => f.id === S.fonte)) S.fonte = fontes[0].id;
   const j = janela({ titulo: `${icone('arte')} Colocar uma imagem`, classe: 'janelaImagem', html: `
     ${fontes.length > 1 ? `<div class="segmento segmentoFontes" role="tablist">${fontes.map(f => `<button type="button" data-fonte="${f.id}" aria-pressed="${S.fonte === f.id}">${icone(f.ic, 20)} ${f.nome}</button>`).join('')}</div>` : ''}
@@ -705,11 +768,90 @@ function janelaImagem() {
   S.janelaImagem = j;
   const pintar = () => {
     $$('[data-fonte]', j.el).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fonte === S.fonte)));
-    (S.fonte === 'buscar' ? telaBuscar : telaEnviar)($('#contImagem', j.el));
+    (S.fonte === 'buscar' ? telaBuscar : enviarOk ? telaEnviar : telaSemArtePropria)($('#contImagem', j.el), j);
   };
   $$('[data-fonte]', j.el).forEach(b => (b.onclick = () => { S.fonte = b.dataset.fonte; pintar(); }));
   pintar();
   j.aoFechar.then(() => { if (S.janelaImagem === j) S.janelaImagem = null; });
+}
+
+/** Envio de arte própria desligado: explica e oferece texto, catálogo ou contato. */
+function telaSemArtePropria(el, j) {
+  el.innerHTML = `
+    <div class="semArtePropria">
+      <div class="semArteAviso">${icone('cadeado', 30)}<div><b>No momento, artes próprias não estão disponíveis por aqui.</b>
+        <small>Mas dá para montar a sua camiseta de outro jeito:</small></div></div>
+      <div class="opcoesSemArte">
+        <button type="button" class="opcaoSemArte" data-op="texto">${icone('editar', 30)}<b>Escrever um texto</b><small>Nome, frase ou número, com várias fontes e cores${extraTexto(' · +', '')}</small></button>
+        <button type="button" class="opcaoSemArte" data-op="catalogo" ${S.catalogo.length ? '' : 'disabled'}>${icone('estrela', 30)}<b>Escolher uma arte pronta</b><small>Do nosso catálogo, já no tamanho e na posição certos</small></button>
+        <button type="button" class="opcaoSemArte" data-op="info">${icone('whatsapp', 30)}<b>Quero usar a minha arte</b><small>Veja como funciona e fale com o responsável</small></button>
+      </div>
+    </div>`;
+  $('[data-op="texto"]', el).onclick = () => { j.fechar(); adicionarTexto(); };
+  $('[data-op="catalogo"]', el).onclick = async () => {
+    const it = item();
+    if (it.artes.some(a => a.tipo !== 'texto') && !(await confirmar('Escolher uma arte pronta tira as imagens que você colocou (os textos ficam). Continuar?', { sim: 'Continuar' }))) return;
+    j.fechar();
+    it.modo = 'pronta'; it.pronta = null; it.artes = it.artes.filter(a => a.tipo === 'texto');
+    irPara('estampa');
+  };
+  $('[data-op="info"]', el).onclick = () => telaComoFunciona(el, j);
+}
+
+const soDigitos = t => String(t || '').replace(/\D/g, '');
+const telefoneBonito = t => {
+  const d = soDigitos(t).replace(/^55(?=\d{10,11}$)/, '');
+  return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : t;
+};
+const linkWhats = (t, msg = '') => { const d = soDigitos(t); return `https://wa.me/${d.length <= 11 ? '55' + d : d}${msg ? '?text=' + encodeURIComponent(msg) : ''}`; };
+const mascaraTel = e => {
+  const d = e.target.value.replace(/\D/g, '').slice(0, 11);
+  e.target.value = d.length > 6 ? `(${d.slice(0, 2)}) ${d.slice(2, d.length - 4)}-${d.slice(-4)}` : d.length > 2 ? `(${d.slice(0, 2)}) ${d.slice(2)}` : d;
+};
+
+/** Como funciona a arte própria: WhatsApp do responsável (com QR) e "deixe seu contato". */
+function telaComoFunciona(el, j) {
+  const zap = S.cfg.whatsResponsavel, resp = S.cfg.nomeResponsavel || 'o responsável pelas personalizações';
+  el.innerHTML = `
+    <div class="comoFunciona">
+      <button type="button" class="btnTexto" data-op="voltar">${icone('voltar', 18)} Voltar</button>
+      <h3>Camiseta com a sua própria arte</h3>
+      <p class="textoAjuda">A sua arte precisa ser conferida antes (qualidade da imagem, tamanho e cores) para a estampa sair perfeita.
+        ${zap ? `Fale com <b>${esc(resp)}</b> pelo WhatsApp, mande a sua arte e receba o orçamento.` : 'Fale com o atendente da loja.'}</p>
+      ${zap ? `<div class="zapResp"><div class="qr" id="qrZap">${icone('whatsapp', 48)}</div>
+        <div><small>WhatsApp de ${esc(resp)}</small><b>${esc(telefoneBonito(zap))}</b><small>Aponte a câmera do seu celular para o código e a conversa abre no seu WhatsApp.</small></div></div>` : ''}
+      <form class="deixarContato" id="formContato">
+        <h4>Prefere que a gente chame você?</h4>
+        <label class="campoPeq"><span>Seu nome</span><input id="ctNome" autocomplete="name" autocapitalize="words" enterkeyhint="next" required></label>
+        <label class="campoPeq"><span>Seu WhatsApp</span><input id="ctTel" type="tel" inputmode="tel" autocomplete="tel" enterkeyhint="next" placeholder="(00) 00000-0000" required></label>
+        <label class="campoPeq largo"><span>O que você quer fazer? <small>(opcional)</small></span><textarea id="ctObs" rows="2" placeholder="Ex.: 20 camisetas com a logo da minha empresa"></textarea></label>
+        <div class="linhaBotoes"><button type="submit" class="btn btnEscuro">${icone('whatsapp', 20)} Quero que entrem em contato</button></div>
+      </form>
+    </div>`;
+  $('[data-op="voltar"]', el).onclick = () => telaSemArtePropria(el, j);
+  $('#ctTel', el).oninput = mascaraTel;
+  if (zap) {
+    lib('qrcode').then(qr => {
+      const q = qr(0, 'M');
+      q.addData(linkWhats(zap, 'Olá! Quero fazer uma camiseta com a minha própria arte.'));
+      q.make();
+      $('#qrZap', el).innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+    }).catch(() => { /* sem internet: fica só o número */ });
+  }
+  $('#formContato', el).onsubmit = async e => {
+    e.preventDefault();
+    const nome = $('#ctNome', el).value.trim(), telefone = $('#ctTel', el).value.trim(), obs = $('#ctObs', el).value.trim();
+    if (!nome) return aviso('Digite o seu nome.', 'erro');
+    if (soDigitos(telefone).length < 10) return aviso('Digite o seu WhatsApp com DDD.', 'erro');
+    // O contato vai junto com os pedidos para a confecção (aparece como "Contato")
+    const reg = { id: Date.now(), tipo: 'contato', numero: 0, data: new Date().toISOString(), cliente: { nome, telefone, obs }, itens: [], total: 0 };
+    await DB.salvar('pedidos', reg);
+    enviarPendentes(S.cfg).catch(() => {});
+    el.innerHTML = `<div class="contatoEnviado">${icone('check', 48)}<h3>Prontinho, ${esc(nome.split(' ')[0])}!</h3>
+      <p class="textoAjuda">Vamos chamar você no WhatsApp <b>${esc(telefone)}</b> para falar sobre a sua arte.</p>
+      <button type="button" class="btn btnClaro" data-op="voltar">Continuar montando a camiseta</button></div>`;
+    $('[data-op="voltar"]', el).onclick = () => j.fechar();
+  };
 }
 
 /** Coloca um texto novo (ou edita um existente). */
@@ -946,6 +1088,11 @@ TELAS.personalizar = () => {
           ${['Frente', 'Costas'].map(l => `<button type="button" data-lado="${l}" aria-pressed="${S.lado === l}">${icone('virar', 18)} ${l}${conta(l) ? ` <small>${conta(l)}</small>` : ''}</button>`).join('')}
         </div>
         <div class="palcoArea" id="palcoArea">${palco(it, S.lado, { mostrarArea: true, sel: S.sel })}</div>
+        <div class="zoomPalco" role="group" aria-label="Zoom na camiseta">
+          <button type="button" data-zoom="-1" aria-label="Diminuir o zoom">${icone('menos', 20)}</button>
+          <button type="button" class="zoomValor" data-zoom="0" aria-label="Tamanho normal">100%</button>
+          <button type="button" data-zoom="1" aria-label="Aumentar o zoom">${icone('mais', 20)}</button>
+        </div>
         ${doLado.length ? (editaveis.length ? `<p class="dicaPalco">${icone('mao', 18)} Arraste · dois dedos mudam o tamanho</p>` : '')
           : `<div class="adicionarNoPalco">
               <p>O que vai ${S.lado === 'Costas' ? 'nas <b>COSTAS</b>' : 'na <b>FRENTE</b>'}?</p>
@@ -972,9 +1119,10 @@ TELAS.personalizar = () => {
             <button type="button" class="btnIcone btnPerigoTexto" id="remover" aria-label="Tirar arte" title="Tirar arte">${icone('lixo', 22)}</button>
           </div>
           <div class="rotuloLinha">${icone('regua', 18)} <b>Tamanho</b><span class="medidas" id="medidas"></span></div>
+          <p class="avisoArea" id="avisoArea" hidden></p>
           <div class="tamanhoArte">
             <button type="button" class="btnRedondo" data-tam="-1" aria-label="Diminuir">${icone('menos', 24)}</button>
-            <input type="range" id="tamanho" min="3" max="${maxCm(it.modelo, a)}" step="0.5" value="${a.cm}" aria-label="Largura em centímetros">
+            <input type="range" id="tamanho" min="3" max="${maxCmLivre(it.modelo, a)}" step="0.5" value="${a.cm}" aria-label="Largura em centímetros">
             <button type="button" class="btnRedondo" data-tam="1" aria-label="Aumentar">${icone('mais', 24)}</button>
           </div>
           <div id="qualidadeAjuste"></div>
@@ -1006,6 +1154,19 @@ TELAS.personalizar = () => {
     $('#medidas').innerHTML = `${textoMedidas(it.modelo, a)}${linhas ? `<small>letras com ~${num(a.cm * a.h / a.w / linhas * 0.72)} cm de altura</small>` : ''}`
       + (custo ? `<span class="custoEstampa">Estampa: <b>${custo}</b></span>` : '');
     const pp = $('#precoPecaAoVivo'); if (pp) pp.textContent = dinheiro(precoItem(S.cfg, it));
+    // Recomenda a área certa, mas deixa o cliente escolher
+    a.foraArea = foraDaArea(a);
+    svg?.querySelector('.areaImp')?.classList.toggle('fora', a.foraArea);
+    const av = $('#avisoArea');
+    if (av) {
+      av.hidden = !a.foraArea;
+      if (a.foraArea && !av.dataset.ok) {
+        av.dataset.ok = '1';
+        av.innerHTML = `${icone('regua', 18)}<span><b>Fora da área recomendada</b> (${m.area.w} × ${m.area.h} cm). Pode deixar, mas fica melhor no tracejado.
+          <button type="button" class="btnTexto" id="irArea">Ajustar</button></span>`;
+        $('#irArea').onclick = () => { salvarDesfazer(); paraAreaRecomendada(a); redesenhar(); $('#btnDesfazer').disabled = false; conferirDepois(); };
+      }
+    }
     $('#medidas').title = `Máximo ${m.area.w} × ${m.area.h} cm`;
     const box = $('#qualidadeAjuste'), novo = caixaQualidade(a);
     if (box.dataset.html !== novo) { box.dataset.html = novo; box.innerHTML = novo; }
@@ -1023,16 +1184,47 @@ TELAS.personalizar = () => {
     pintarMedidas();
   };
 
+  // Zoom: botões, dois dedos fora de uma arte e arrastar o fundo para mover
+  S.zoom ||= { k: 1, cx: VB.w / 2, cy: VB.h / 2 };
+  const aplicarZoom = () => {
+    const z = S.zoom, w = VB.w / z.k, h = VB.h / z.k;
+    z.cx = Math.min(VB.w - w / 2, Math.max(w / 2, z.cx)); z.cy = Math.min(VB.h - h / 2, Math.max(h / 2, z.cy));
+    svg.setAttribute('viewBox', `${(z.cx - w / 2).toFixed(1)} ${(z.cy - h / 2).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`);
+    $('.zoomValor').textContent = `${Math.round(z.k * 100)}%`;
+    $('#palcoArea').classList.toggle('comZoom', z.k > 1);
+  };
+  const definirZoom = (k, centro) => {
+    const antes = S.zoom.k;
+    S.zoom.k = Math.max(1, Math.min(4, Math.round(k * 100) / 100));
+    if (S.zoom.k === 1) { S.zoom.cx = VB.w / 2; S.zoom.cy = VB.h / 2; }
+    else if (centro && antes === 1) { S.zoom.cx = centro.x; S.zoom.cy = centro.y; }
+    aplicarZoom();
+  };
+  const escalaSvg = () => { const r = svg.getBoundingClientRect(); return Math.max((VB.w / S.zoom.k) / r.width, (VB.h / S.zoom.k) / r.height); };
+  aplicarZoom();
+  $$('[data-zoom]').forEach(b => (b.onclick = () => {
+    const d = +b.dataset.zoom;
+    const g = a && a.lado === S.lado ? geom(a) : null;
+    definirZoom(d === 0 ? 1 : S.zoom.k * (d > 0 ? 1.5 : 1 / 1.5), g ? { x: g.x + g.w / 2, y: g.y + g.h / 2 } : null);
+  }));
+
   // Arrastar (1 dedo) e mudar o tamanho (2 dedos)
   const ponto = e => { const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); };
   const dedos = new Map();
-  let arraste = null, pinca = null, mudou = false;
+  let arraste = null, pinca = null, mudou = false, mover = null, pincaZoom = null;
   svg.addEventListener('pointerdown', e => {
     clearTimeout(tConferir);
     const alvo = e.target.closest('image[data-uid]');
     dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { svg.setPointerCapture(e.pointerId); } catch { /* ok */ }
     if (dedos.size === 1 && alvo && alvo.dataset.uid !== S.sel) { S.sel = alvo.dataset.uid; return TELAS.personalizar(); }
+    // Com zoom, arrastar fora da arte move a camiseta; dois dedos sem arte escolhida mudam o zoom
+    if (dedos.size === 1 && !alvo && S.zoom.k > 1) { mover = { x: e.clientX, y: e.clientY, cx: S.zoom.cx, cy: S.zoom.cy }; return; }
+    if (dedos.size === 2 && (!a || mover)) {
+      const [p1, p2] = [...dedos.values()];
+      mover = null; pincaZoom = { d0: Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1, k0: S.zoom.k };
+      return;
+    }
     if (!a) return;
     if (pronta && dedos.size === 1 && !alvo) return; // na pronta, só arrasta tocando no texto (a estampa é fixa)
     if (dedos.size === 2) {
@@ -1046,6 +1238,18 @@ TELAS.personalizar = () => {
     if (!mudou) { salvarDesfazer(); mudou = true; }
   });
   svg.addEventListener('pointermove', e => {
+    if (dedos.has(e.pointerId) && (mover || pincaZoom)) {
+      dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pincaZoom && dedos.size >= 2) {
+        const [p1, p2] = [...dedos.values()];
+        definirZoom(pincaZoom.k0 * Math.hypot(p1.x - p2.x, p1.y - p2.y) / pincaZoom.d0);
+      } else if (mover) {
+        const k = escalaSvg();
+        S.zoom.cx = mover.cx - (e.clientX - mover.x) * k; S.zoom.cy = mover.cy - (e.clientY - mover.y) * k;
+        aplicarZoom();
+      }
+      return;
+    }
     if (!dedos.has(e.pointerId) || !a) return;
     dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const area = areaImpressao(it.modelo, a.lado);
@@ -1054,15 +1258,19 @@ TELAS.personalizar = () => {
       a.cm = Math.round(pinca.cm0 * Math.hypot(p1.x - p2.x, p1.y - p2.y) / pinca.d0 * 2) / 2;
       encaixar(a); redesenhar();
     } else if (arraste) {
-      const p = ponto(e);
+      const p = ponto(e), antes = [a.fx, a.fy];
       a.fx = arraste.fx + (p.x - arraste.p0.x) / area.w;
       a.fy = arraste.fy + (p.y - arraste.p0.y) / area.h;
-      encaixar(a); redesenhar();
+      encaixar(a);
+      const g = geom(a);
+      if (!dentroDaCamiseta(it.modelo, g.x + g.w / 2, g.y + g.h / 2)) [a.fx, a.fy] = antes; // não sai da camiseta
+      redesenhar();
     }
   });
   const soltar = e => {
     dedos.delete(e.pointerId);
-    if (dedos.size < 2) pinca = null;
+    if (dedos.size < 2) { pinca = null; pincaZoom = null; }
+    if (!dedos.size) mover = null;
     if (!dedos.size) { arraste = null; if (mudou) { mudou = false; $('#btnDesfazer').disabled = false; conferirDepois(); } }
   };
   svg.addEventListener('pointerup', soltar);
@@ -1107,7 +1315,7 @@ TELAS.personalizar = () => {
     $$('[data-tam]').forEach(b => (b.onclick = () => {
       salvarDesfazer();
       a.cm = Math.round(a.cm) + +b.dataset.tam;
-      const max = maxCm(it.modelo, a);
+      const max = maxCmLivre(it.modelo, a);
       if (a.cm > max) aviso(`Este é o tamanho máximo para esta arte: ${num(max)} cm.`);
       encaixar(a); redesenhar(); $('#btnDesfazer').disabled = false;
       conferirDepois();
@@ -1228,7 +1436,7 @@ TELAS.revisar = () => {
             ${comPreco() && valorItem(S.cfg, it).total ? `<p class="precoItem">${valorItem(S.cfg, it).linhas.map(l => `${l.qtd}× ${l.t} ${dinheiro(l.unit)}`).join(' · ')} = <b>${dinheiro(valorItem(S.cfg, it).total)}</b></p>` : ''}
             <ul class="itemArtes">
               ${it.modo === 'pronta' ? `<li>${icone('estrela', 16)} <b>Camiseta pronta</b></li>` : ''}
-              ${it.artes.length ? it.artes.map(a => `<li>${icone(a.tipo === 'texto' ? 'editar' : 'arte', 16)} <b>${a.lado}:</b> ${esc(a.nome)} <small>${textoMedidas(it.modelo, a, true)}${textoCusto(it.modelo, a) && !(a.fixa && it.precoPronta) ? ` · ${textoCusto(it.modelo, a)}` : ''}</small></li>`).join('') : `<li>${icone('camisa', 16)} Camiseta lisa (sem estampa)</li>`}</ul>
+              ${it.artes.length ? it.artes.map(a => `<li>${icone(a.tipo === 'texto' ? 'editar' : 'arte', 16)} <b>${a.lado}:</b> ${esc(a.nome)} <small>${textoMedidas(it.modelo, a, true)}${textoCusto(it.modelo, a) && !(a.fixa && it.precoPronta) ? ` · ${textoCusto(it.modelo, a)}` : ''}${a.foraArea ? ' · fora da área recomendada' : ''}</small></li>`).join('') : `<li>${icone('camisa', 16)} Camiseta lisa (sem estampa)</li>`}</ul>
             <div class="linhaBotoes">
               <button type="button" class="btn btnClaro" data-editar="${i}">${icone('editar', 20)} Editar</button>
               ${S.itens.length > 1 ? `<button type="button" class="btn btnClaro btnPerigoTexto" data-remover="${i}">${icone('lixo', 20)} Remover</button>` : ''}
@@ -1452,6 +1660,46 @@ function vigiarInatividade() {
   reiniciar();
 }
 
+// ---------- Descanso de tela ----------
+
+/**
+ * Depois de um tempo sem toques a tela escurece (o app continua aberto, no
+ * mesmo lugar). Qualquer toque clareia de novo, sem mexer em nada.
+ */
+function vigiarDescanso() {
+  let ultimo = Date.now();
+  const tela = document.createElement('div');
+  tela.className = 'descanso';
+  tela.innerHTML = `<div class="descansoTexto"><strong></strong><span>${icone('mao', 22)} Toque na tela para continuar</span></div>`;
+  const popover = 'popover' in HTMLElement.prototype;
+  if (popover) tela.popover = 'manual';
+  const esconder = () => {
+    try { if (popover && tela.matches(':popover-open')) tela.hidePopover(); } catch { /* ok */ }
+    tela.remove();
+  };
+  const mostrar = () => {
+    // Dentro da janela aberta (se houver), senão o toque "atravessaria" e fecharia a janela
+    const dono = [...document.querySelectorAll('dialog[open]')].pop() || document.body;
+    tela.querySelector('strong').textContent = S.cfg.loja || '';
+    dono.appendChild(tela);
+    try { if (popover) tela.showPopover(); } catch { /* ok */ }
+    tela.classList.remove('some'); void tela.offsetWidth; tela.classList.add('ativo');
+  };
+  const acordar = e => {
+    e.preventDefault(); e.stopPropagation();
+    ultimo = Date.now();
+    tela.classList.remove('ativo');
+    setTimeout(esconder, 200);
+  };
+  tela.addEventListener('pointerdown', acordar);
+  tela.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+  ['pointerdown', 'keydown', 'input'].forEach(t => document.addEventListener(t, () => { ultimo = Date.now(); }, { passive: true, capture: true }));
+  setInterval(() => {
+    const min = +S.cfg.descansoMin;
+    if (min > 0 && Date.now() - ultimo > min * 60000 && !tela.isConnected) mostrar();
+  }, 5000);
+}
+
 // ---------- Catálogo e configuração ----------
 
 async function recarregarCatalogo() {
@@ -1490,17 +1738,41 @@ function modoConfeccao() {
   try { return !!(localStorage.getItem('chaveConfeccao') || sessionStorage.getItem('chaveConfeccao')); } catch { return false; }
 }
 
+/**
+ * Altura e tamanho da letra a partir da área visível (em vez de depender só do
+ * CSS: navegadores antigos e o modo "site para computador" erram a altura e o
+ * rodapé sumia). Com o teclado aberto não mexe: o teclado passa por cima.
+ */
+function ajustarTela() {
+  const ativo = document.activeElement;
+  const digitando = ativo && /^(INPUT|TEXTAREA)$/.test(ativo.tagName);
+  const w = window.innerWidth, h = window.innerHeight;
+  if (digitando && S.alturaTela && h < S.alturaTela && w === S.larguraTela) return;
+  S.alturaTela = h; S.larguraTela = w;
+  const raiz = document.documentElement.style;
+  raiz.setProperty('--altura', h + 'px');
+  const fs = w >= h ? Math.min(w * 0.0125, h * 0.02) : Math.min(w * 0.02, h * 0.0125);
+  raiz.fontSize = Math.max(10, Math.min(18, fs)).toFixed(2) + 'px';
+  if (window.scrollY || window.scrollX) window.scrollTo(0, 0);
+}
+
 async function iniciar() {
   if (modoConfeccao()) {
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
     return (await import('./painel.js')).iniciar();
   }
+  ajustarTela();
+  window.addEventListener('resize', ajustarTela);
+  window.addEventListener('orientationchange', () => setTimeout(ajustarTela, 250));
+  document.addEventListener('focusout', () => setTimeout(ajustarTela, 400));
+  [300, 1000, 2500].forEach(t => setTimeout(ajustarTela, t));
   montarEsqueleto();
   aplicarConfig(await DB.config(PADRAO));
   await recarregarCatalogo();
   DB.persistir();
   irPara('inicio');
   vigiarInatividade();
+  vigiarDescanso();
   ajudarTeclado();
   vigiarEnvio(() => S.cfg);
   document.addEventListener('visibilitychange', manterTelaLigada);

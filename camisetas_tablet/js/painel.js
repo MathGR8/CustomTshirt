@@ -10,7 +10,7 @@
  * Entra com a senha da confecção (a mesma configurada no tablet).
  */
 
-import { $, $$, esc, aviso, confirmar, ajudarTeclado } from './ui.js';
+import { $, $$, esc, aviso, confirmar, ajudarTeclado, janela } from './ui.js';
 import { icone } from './icons.js';
 import { verPedido } from './admin.js';
 import { pdfPedido, baixar, numeroPedido } from './order.js';
@@ -115,7 +115,9 @@ async function carregar(avisar = false) {
   try {
     const { pedidos } = await (await api()).json();
     const novos = pedidos.filter(p => !E.vistos.has(p.id));
-    if (!E.primeira && novos.length) aviso(`${novos.length} pedido${novos.length > 1 ? 's' : ''} novo${novos.length > 1 ? 's' : ''} chegou${novos.length > 1 ? 'ram' : ''}!`, 'ok');
+    const novosPed = novos.filter(p => p.tipo !== 'contato'), novosCont = novos.filter(p => p.tipo === 'contato');
+    if (!E.primeira && novosPed.length) aviso(`${novosPed.length} pedido${novosPed.length > 1 ? 's' : ''} novo${novosPed.length > 1 ? 's' : ''} chegou${novosPed.length > 1 ? 'ram' : ''}!`, 'ok');
+    if (!E.primeira && novosCont.length) aviso(`${novosCont.length === 1 ? `${novosCont[0].nome || 'Um cliente'} quer` : `${novosCont.length} clientes querem`} fazer camiseta com a própria arte: chame no WhatsApp.`, 'ok');
     pedidos.forEach(p => E.vistos.add(p.id));
     E.primeira = false;
     E.pedidos = pedidos;
@@ -141,6 +143,15 @@ function pintarLista() {
   const lista = filtrados();
   $('#lista').innerHTML = lista.length ? `<div class="gradePedidos">${lista.map(p => {
     const d = new Date(p.data);
+    if (p.tipo === 'contato') return `<button type="button" class="cartaoPedido contatoCartao st-${esc(p.status)}" data-id="${esc(p.id)}">
+      <span class="cpImg">${icone('whatsapp', 48)}</span>
+      <span class="cpInfo">
+        <span class="cpTopo"><strong>Contato</strong><span class="chipSituacao st-${esc(p.status)}">${p.status === 'entregue' ? 'Atendido' : 'Chamar'}</span></span>
+        <span class="cpNome">${esc(p.nome || 'Sem nome')}</span>
+        <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${p.telefone ? ' · ' + esc(p.telefone) : ''}</small>
+        <small>Quer fazer camiseta com a própria arte</small>
+      </span>
+    </button>`;
     return `<button type="button" class="cartaoPedido st-${esc(p.status)}" data-id="${esc(p.id)}">
       <span class="cpImg">${p.miniatura ? `<img src="${esc(p.miniatura)}" alt="">` : icone('camisa', 48)}</span>
       <span class="cpInfo">
@@ -154,6 +165,33 @@ function pintarLista() {
   }).join('')}</div>`
     : `<div class="vazio">${icone('lista', 48)}<p>${E.pedidos.length ? 'Nenhum pedido neste filtro.' : 'Nenhum pedido ainda. Assim que o tablet enviar, aparece aqui (a lista atualiza sozinha).'}</p></div>`;
   $$('#lista [data-id]').forEach(b => (b.onclick = () => abrir(b.dataset.id)));
+}
+
+// ---------- Contato (cliente que quer usar a própria arte) ----------
+
+function verContato(p) {
+  const id = String(p.id), c = p.cliente || {}, d = new Date(p.data);
+  const dig = String(c.telefone || '').replace(/\D/g, '');
+  const zap = `https://wa.me/${dig.length <= 11 ? '55' + dig : dig}?text=${encodeURIComponent(`Olá, ${c.nome || ''}! Aqui é da confecção. Você pediu informações sobre camiseta com a sua própria arte.`)}`;
+  const j = janela({ titulo: `${icone('whatsapp')} Contato — ${esc(c.nome || 'Sem nome')}`, classe: 'janelaPequena', html: `
+    <p><b>WhatsApp:</b> ${esc(c.telefone || '—')}<br><small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · pelo tablet da loja</small></p>
+    <p>Quer fazer camiseta com a <b>própria arte</b>.</p>
+    ${c.obs ? `<div class="obsContato">${esc(c.obs)}</div>` : '<p class="textoAjuda">Não deixou observação.</p>'}
+    <div class="linhaBotoes">
+      <a class="btn btnEscuro" href="${zap}" target="_blank" rel="noopener">${icone('whatsapp', 20)} Chamar no WhatsApp</a>
+      <button type="button" class="btn btnClaro" id="cAtendido">${icone('check', 20)} ${p.status === 'entregue' ? 'Marcar como não atendido' : 'Marcar como atendido'}</button>
+      <button type="button" class="btnIcone btnPerigoTexto" id="cApagar" aria-label="Apagar">${icone('lixo', 20)}</button>
+    </div>` });
+  $('#cAtendido', j.el).onclick = async () => {
+    try {
+      await api(encodeURIComponent(id), { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: p.status === 'entregue' ? 'novo' : 'entregue' }) });
+      j.fechar(); await carregar();
+    } catch (e) { aviso(e.message, 'erro'); }
+  };
+  $('#cApagar', j.el).onclick = async () => {
+    if (!(await confirmar('Apagar este contato?', { sim: 'Apagar', perigo: true }))) return;
+    try { await api(encodeURIComponent(id), { method: 'DELETE' }); j.fechar(); await carregar(); } catch (e) { aviso(e.message, 'erro'); }
+  };
 }
 
 // ---------- Pedido ----------
@@ -171,6 +209,7 @@ async function blobArquivo(id, nome) {
 async function abrir(id) {
   let p;
   try { p = await (await api(encodeURIComponent(id))).json(); } catch (e) { return aviso(e.message, 'erro'); }
+  if (p.tipo === 'contato') return verContato(p);
   const nomeArq = `pedido-${numeroPedido(p.numero)}`;
   const j = await verPedidoPainel(p, nomeArq);
   return j;

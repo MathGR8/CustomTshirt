@@ -56,6 +56,8 @@ export class Pedidos extends DurableObject {
       CREATE TABLE IF NOT EXISTS arquivo_partes (pedido TEXT, nome TEXT, idx INTEGER, dados BLOB, PRIMARY KEY (pedido, nome, idx));
       CREATE TABLE IF NOT EXISTS tentativas (ip TEXT PRIMARY KEY, n INTEGER, ate INTEGER);
     `);
+    // Tipo do registro ("pedido" ou "contato": cliente que quer usar a própria arte)
+    try { this.sql.exec("ALTER TABLE pedidos ADD COLUMN tipo TEXT DEFAULT 'pedido'"); } catch { /* já existe */ }
     // Uma vez só: apaga a senha gravada pelas versões antigas (a 1ª senha usada
     // ficava valendo) e volta para a senha inicial 000000. Os pedidos ficam.
     if (!this.um("SELECT v FROM cfg WHERE k = 'senha_inicial_v2'")) {
@@ -140,7 +142,7 @@ export class Pedidos extends DurableObject {
   lista(url) {
     const status = url.searchParams.get('status');
     const rows = this.sql.exec(
-      `SELECT p.id, p.numero, p.data, p.nome, p.telefone, p.total, p.pecas, p.camisetas, p.status, p.miniatura, p.recebido, p.alerta,
+      `SELECT p.id, p.numero, p.data, p.nome, p.telefone, p.total, p.pecas, p.camisetas, p.status, p.miniatura, p.recebido, p.alerta, p.tipo,
               (SELECT COUNT(*) FROM arquivos a WHERE a.pedido = p.id) AS arquivos
          FROM pedidos p ${status && STATUS.includes(status) ? 'WHERE p.status = ?' : ''}
         ORDER BY p.recebido DESC LIMIT 500`, ...(status && STATUS.includes(status) ? [status] : [])).toArray();
@@ -161,10 +163,11 @@ export class Pedidos extends DurableObject {
     this.ctx.storage.transactionSync(() => {
       this.sql.exec('DELETE FROM pedido_partes WHERE id = ?', id);
       for (let i = 0; i < n; i++) this.sql.exec('INSERT INTO pedido_partes (id, idx, dados) VALUES (?, ?, ?)', id, i, dados.slice(i * PEDACO, (i + 1) * PEDACO));
-      this.sql.exec(`INSERT OR REPLACE INTO pedidos (id, numero, data, nome, telefone, total, pecas, camisetas, status, miniatura, recebido, partes, alerta)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      this.sql.exec(`INSERT OR REPLACE INTO pedidos (id, numero, data, nome, telefone, total, pecas, camisetas, status, miniatura, recebido, partes, alerta, tipo)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         id, p.numero || 0, p.data || new Date().toISOString(), p.cliente?.nome || '', p.cliente?.telefone || '',
-        +p.total || 0, pecas, (p.itens || []).length, antigo?.status || 'novo', miniatura, antigo?.recebido || Date.now(), n, alerta);
+        +p.total || 0, pecas, (p.itens || []).length, antigo?.status || 'novo', miniatura, antigo?.recebido || Date.now(), n, alerta,
+        p.tipo === 'contato' ? 'contato' : 'pedido');
     });
     return json({ ok: true });
   }

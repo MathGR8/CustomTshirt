@@ -38,7 +38,7 @@ button:disabled { cursor: default; opacity: .4; }
 .ic { flex-shrink: 0; width: var(--t, 1.5rem); height: var(--t, 1.5rem); }
 
 /* ---------- Estrutura ---------- */
-#app { height: 100%; height: 100dvh; width: 100%; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--topo) minmax(0, 1fr) var(--rodape); }
+#app { position: fixed; top: 0; left: 0; height: 100%; height: var(--altura, 100dvh); width: 100%; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--topo) minmax(0, 1fr) var(--rodape); }
 #app[data-tela="inicio"] { grid-template-rows: 0 minmax(0, 1fr) 0; }
 #app[data-tela="inicio"] .topo, #app[data-tela="inicio"] .rodape, #app[data-tela="pronto"] .rodape { display: none; }
 #app[data-tela="pronto"] { grid-template-rows: var(--topo) minmax(0, 1fr) 0; }
@@ -121,13 +121,17 @@ button:disabled { cursor: default; opacity: .4; }
 
 /* ---------- Duas colunas (palco + painel) ---------- */
 /* Camiseta grande; menu estreito ao lado */
-.duasColunas { display: grid; grid-template-columns: minmax(0, 1fr) clamp(18.75rem, 29vw, 23.75rem); gap: 1rem; padding: 0.875rem 1rem; min-height: 100%; }
+.duasColunas { display: grid; grid-template-columns: minmax(0, 1fr) clamp(18.75rem, 29vw, 23.75rem); grid-template-rows: minmax(0, 1fr); gap: 1rem; padding: 0.875rem 1rem; height: 100%; }
 .palco { position: relative; background: var(--palco); border-radius: var(--raio-g); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; min-height: 0; }
-.duasColunas .palco { position: sticky; top: 0; height: calc(100dvh - var(--topo) - var(--rodape) - 1.75rem); padding: 0.5rem; }
+.duasColunas .palco { position: relative; height: 100%; min-height: 0; padding: 0.5rem; }
+.duasColunas > .painel { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .palcoArea { flex: 1; width: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; }
 .palcoSvg { width: 100%; height: 100%; max-height: 100%; display: block; overflow: visible; }
 .palcoSvg image { cursor: grab; }
 .areaImp { fill: none; stroke: rgba(120,120,120,.85); stroke-width: 3; stroke-dasharray: 14 10; }
+.areaImp.fora { stroke: #e08a00; }
+.avisoArea { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8125rem; line-height: 1.3; background: #fff4e0; color: #6b4300; border-radius: 0.75rem; padding: 0.5rem 0.75rem; margin: 0.25rem 0; }
+.avisoArea .btnTexto { font-size: 0.8125rem; font-weight: 800; color: #6b4300; }
 .areaRotulo { font: 600 1.5rem system-ui, sans-serif; text-anchor: middle; fill: #6b6b6b; }
 .selecao { fill: none; stroke: #ffffff; stroke-width: 4; stroke-dasharray: 16 10; filter: drop-shadow(0 0 2px rgba(0,0,0,.9)); pointer-events: none; animation: formigas 1s linear infinite; }
 @keyframes formigas { to { stroke-dashoffset: -26; } }
@@ -204,7 +208,7 @@ button:disabled { cursor: default; opacity: .4; }
 .vazioPainel { padding: 1.875rem 0.625rem; }
 
 /* Ver arte (janela grande) */
-.janelaArte { width: min(68.75rem, 94vw); height: min(47.5rem, 90dvh); }
+.janelaArte { width: min(68.75rem, 94vw); height: min(47.5rem, calc(var(--altura, 100dvh) * 0.9)); }
 .janelaArte .janelaTopo { position: absolute; right: 0.5rem; top: 0.5rem; z-index: 2; border: 0; padding: 0; background: transparent; }
 .janelaArte .janelaCorpo { height: 100%; padding: 0; overflow: hidden; }
 .verArte { display: grid; grid-template-columns: 1.35fr 1fr; height: 100%; }
@@ -286,7 +290,7 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 @keyframes aparecer { from { transform: scale(.3); opacity: 0; } }
 
 /* ---------- Janelas ---------- */
-.janela { margin: auto; border: 0; border-radius: var(--raio-g); padding: 0; background: var(--branco); color: var(--preto); box-shadow: var(--sombra-forte); max-width: 94vw; max-height: 92dvh; display: flex; flex-direction: column; overflow: hidden; animation: subir .22s ease-out; position: relative; }
+.janela { margin: auto; border: 0; border-radius: var(--raio-g); padding: 0; background: var(--branco); color: var(--preto); box-shadow: var(--sombra-forte); max-width: 94vw; max-height: calc(var(--altura, 100dvh) * 0.92); display: flex; flex-direction: column; overflow: hidden; animation: subir .22s ease-out; position: relative; }
 .janela:not([open]) { display: none; }
 .janela::backdrop { background: rgba(0,0,0,.55); }
 .janela.saindo { animation: descer .16s ease-in forwards; }
@@ -350,7 +354,7 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 .coachPontos i.ativo { background: var(--preto); width: 1.5rem; border-radius: 0.375rem; }
 
 /* ---------- Administrador ---------- */
-.janelaAdmin { width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh; border-radius: 0; }
+.janelaAdmin { width: 100vw; height: var(--altura, 100dvh); max-width: 100vw; max-height: var(--altura, 100dvh); border-radius: 0; }
 .janelaAdmin .janelaCorpo { padding: 0; gap: 0; background: var(--fundo); flex: 1; }
 .abas { display: flex; gap: 0.375rem; padding: 0.625rem 1.125rem; background: var(--branco); border-bottom: 1px solid var(--linha); position: sticky; top: 0; z-index: 2; overflow-x: auto; }
 .abas button { display: flex; align-items: center; gap: 0.5rem; min-height: 3.25rem; padding: 0 1.125rem; border-radius: 0.875rem; font-weight: 700; color: var(--cinza-escuro); flex-shrink: 0; }
@@ -398,15 +402,15 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 
 /* ---------- Tablet em pé (retrato) e telas menores ---------- */
 @media (max-aspect-ratio: 1/1) {
-  .duasColunas { grid-template-columns: 1fr; gap: 1rem; }
-  /* A camiseta fica fixa no alto enquanto as opções rolam embaixo */
+  .duasColunas { grid-template-columns: 1fr; grid-template-rows: minmax(0, 46%) minmax(0, 1fr); gap: 0.75rem; }
+  /* A camiseta fica no alto e as opções embaixo, cada uma na sua parte da tela */
   .duasColunas { padding-top: 0; }
-  .duasColunas .palco { position: sticky; top: 0; z-index: 4; height: 44dvh; border-radius: 0 0 var(--raio-g) var(--raio-g); margin: 0 -16px; box-shadow: 0 0.5rem 1.125rem rgba(0,0,0,.08); }
+  .duasColunas .palco { z-index: 4; height: 100%; border-radius: 0 0 var(--raio-g) var(--raio-g); margin: 0 -16px; box-shadow: 0 0.5rem 1.125rem rgba(0,0,0,.08); }
   .inicio { grid-template-columns: 1fr; grid-template-rows: 42% 1fr; }
   .inicioVitrine { order: -1; }
   .inicioTexto { padding: 1.875rem 2.25rem; gap: 1.25rem; justify-content: flex-start; }
   .verArte { grid-template-columns: 1fr; grid-template-rows: 1.2fr auto; }
-  .janelaArte { height: 92dvh; }
+  .janelaArte { height: calc(var(--altura, 100dvh) * 0.92); }
   .verInfo { padding: 1.125rem 1.375rem; gap: 0.75rem; }
   .itemPedido { grid-template-columns: 1fr; }
   .itemImagens figure { flex: 0 1 13.75rem; width: auto; }
@@ -531,7 +535,8 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 @keyframes girar { to { transform: rotate(360deg); } }
 
 @media (max-aspect-ratio: 1/1) {
-  .duasColunas .palco { height: 52dvh; }
+  .duasColunas { grid-template-rows: minmax(0, 52%) minmax(0, 1fr); }
+  .duasColunas .palco { height: 100%; }
   .envio { grid-template-columns: 1fr; }
   .caixaEnvio { min-height: 13.75rem; }
 }
@@ -585,7 +590,7 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 .corGrande { width: 3.375rem; height: 3.375rem; }
 
 /* Janela "Colocar uma imagem" */
-.janelaImagem { width: min(68.75rem, 96vw); height: min(51.25rem, 92dvh); }
+.janelaImagem { width: min(68.75rem, 96vw); height: min(51.25rem, calc(var(--altura, 100dvh) * 0.92)); }
 .janelaImagem .janelaCorpo { flex: 1; padding: 0.875rem 0 0; gap: 0.5rem; }
 .janelaImagem .segmentoFontes { align-self: center; }
 .janelaImagem .envio, .janelaImagem .buscaWeb { padding-top: 0.375rem; }
@@ -606,11 +611,11 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 .medidaTamanho:empty { display: none; }
 
 /* Tabela de medidas */
-.janelaMedidas { width: min(61.25rem, 96vw); max-height: 92dvh; }
+.janelaMedidas { width: min(61.25rem, 96vw); max-height: calc(var(--altura, 100dvh) * 0.92); }
 .janelaMedidas .abasMedidas { align-self: center; box-shadow: none; background: var(--fundo); }
 .medidasCorpo { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 1.375rem; align-items: start; }
 .desenhoMedidas { background: var(--palco); border-radius: var(--raio-g); padding: 1rem; display: flex; flex-direction: column; gap: 0.625rem; }
-.desenhoMedidas svg { width: 100%; height: auto; max-height: 52dvh; }
+.desenhoMedidas svg { width: 100%; height: auto; max-height: calc(var(--altura, 100dvh) * 0.52); }
 .desenhoMedidas figcaption { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.5rem 1rem; font-weight: 700; font-size: 0.9375rem; }
 .desenhoMedidas figcaption b, .tabelaMedidas th b { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--preto); color: var(--branco); font-size: 0.8125rem; margin-right: 0.25rem; }
 .seta line { stroke: var(--preto); stroke-width: 6; }
@@ -630,7 +635,7 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 .tabelaMedidas tr.destaque small { color: #bbb; }
 
 /* Editor de texto */
-.janelaTexto { width: min(62.5rem, 96vw); max-height: 94dvh; }
+.janelaTexto { width: min(62.5rem, 96vw); max-height: calc(var(--altura, 100dvh) * 0.94); }
 .editorTexto { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 1.25rem; align-items: start; }
 .textoPrevia { position: sticky; top: 0; background: var(--fundo); border-radius: var(--raio-g); padding: 0.875rem; }
 .previaTexto { background: var(--fundo); min-height: 13.75rem; border-radius: var(--raio); display: grid; place-items: center; padding: 1.25rem; text-align: center; white-space: pre-line; overflow-wrap: anywhere; font-size: clamp(1.875rem, 4.6vw, 3.375rem); line-height: 1.15; }
@@ -678,7 +683,7 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
   .cartoesCaminho { grid-template-columns: 1fr; }
   .caminhoAmostras, .caminhoIcones { height: 8.75rem; }
   .medidasCorpo { grid-template-columns: 1fr; }
-  .desenhoMedidas svg { max-height: 30dvh; }
+  .desenhoMedidas svg { max-height: calc(var(--altura, 100dvh) * 0.3); }
   .editorTexto { grid-template-columns: 1fr; }
   .textoPrevia { position: static; }
   .previaTexto { min-height: 8.75rem; }
@@ -742,7 +747,7 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
    Pedido em tela cheia
    ========================================================= */
 .pedidoMini { padding: 0; border-radius: 0.625rem; }
-.janelaPedido { width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh; border-radius: 0; }
+.janelaPedido { width: 100vw; height: var(--altura, 100dvh); max-width: 100vw; max-height: var(--altura, 100dvh); border-radius: 0; }
 .janelaPedido .janelaCorpo { flex: 1; background: var(--fundo); padding: 1rem; }
 .pedidoDetalhe { display: flex; flex-direction: column; gap: 1rem; max-width: 87.5rem; width: 100%; margin: 0 auto; }
 .pedidoCab { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; background: var(--preto); color: var(--branco); border-radius: var(--raio-g); padding: 1.125rem 1.375rem; }
@@ -781,7 +786,7 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 .semArte { color: var(--cinza-escuro); }
 
 /* Visualizador (tela cheia) */
-.janelaZoom { width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh; border-radius: 0; background: #0d0d0d; color: var(--branco); }
+.janelaZoom { width: 100vw; height: var(--altura, 100dvh); max-width: 100vw; max-height: var(--altura, 100dvh); border-radius: 0; background: #0d0d0d; color: var(--branco); }
 .janelaZoom .janelaTopo { position: absolute; right: 0.625rem; top: 0.625rem; z-index: 3; border: 0; padding: 0; background: transparent; }
 .janelaZoom .janelaTopo .btnIcone { background: #262626; color: var(--branco); width: 3.5rem; height: 3.5rem; }
 .janelaZoom .janelaCorpo { height: 100%; padding: 0; gap: 0; position: relative; overflow: hidden; }
@@ -891,7 +896,7 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 .tabelaMedidas thead th { padding: 0.5rem; }
 .tabelaMedidas tbody th { font-size: 1.0625rem; }
 .desenhoMedidas { padding: 0.75rem; }
-.desenhoMedidas svg { max-height: 44dvh; }
+.desenhoMedidas svg { max-height: calc(var(--altura, 100dvh) * 0.44); }
 .tabelasMedidas { gap: 0.75rem; }
 
 /* Editor de texto */
@@ -941,7 +946,7 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 @media (max-aspect-ratio: 1/1) {
   .segPeq button { flex-direction: column; gap: 0; line-height: 1.15; font-size: 0.8125rem; padding: 0.25rem; }
   .medidasCorpo { grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 0.75rem; }
-  .desenhoMedidas svg { max-height: 40dvh; }
+  .desenhoMedidas svg { max-height: calc(var(--altura, 100dvh) * 0.4); }
   .itemPedido { grid-template-columns: auto 1fr; }
   .itemImagens { flex-direction: column; }
   .itemImagens figure { width: 7.5rem; flex: none; }
@@ -949,7 +954,7 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 }
 .janelaImagem .envio { padding-bottom: 1rem; }
 .revisar { padding-top: 0.75rem; padding-bottom: 0.5rem; }
-@media (max-aspect-ratio: 1/1) { .janelaImagem { height: auto; max-height: 92dvh; } }
+@media (max-aspect-ratio: 1/1) { .janelaImagem { height: auto; max-height: calc(var(--altura, 100dvh) * 0.92); } }
 
 /* Botão "Pronto" que fecha o teclado (fica logo acima do teclado) */
 .btnTeclado { position: fixed; z-index: 2000; display: flex; align-items: center; gap: 0.5rem; min-height: 3.25rem; padding: 0 1.25rem; border-radius: 1rem; background: var(--preto); color: var(--branco); font-weight: 800; font-size: 1.0625rem; box-shadow: var(--sombra-forte); }
@@ -961,12 +966,12 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 .paginaPainel { min-height: 100%; height: auto; }
 html:has(body.paginaPainel) { font-size: 16px; }
 .paginaPainel { overflow: auto; }
-.painelEntrar { min-height: 100dvh; display: grid; place-items: center; padding: 1.5rem; background: var(--preto); }
+.painelEntrar { min-height: var(--altura, 100dvh); display: grid; place-items: center; padding: 1.5rem; background: var(--preto); }
 .caixaEntrar { width: min(26rem, 100%); background: var(--branco); border-radius: var(--raio-g); padding: 2rem; display: flex; flex-direction: column; gap: 1rem; box-shadow: var(--sombra-forte); }
 .caixaEntrar h1 { font-size: 1.75rem; }
 .marcaIcone.grande { width: 4rem; height: 4rem; border-radius: 1.125rem; background: var(--preto); color: var(--branco); display: grid; place-items: center; }
 .campoPeq input[type="password"] { border: 2px solid var(--linha); border-radius: 0.875rem; min-height: 3.375rem; padding: 0 0.875rem; font-size: 1.125rem; }
-.painel { min-height: 100dvh; display: flex; flex-direction: column; }
+.painel { min-height: var(--altura, 100dvh); display: flex; flex-direction: column; }
 .painelTopo { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; padding: 0.75rem 1.25rem; background: var(--preto); color: var(--branco); }
 .painelMarca { display: flex; align-items: center; gap: 0.625rem; font-size: 1.25rem; margin-right: auto; }
 .painelTopo .busca { flex: 0 1 20rem; color: var(--cinza-escuro); min-height: 3rem; }
@@ -1017,3 +1022,68 @@ html:has(body.paginaPainel) { font-size: 16px; }
 .virarPronta { width: 100%; }
 /* "Acesso da equipe" só no computador (no tablet: 5 toques no nome da loja) */
 @media (pointer: coarse) { .acessoEquipe { display: none; } }
+
+/* ---------- Zoom na camiseta (personalizar) ---------- */
+.zoomPalco { position: absolute; right: 1rem; top: 1rem; z-index: 3; display: flex; align-items: center; gap: 0.25rem; background: var(--branco); border-radius: 1.5rem; padding: 0.25rem; box-shadow: var(--sombra); }
+.zoomPalco button { width: 2.75rem; height: 2.75rem; border-radius: 50%; display: grid; place-items: center; }
+.zoomPalco button:active { background: var(--fundo); }
+.zoomPalco .zoomValor { width: auto; min-width: 3.5rem; border-radius: 1rem; font-weight: 800; font-size: 0.875rem; padding: 0 0.375rem; }
+.palcoArea.comZoom { cursor: grab; }
+
+/* ---------- Galeria: grade / tela cheia ---------- */
+.galeriaTopo { display: flex; gap: 0.75rem; align-items: center; }
+.galeriaTopo .busca { flex: 1; }
+.segVista button { white-space: nowrap; }
+.janelaArte.telaCheia { width: 100vw; height: var(--altura, 100dvh); max-width: 100vw; max-height: var(--altura, 100dvh); border-radius: 0; }
+.telaCheia .verArte { grid-template-columns: minmax(0, 1fr) 22rem; }
+.telaCheia .verPalco { padding: 0.75rem 5.5rem; }
+.telaCheia .verInfo { padding: 1.5rem; }
+.verPalcoBox { position: relative; min-height: 0; display: flex; }
+.verPalcoBox .verPalco { flex: 1; min-width: 0; }
+.setaCheia { position: absolute; top: 50%; transform: translateY(-50%); width: 4.25rem; height: 4.25rem; border-radius: 50%; background: rgba(255,255,255,.92); box-shadow: var(--sombra); display: grid; place-items: center; z-index: 2; }
+.setaCheia.esq { left: 1rem; }
+.setaCheia.dir { right: 1rem; }
+.dicaSwipe { position: absolute; bottom: 0.75rem; left: 50%; transform: translateX(-50%); font-size: 0.875rem; color: var(--cinza-escuro); background: rgba(255,255,255,.85); padding: 0.25rem 0.75rem; border-radius: 1rem; display: flex; align-items: center; gap: 0.375rem; pointer-events: none; }
+.verPalco.entra { animation: entraArte .28s ease-out; }
+@keyframes entraArte { from { opacity: .15; transform: translateX(var(--de, 3rem)); } to { opacity: 1; transform: none; } }
+@media (max-aspect-ratio: 1/1) {
+  .telaCheia .verArte { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  .telaCheia .verPalco { padding: 0.75rem 1rem; }
+  .setaCheia { width: 3.25rem; height: 3.25rem; }
+}
+
+/* ---------- Arte própria desligada / contato ---------- */
+.semArtePropria, .comoFunciona { display: flex; flex-direction: column; gap: 1rem; }
+.semArteAviso { display: flex; gap: 0.875rem; align-items: center; background: var(--fundo); border-radius: var(--raio); padding: 1rem 1.25rem; }
+.semArteAviso small { display: block; color: var(--cinza-escuro); margin-top: 0.25rem; }
+.opcoesSemArte { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+.opcaoSemArte { display: flex; flex-direction: column; align-items: flex-start; gap: 0.375rem; text-align: left; padding: 1.125rem; border: 2px solid var(--linha); border-radius: var(--raio); background: var(--branco); }
+.opcaoSemArte b { font-size: 1.0625rem; }
+.opcaoSemArte small { color: var(--cinza-escuro); }
+.opcaoSemArte:active { border-color: var(--preto); }
+.zapResp { display: flex; gap: 1.25rem; align-items: center; background: var(--fundo); border-radius: var(--raio); padding: 1rem 1.25rem; }
+.zapResp .qr { width: 9rem; height: 9rem; flex-shrink: 0; background: #fff; border-radius: 0.5rem; display: grid; place-items: center; }
+.zapResp .qr svg { width: 100%; height: 100%; }
+.zapResp b { display: block; font-size: 1.5rem; margin: 0.125rem 0; }
+.zapResp small { color: var(--cinza-escuro); }
+.deixarContato { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; border-top: 1px solid var(--linha); padding-top: 1rem; }
+.deixarContato h4, .deixarContato .campoPeq.largo, .deixarContato .linhaBotoes { grid-column: 1 / -1; }
+.contatoEnviado { text-align: center; padding: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; align-items: center; }
+.pedidoAdmin.contatoAdmin { border-left: 0.375rem solid #25d366; }
+.cartaoPedido.contatoCartao { border-left: 0.375rem solid #25d366; }
+.obsContato { white-space: pre-wrap; background: var(--fundo); border-radius: var(--raio); padding: 0.875rem 1rem; }
+@media (max-aspect-ratio: 1/1) { .opcoesSemArte { grid-template-columns: 1fr; } .deixarContato { grid-template-columns: 1fr; } }
+
+/* ---------- Descanso de tela ---------- */
+.descanso { position: fixed; inset: 0; width: 100vw; height: var(--altura, 100dvh); max-width: none; max-height: none; margin: 0; border: 0; padding: 0;
+  background: rgba(0, 0, 0, .85); z-index: 3000; display: grid; place-items: center; opacity: 0; transition: opacity 1.2s ease; color: #fff; }
+.descanso.ativo { opacity: 1; }
+.descansoTexto { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; opacity: .55; animation: respirar 4s ease-in-out infinite; text-align: center; }
+.descansoTexto strong { font-size: 2.5rem; font-weight: 900; letter-spacing: 0.02em; }
+.descansoTexto span { display: flex; align-items: center; gap: 0.5rem; font-size: 1.125rem; }
+@keyframes respirar { 50% { opacity: .25; } }
+.janelaImagem #contImagem { min-height: 0; overflow-y: auto; }
+.semArtePropria, .comoFunciona, .contatoEnviado { padding: 0.5rem 1.5rem 1.25rem; }
+.comoFunciona > .btnTexto { align-self: flex-start; }
+.campoPeq textarea { border: 2px solid var(--linha); border-radius: 0.875rem; padding: 0.625rem 0.875rem; font-size: 1.0625rem; width: 100%; resize: none; outline: 0; background: var(--branco); }
+.campoPeq textarea:focus { border-color: var(--preto); }

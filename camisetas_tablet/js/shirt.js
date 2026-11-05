@@ -40,6 +40,28 @@ CORTES.infantil = CORTES.tradicional; // mesma forma; a área (30 cm) é que mud
 
 export const modelo = id => MODELOS.find(m => m.id === id) || MODELOS[0];
 
+/** Retângulo da camiseta inteira (com as mangas), em unidades do desenho. */
+export function limiteCamiseta(modeloId) {
+  const f = CORTES[modelo(modeloId).corte] || CORTES.tradicional;
+  if (!f.limite) {
+    const n = f.corpo.match(/-?\d+(\.\d+)?/g).map(Number);
+    const xs = n.filter((_, i) => i % 2 === 0), ys = n.filter((_, i) => i % 2 === 1);
+    f.limite = { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+  }
+  return f.limite;
+}
+
+let ctxTeste = null;
+/** O ponto (unidades do desenho) está em cima da camiseta? */
+export function dentroDaCamiseta(modeloId, x, y) {
+  const f = CORTES[modelo(modeloId).corte] || CORTES.tradicional;
+  try {
+    ctxTeste ||= document.createElement('canvas').getContext('2d');
+    f.caminho ||= new Path2D(f.corpo);
+    return ctxTeste.isPointInPath(f.caminho, x, y);
+  } catch { return true; }
+}
+
 /**
  * Área de impressão no desenho (unidades do viewBox) e escala.
  * @returns {{x, y, w, h, upc: number, cm: {w, h}}} upc = unidades por cm
