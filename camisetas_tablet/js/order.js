@@ -126,7 +126,7 @@ export function textoResumo(pedido, loja, comPrecos = true) {
     linhas.push('', `*${i + 1}) ${modelo(it.modelo).nome} · ${it.malha} · ${cor}${it.modo === 'pronta' ? ' · camiseta pronta' : ''}*`, `Tamanhos: ${tam}`);
     it.artes.forEach(a => linhas.push(a.tipo === 'texto'
       ? `• ${a.lado}: texto "${a.texto.replace(/\n/g, ' / ')}" (${a.medidas}) — ${a.descricao}`
-      : `• ${a.lado}: ${a.nome} (${a.medidas})${a.origem === 'cliente' ? ' — arte do cliente' : a.origem === 'internet' ? ' — imagem da internet' : ''}${a.qualidade ? ` · qualidade ${a.qualidade}` : ''}`));
+      : `• ${a.lado}: ${a.nome}${a.codigo ? ` [${a.codigo}]` : ''} (${a.medidas})${a.origem === 'cliente' ? ' — arte do cliente' : a.origem === 'internet' ? ' — imagem da internet' : ''}${a.qualidade ? ` · qualidade ${a.qualidade}` : ''}`));
   });
   const total = pedido.itens.reduce((s, it) => s + totalPecas(it), 0);
   linhas.push('', `Total: ${total} peça${total === 1 ? '' : 's'}${comPrecos && pedido.total ? ` · *${dinheiro(pedido.total)}*` : ''}`);
@@ -189,7 +189,7 @@ export async function pdfPedido(pedido, loja) {
         a.tipo === 'texto' ? `TEXTO: "${a.texto}"\n${a.descricao}`
           : a.origem === 'cliente' ? `${a.nome}\nARTE DO CLIENTE: ${a.arquivo}${a.qualidade ? '\nQualidade: ' + a.qualidade : ''}`
           : a.origem === 'internet' ? `${a.nome}\nIMAGEM DA INTERNET${a.qualidade ? ' · ' + a.qualidade : ''}\n${a.credito || ''}`
-          : `${a.nome}\n${a.tema} · ${a.arquivo}${a.pagina > 1 ? ' (pág. ' + a.pagina + ')' : ''}`,
+          : `${a.nome}${a.codigo ? '  ·  Cód. ' + a.codigo : ''}\n${a.tema}${a.grupo ? ' › ' + a.grupo : ''} · ${a.arquivo}${a.pagina > 1 ? ' (pág. ' + a.pagina + ')' : ''}`,
         a.lado, a.medidas.replace(' · ', '\n')])
                             : [['Camiseta lisa (sem arte)', '—', '—']],
       styles: { fontSize: 8, cellPadding: 1.8 }, headStyles: { fillColor: [30, 30, 30] },

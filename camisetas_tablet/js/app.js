@@ -48,7 +48,7 @@ const S = {
   itens: [novoItem()], atual: 0,
   lado: 'Frente', sel: null,
   desfazer: [],
-  catalogo: [], todasArtes: [], tema: 'Todas', busca: '',
+  catalogo: [], todasArtes: [], tema: 'Todas', grupo: 'Todos', busca: '',
   fonte: 'enviar',                      // imagem do cliente: enviar | buscar
   janelaImagem: null,
   artesCliente: new Set(),              // artes enviadas/baixadas nesta sessão (apagadas ao recomeçar)
@@ -169,7 +169,7 @@ function recomecar() {
   limparArtesCliente();
   S.fonte = 'enviar'; S.janelaImagem = null; S.web = { termo: '', vetor: false, resultados: [], total: 0, pagina: 1, erro: '' };
   S.itens = [novoItem()]; S.atual = 0; S.lado = 'Frente'; S.sel = null; S.desfazer = [];
-  S.tema = 'Todas'; S.busca = ''; S.coachVisto = false; S.editando = false; S.ultimoPedido = null; S.cliente = null;
+  S.tema = 'Todas'; S.grupo = 'Todos'; S.busca = ''; S.coachVisto = false; S.editando = false; S.ultimoPedido = null; S.cliente = null;
   $$('dialog[open]').forEach(d => d.remove());
   irPara('inicio');
 }
@@ -214,6 +214,7 @@ async function criarArte(resumo, lado) {
   const url = await urlDa(resumo.id, 'previa');
   const it = item(), area = areaImpressao(it.modelo, lado);
   const a = { uid: 'a' + (++uidSeq), artId: resumo.id, nome: resumo.nome, tema: resumo.tema, arquivo: resumo.arquivo,
+              ...(resumo.codigo ? { codigo: resumo.codigo } : {}), ...(resumo.grupo ? { grupo: resumo.grupo } : {}),
               pagina: resumo.pagina, w: resumo.w, h: resumo.h, url, lado, cm: 0, fx: 0.5, fy: 0.5,
               origem: resumo.origem || 'catalogo', vetor: !!resumo.vetor, pdfComImagem: !!resumo.pdfComImagem,
               pxW: resumo.pxW, pxH: resumo.pxH, fonte: resumo.fonte || null };
@@ -379,6 +380,7 @@ async function arteFixa(resumo, modeloId, ladoForcado) {
   const url = await urlDa(resumo.id, 'previa');
   const m = modelo(modeloId), area = areaImpressao(modeloId, lado);
   const a = { uid: 'a' + (++uidSeq), artId: resumo.id, nome: resumo.nome, tema: resumo.tema, arquivo: resumo.arquivo,
+              ...(resumo.codigo ? { codigo: resumo.codigo } : {}), ...(resumo.grupo ? { grupo: resumo.grupo } : {}),
               pagina: resumo.pagina, w: resumo.w, h: resumo.h, url, lado, origem: 'catalogo', fixa: true, cm: 0, fx: 0.5, fy: 0.5 };
   // Tamanho definido para a masculina (38 cm de largura máxima); nos outros modelos, proporcional
   a.cm = Math.min(maxCm(modeloId, a), cfg.cm * m.area.w / 38);
@@ -496,7 +498,14 @@ TELAS.estampa = () => {
 
 function artesFiltradas() {
   const b = S.busca.trim().toLowerCase();
-  return S.catalogo.filter(a => (S.tema === 'Todas' || a.tema === S.tema) && (!b || (a.nome + ' ' + a.tema).toLowerCase().includes(b)));
+  return S.catalogo.filter(a => (S.tema === 'Todas' || a.tema === S.tema) && (S.tema === 'Todas' || S.grupo === 'Todos' || (a.grupo || '') === S.grupo)
+    && (!b || `${a.nome} ${a.tema} ${a.grupo || ''} ${a.codigo || ''}`.toLowerCase().includes(b)));
+}
+
+/** Subcategorias de um tema (ex.: bandas dentro de Rock), "Diversos" por último. */
+function gruposDoTema(tema) {
+  const g = [...new Set(S.catalogo.filter(a => a.tema === tema && a.grupo).map(a => a.grupo))];
+  return g.sort((a, b) => (a === 'Diversos') - (b === 'Diversos') || a.localeCompare(b, 'pt-BR'));
 }
 
 let observador = null;
@@ -533,8 +542,24 @@ function galeriaProntas() {
         <button type="button" class="tema" data-tema="Todas" aria-pressed="${S.tema === 'Todas'}">Todas <small>${S.catalogo.length}</small></button>
         ${temas.map(t => `<button type="button" class="tema" data-tema="${esc(t)}" aria-pressed="${S.tema === t}">${esc(t)} <small>${cont(t)}</small></button>`).join('')}
       </div>
+      <div class="temas subtemas" id="subtemas" role="tablist" hidden></div>
       <div class="grade" id="grade"></div>
     </section>`;
+  // Subcategorias do tema escolhido (ex.: Rock → bandas)
+  const pintarSub = () => {
+    const el = $('#subtemas'), grupos = S.tema === 'Todas' ? [] : gruposDoTema(S.tema);
+    el.hidden = !grupos.length;
+    if (!grupos.length) { S.grupo = 'Todos'; el.innerHTML = ''; return; }
+    if (S.grupo !== 'Todos' && !grupos.includes(S.grupo)) S.grupo = 'Todos';
+    const n = g => S.catalogo.filter(a => a.tema === S.tema && a.grupo === g).length;
+    el.innerHTML = `<button type="button" class="tema sub" data-grupo="Todos" aria-pressed="${S.grupo === 'Todos'}">Todas de ${esc(S.tema)}</button>`
+      + grupos.map(g => `<button type="button" class="tema sub" data-grupo="${esc(g)}" aria-pressed="${S.grupo === g}">${esc(g)} <small>${n(g)}</small></button>`).join('');
+    $$('#subtemas [data-grupo]').forEach(b => (b.onclick = () => {
+      S.grupo = b.dataset.grupo;
+      $$('#subtemas [data-grupo]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      pintarGrade();
+    }));
+  };
   const pintarGrade = () => {
     const lista = artesFiltradas();
     $('#grade').innerHTML = lista.length ? lista.map((a, i) => {
@@ -542,6 +567,7 @@ function galeriaProntas() {
       return `<button type="button" class="cartaoArte" data-i="${i}">
         <span class="cartaoImg" style="background-color:${CORES[cores[0]].hex}"><img data-id="${esc(a.id)}" alt=""></span>
         <span class="cartaoNome">${esc(a.nome)}</span>
+        ${a.codigo ? `<span class="cartaoCod">${esc(a.codigo)}</span>` : ''}
         ${comPreco() && precoDaPronta(a, it.modelo, cores[0]) ? `<span class="preco precoCartao">${dinheiro(Math.min(...cores.map(c => precoDaPronta(a, it.modelo, c)).filter(Boolean)))}</span>` : ''}
         <span class="bolinhasCor">${cores.slice(0, 7).map(c => `<i style="--c:${CORES[c].hex}" title="${esc(CORES[c].nome || c)}"></i>`).join('')}</span>
         ${it.pronta === a.id ? `<span class="selo">${icone('check', 14)} Escolhida</span>` : ''}
@@ -552,12 +578,14 @@ function galeriaProntas() {
     carregarMiniaturas($('#grade'));
     $$('#grade [data-i]').forEach(b => (b.onclick = () => verPronta(lista, +b.dataset.i)));
   };
+  pintarSub();
   pintarGrade();
   let tBusca;
   $('#busca').oninput = e => { clearTimeout(tBusca); tBusca = setTimeout(() => { S.busca = e.target.value; pintarGrade(); }, 180); };
   $$('#temas [data-tema]').forEach(b => (b.onclick = () => {
-    S.tema = b.dataset.tema;
+    S.tema = b.dataset.tema; S.grupo = 'Todos';
     $$('#temas [data-tema]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    pintarSub();
     pintarGrade();
   }));
   $('#irCriar').onclick = async () => {
@@ -613,7 +641,7 @@ async function verPronta(lista, i) {
   const carregar = async () => {
     const r = lista[atual];
     $('#verNome', j.el).textContent = r.nome;
-    $('#verTema', j.el).textContent = r.tema;
+    $('#verTema', j.el).textContent = [r.tema, r.grupo, r.codigo && `Cód. ${r.codigo}`].filter(Boolean).join(' · ');
     $('#verPos', j.el).textContent = `${atual + 1} de ${lista.length}`;
     artes = await montarPronta(r, it.modelo);
     const cores = coresDaPronta(r, it.modelo);
@@ -1417,7 +1445,9 @@ async function recarregarCatalogo() {
   const lista = await DB.artesResumo();
   S.todasArtes = lista.filter(a => !a.cliente);
   const costas = new Set(S.todasArtes.map(a => a.fixo?.costas).filter(Boolean));
-  S.catalogo = lista.filter(a => !a.oculto && !a.cliente && !costas.has(a.id)).sort((a, b) => a.tema.localeCompare(b.tema, 'pt-BR') || (a.ordem ?? 0) - (b.ordem ?? 0));
+  S.catalogo = lista.filter(a => !a.oculto && !a.cliente && !costas.has(a.id)).sort((a, b) => a.tema.localeCompare(b.tema, 'pt-BR')
+    || ((a.grupo || '') === 'Diversos') - ((b.grupo || '') === 'Diversos') || (a.grupo || '').localeCompare(b.grupo || '', 'pt-BR')
+    || (a.ordem ?? 0) - (b.ordem ?? 0));
 }
 
 function aplicarConfig(cfg) {

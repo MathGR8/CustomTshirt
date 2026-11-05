@@ -100,7 +100,8 @@ ABAS.artes = async el => {
       </div>
       ${selecao ? `<div class="dicaSelecao">${icone('mao', 18)} Toque nas artes para marcar. <button type="button" class="btnTexto" id="selTodas">Marcar todas</button> <button type="button" class="btnTexto" id="selNenhuma">Desmarcar</button></div>` : `<p class="dicaPequena dicaSegurar">Dica: segure o dedo numa arte para selecionar várias.</p>`}
       ${temas.length ? temas.map(t => {
-        const doTema = lista.filter(a => a.tema === t).sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+        const doTema = lista.filter(a => a.tema === t).sort((a, b) => ((a.grupo || '') === 'Diversos') - ((b.grupo || '') === 'Diversos')
+          || (a.grupo || '').localeCompare(b.grupo || '', 'pt-BR') || (a.ordem ?? 0) - (b.ordem ?? 0));
         return `<details class="temaAdmin" open>
           <summary><strong>${esc(t)}</strong> <small>${doTema.length}</small>
             <span class="summaryAcoes">${selecao ? `<button type="button" class="btn btnClaro btnPeq" data-sel-tema="${esc(t)}">${icone('check', 18)} Marcar tema</button>` : ''}<button type="button" class="btnIcone" data-renomear-tema="${esc(t)}" aria-label="Renomear tema">${icone('editar', 20)}</button>
@@ -110,6 +111,7 @@ ABAS.artes = async el => {
               ${selecao ? `<span class="marcaSel">${icone('check', 18)}</span>` : ''}
               <span class="miniImg"><img data-id="${esc(a.id)}" alt="" decoding="async"></span>
               <span class="miniNome">${esc(a.nome)}</span>
+              ${a.codigo || a.grupo ? `<span class="miniCod">${esc([a.codigo, a.grupo].filter(Boolean).join(' · '))}</span>` : ''}
               ${a.baixaRes ? '<span class="seloAviso">baixa resolução</span>' : ''}
               ${a.oculto ? '<span class="seloAviso">oculta</span>' : ''}
               ${a.fixo ? '<span class="seloPronta" title="Camiseta pronta configurada">' + icone('estrela', 14) + '</span>' : ''}
@@ -278,10 +280,14 @@ async function acaoEmMassa(acao, lista, temas, depois) {
   } else if (acao === 'tema') {
     const novo = await perguntarTexto(`Mover ${n} arte${n > 1 ? 's' : ''} para o tema`, '', temas);
     if (!novo) return;
+    const todas = await DB.artesResumo();
+    const grupos = [...new Set(todas.filter(a => a.tema === novo && a.grupo).map(a => a.grupo))].sort();
+    // Subcategoria (ex.: banda): vazio = sem subcategoria; Cancelar = mantém a de cada arte
+    const grupo = await perguntarTexto(`Subcategoria dentro de "${novo}" (opcional; ex.: nome da banda)`, '', grupos);
     const artes = await pegar();
-    artes.forEach(a => (a.tema = novo));
+    artes.forEach(a => { a.tema = novo; if (grupo === '') delete a.grupo; else if (grupo) a.grupo = grupo; });
     await DB.salvarVarios('artes', artes);
-    aviso(`Movida${n > 1 ? 's' : ''} para "${novo}".`);
+    aviso(`Movida${n > 1 ? 's' : ''} para "${novo}${grupo ? ' › ' + grupo : ''}".`);
   } else if (acao === 'pronta') {
     const f = await prontaEmMassa(n);
     if (!f) return;
@@ -375,6 +381,11 @@ async function editarArte(id, temas, depois) {
         <label class="campoPeq"><span>Nome que o cliente vê</span><input id="eNome" value="${esc(a.nome)}"></label>
         <label class="campoPeq"><span>Tema</span><input id="eTema" list="eTemas" value="${esc(a.tema)}"></label>
         <datalist id="eTemas">${temas.map(t => `<option value="${esc(t)}">`).join('')}</datalist>
+        <div class="formLinha">
+          <label class="campoPeq"><span>Subcategoria <small>(ex.: banda, jogo ou filme)</small></span><input id="eGrupo" list="eGrupos" value="${esc(a.grupo || '')}" placeholder="—"></label>
+          <label class="campoPeq"><span>Código da estampa</span><input id="eCodigo" value="${esc(a.codigo || '')}" placeholder="Ex.: ROCK-12" autocapitalize="characters"></label>
+        </div>
+        <datalist id="eGrupos">${[...new Set(outras.filter(o => o.tema === a.tema && o.grupo).map(o => o.grupo))].sort().map(g => `<option value="${esc(g)}">`).join('')}</datalist>
         <label class="checkLinha"><input type="checkbox" id="eOculta" ${a.oculto ? 'checked' : ''}> Ocultar dos clientes</label>
         <p class="textoAjuda">Arquivo: ${esc(a.arquivo)}${a.pagina > 1 ? ` (página ${a.pagina})` : ''} · ${a.w}×${a.h} px${a.baixaRes ? ' · <b>prévia do Corel em baixa resolução</b> — exporte em PDF para melhorar' : ''}</p>
 
@@ -431,6 +442,9 @@ async function editarArte(id, temas, depois) {
     const f = ler();
     a.nome = $('#eNome', j.el).value.trim() || a.nome;
     a.tema = $('#eTema', j.el).value.trim() || a.tema;
+    const grupo = $('#eGrupo', j.el).value.trim(), codigo = $('#eCodigo', j.el).value.trim().toUpperCase();
+    if (grupo) a.grupo = grupo; else delete a.grupo;
+    if (codigo) a.codigo = codigo; else delete a.codigo;
     a.oculto = $('#eOculta', j.el).checked;
     a.fixo = { ...f, cores: f.cores.length ? f.cores : null };
     await DB.salvar('artes', a);
@@ -581,7 +595,7 @@ export async function verPedido(p, acoes = {}) {
   const nomeCor = it => CORES[it.cor]?.nome || it.cor;
   const descArte = a => a.tipo === 'texto'
     ? `<b>Texto:</b> “${esc(a.texto).replace(/\n/g, '<br>')}”<small>${esc(a.descricao || '')}</small>`
-    : `<b>${esc(a.nome)}</b><small>${a.origem === 'cliente' ? `Arte do cliente · ${esc(a.arquivo || '')}` : a.origem === 'internet' ? `Imagem da internet${a.credito ? ' · ' + esc(a.credito) : ''}` : `${esc(a.tema || '')} · ${esc(a.arquivo || '')}${a.pagina > 1 ? ` (pág. ${a.pagina})` : ''}`}</small>`;
+    : `<b>${esc(a.nome)}${a.codigo ? ` <span class="codPedido">${esc(a.codigo)}</span>` : ''}</b><small>${a.origem === 'cliente' ? `Arte do cliente · ${esc(a.arquivo || '')}` : a.origem === 'internet' ? `Imagem da internet${a.credito ? ' · ' + esc(a.credito) : ''}` : `${esc(a.tema || '')}${a.grupo ? ' › ' + esc(a.grupo) : ''} · ${esc(a.arquivo || '')}${a.pagina > 1 ? ` (pág. ${a.pagina})` : ''}`}</small>`;
   const j = janela({ titulo: `${icone('lista')} Pedido nº ${numeroPedido(p.numero)}`, classe: 'janelaPedido', html: `
     <div class="pedidoDetalhe">
       <header class="pedidoCab">
@@ -911,7 +925,7 @@ ABAS.ajuda = el => {
       <h3>${icone('upload', 22)} PDF de catálogo (código em cima da arte)</h3>
       <p>Com <b>PDF de catálogo</b> marcado, cada arte do PDF é separada pelo selo com o código (ex.: <i>COD: ROCK-1</i>), recebe o código como nome e vira camiseta pronta na cor do fundo da página. Precisa de internet para ler os códigos. <b>Apagar todas</b> (em Catálogo) limpa todas as artes do tablet.</p>
       <h3>${icone('check', 22)} Várias artes de uma vez</h3>
-      <p>Em <b>Artes</b>, toque em <b>Selecionar várias</b> (ou segure o dedo numa arte). Marque as artes ou um tema inteiro e escolha: <b>Camiseta pronta</b> (tamanho, posição, cores e preço para todas), <b>Mover para tema</b>, <b>Ocultar</b>, <b>Mostrar</b> ou <b>Apagar</b>.</p>
+      <p>Em <b>Artes</b>, toque em <b>Selecionar várias</b> (ou segure o dedo numa arte). Marque as artes ou um tema inteiro e escolha: <b>Camiseta pronta</b> (tamanho, posição, cores e preço para todas), <b>Mover para tema</b> (com subcategoria, ex.: a banda), <b>Ocultar</b>, <b>Mostrar</b> ou <b>Apagar</b>.</p>
       <h3>${icone('lista', 22)} Pedidos no computador da confecção</h3>
       <p>Cada pedido novo vai sozinho para a confecção. No computador, abra o mesmo endereço do app, clique em <b>Acesso da equipe</b> e digite a senha da confecção (a inicial é <b>${SENHA_INICIAL}</b>; troque em <b>Configurações</b>).</p>
       <h3>${icone('dinheiro', 22)} Preços</h3>
