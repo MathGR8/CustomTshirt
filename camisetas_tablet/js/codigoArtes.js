@@ -35,15 +35,20 @@ function tela(w, h) {
  * @returns {null | {k: number, a: {w,h,p}, selos: {x0,y0,x1,y1}[]}} coordenadas da imagem de análise
  */
 function acharSelos(pag) {
-  const k = Math.min(1, 900 / pag.width);
+  const k = Math.min(1, 1400 / pag.width);
   const w = Math.round(pag.width * k), h = Math.round(pag.height * k);
   const c = tela(w, h), x = c.getContext('2d', { willReadFrequently: true });
-  x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); // transparente conta como branco
+  // Cópia com a transparência real (para achar a arte) e outra com o transparente
+  // contando como branco (para achar os selos)
   x.drawImage(pag, 0, 0, w, h);
+  const pr = x.getImageData(0, 0, w, h).data;
+  x.globalCompositeOperation = 'destination-over';
+  x.fillStyle = '#fff'; x.fillRect(0, 0, w, h);
   const p = x.getImageData(0, 0, w, h).data, N = w * h;
-  // Selo = retângulo branco puro (desenho vetorial), com margem branca em volta do texto
+  // Selo = retângulo branco com margem branca em volta do texto. Pode ser desenho
+  // vetorial (branco puro) ou fazer parte da imagem JPG (branco com "chuviscos")
   const branco = new Uint8Array(N);
-  for (let i = 0; i < N; i++) if (p[i * 4] > 246 && p[i * 4 + 1] > 246 && p[i * 4 + 2] > 246) branco[i] = 1;
+  for (let i = 0; i < N; i++) if (p[i * 4] > 225 && p[i * 4 + 1] > 225 && p[i * 4 + 2] > 225) branco[i] = 1;
   let nb = 0; for (let i = 0; i < N; i++) nb += branco[i];
   if (nb > N * 0.5) return null; // página quase toda branca: não é este formato
   const b = (x, y) => branco[y * w + x] === 1;
@@ -53,42 +58,58 @@ function acharSelos(pag) {
     const l = [];
     for (let x = 0; x < w;) {
       if (!b(x, y)) { x++; continue; }
-      const ini = x; while (x < w && b(x, y)) x++;
+      const ini = x;
+      // segue o branco, pulando falhas de até 2 px (ruído do JPG)
+      while (x < w && (b(x, y) || (x + 2 < w && (b(x + 1, y) || b(x + 2, y))))) x++;
+      while (x > ini && !b(x - 1, y)) x--;
       if (x - ini >= w * 0.03 && x - ini <= w * 0.45) l.push([ini, x - 1]);
     }
     trechos.push(l);
   }
-  const igual = (l, a, z) => l.some(([c, d]) => Math.abs(c - a) <= 1 && Math.abs(d - z) <= 1);
+  const igual = (l, a, z) => l.some(([c, d]) => Math.abs(c - a) <= 2 && Math.abs(d - z) <= 2);
   let cands = [];
   for (let y = 0; y < h - 2; y++) for (const [a, z] of trechos[y]) {
     if (y > 0 && igual(trechos[y - 1], a, z)) continue;  // não é o topo
     if (!igual(trechos[y + 1], a, z)) continue;           // topo com pelo menos 2 linhas brancas
-    // Desce enquanto as margens esquerda e direita continuam brancas
-    let yy = y;
-    while (yy < h && b(a + 1, yy) && b(a + 2, yy) && b(z - 1, yy) && b(z - 2, yy)) yy++;
-    const y1 = yy - 1, bw = z - a + 1, bh = y1 - y + 1;
+    // Faixa branca de cima, linhas do texto, faixa branca de baixo. (O texto pode
+    // encostar nas laterais do selo quando o código é comprido: GAME-100, FILME-102.)
+    const fracao = r => { let n = 0; for (let xx = a; xx <= z; xx++) n += branco[r * w + xx]; return n / (z - a + 1); };
+    let y1 = -1, viuTexto = false, falhas = 0;
+    for (let yy = y + 1; yy < h && yy - y < h * 0.15; yy++) {
+      const f = fracao(yy);
+      if (f >= 0.85) { if (viuTexto) { y1 = yy; falhas = 0; } }
+      else if (y1 >= 0) { if (f < 0.3 || ++falhas > 4) break; } // faixa de baixo com ruído do JPG
+      else viuTexto = true;
+    }
+    if (y1 < 0) continue;
+    const bw = z - a + 1, bh = y1 - y + 1;
     if (bh < h * 0.012 || bh > h * 0.14) continue;
     const asp = bw / bh;
     if (asp < 1.6 || asp > 12) continue;
-    // Base também branca e reta; dentro, um pouco de texto
-    let base = 0; for (let xx = a; xx <= z; xx++) base += branco[y1 * w + xx];
-    if (base < bw * 0.9) continue;
+    // Dentro, um pouco de texto
     let tinta = 0; for (let yy2 = y; yy2 <= y1; yy2++) for (let xx = a; xx <= z; xx++) tinta += 1 - branco[yy2 * w + xx];
     const t = tinta / (bw * bh);
     if (t < 0.03 || t > 0.55) continue;
+    // Em volta (em cima e dos lados) é o fundo, não uma parte branca da arte
+    // (embaixo a arte pode encostar no selo)
+    let anel = 0, escuro = 0;
+    for (let xx = a - 3; xx <= z + 3; xx++) { const yy2 = y - 3; if (xx >= 0 && xx < w && yy2 >= 0) { anel++; escuro += 1 - branco[yy2 * w + xx]; } }
+    for (let yy2 = y; yy2 <= y1; yy2++) for (const xx of [a - 3, z + 3]) if (xx >= 0 && xx < w) { anel++; escuro += 1 - branco[yy2 * w + xx]; }
+    if (anel && escuro / anel < 0.6) continue;
     cands.push({ x0: a, y0: y, x1: z, y1 });
   }
   // Sem repetidos (um dentro do outro): fica o maior
   cands.sort((m, n) => (n.x1 - n.x0) * (n.y1 - n.y0) - (m.x1 - m.x0) * (m.y1 - m.y0));
   const selos = [];
   for (const c of cands) if (!selos.some(s => c.x0 < s.x1 && c.x1 > s.x0 && c.y0 < s.y1 && c.y1 > s.y0)) selos.push(c);
-  // Selos da mesma página têm a mesma altura: descarta os fora do padrão
+  // Selos da mesma página têm a mesma altura (a dos maiores): descarta os menores,
+  // que são pedaços brancos da arte
   if (selos.length > 1) {
-    const alts = selos.map(s => s.y1 - s.y0).sort((m, n) => m - n), med = alts[Math.floor(alts.length / 2)];
-    for (let i = selos.length - 1; i >= 0; i--) if (Math.abs(selos[i].y1 - selos[i].y0 - med) > med * 0.2) selos.splice(i, 1);
+    const maior = Math.max(...selos.map(s => s.y1 - s.y0));
+    for (let i = selos.length - 1; i >= 0; i--) if (selos[i].y1 - selos[i].y0 < maior * 0.8) selos.splice(i, 1);
   }
   if (!selos.length) return null;
-  return { k, a: { w, h, p }, selos };
+  return { k, a: { w, h, p: pr }, selos };
 }
 
 /** Divide a página em áreas (uma por selo): linhas e colunas pela posição dos selos. */
@@ -116,7 +137,7 @@ function areas(selos, w, h) {
 }
 
 /** Cor de fundo da área (a mais comum na borda dela). */
-function corFundo(p, w, r) {
+function corFundo(p, w, r, tudo = false) {
   const grupos = new Map();
   const conta = (x, y) => {
     const i = (y * w + x) * 4;
@@ -125,22 +146,35 @@ function corFundo(p, w, r) {
     g.n++; g.r += p[i]; g.g += p[i + 1]; g.b += p[i + 2];
     grupos.set(ch, g);
   };
-  for (let x = r.x0; x < r.x1; x++) { conta(x, r.y0); conta(x, r.y1 - 1); }
-  for (let y = r.y0; y < r.y1; y++) { conta(r.x0, y); conta(r.x1 - 1, y); }
+  if (tudo) { for (let y = r.y0; y < r.y1; y += 2) for (let x = r.x0; x < r.x1; x += 2) if (p[(y * w + x) * 4 + 3] > 200) conta(x, y); }
+  else {
+    for (let x = r.x0; x < r.x1; x++) { conta(x, r.y0); conta(x, r.y1 - 1); }
+    for (let y = r.y0; y < r.y1; y++) { conta(r.x0, y); conta(r.x1 - 1, y); }
+  }
+  if (!grupos.size) return [0, 0, 0];
   const m = [...grupos.values()].reduce((a, b) => (b.n > a.n ? b : a));
   return [m.r / m.n, m.g / m.n, m.b / m.n];
 }
+
+/** É fundo? (perto da cor do fundo; num fundo escuro, tudo que for ainda mais escuro também) */
+function ehFundo(r, g, b, fundo) {
+  if (Math.hypot(r - fundo[0], g - fundo[1], b - fundo[2]) <= 40) return true;
+  return lum(fundo) < 80 && r <= fundo[0] + 12 && g <= fundo[1] + 12 && b <= fundo[2] + 12;
+}
+const lum = c => 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
 
 /** Retângulo do desenho dentro da área (sem o selo, sem linhas finas de corte). */
 function caixaDaArte(a, r, selos, fundo) {
   const { w, p } = a;
   const W = r.x1 - r.x0, H = r.y1 - r.y0, N = W * H;
   const des = new Uint8Array(N);
+  const margem = Math.round(Math.min(a.w, a.h) * 0.008);
   const dentroSelo = (x, y) => selos.some(s => x >= s.x0 - 2 && x <= s.x1 + 2 && y >= s.y0 - 2 && y <= s.y1 + 2);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const X = x + r.x0, Y = y + r.y0, i = (Y * w + X) * 4;
     if (dentroSelo(X, Y)) continue;
-    if (Math.hypot(p[i] - fundo[0], p[i + 1] - fundo[1], p[i + 2] - fundo[2]) > 40) des[y * W + x] = 1;
+    if (X < margem || Y < margem || X >= a.w - margem || Y >= a.h - margem) continue; // moldura da página
+    if (p[i + 3] >= 60 && !ehFundo(p[i], p[i + 1], p[i + 2], fundo)) des[y * W + x] = 1; // quase transparente = fundo
   }
   const rot = new Uint8Array(N), pilha = new Int32Array(N);
   let x0 = W, y0 = H, x1 = -1, y1 = -1;
@@ -160,8 +194,9 @@ function caixaDaArte(a, r, selos, fundo) {
       }
     }
     const bw = a1 - a0 + 1, bh = b1 - b0 + 1;
-    if (n < 12) continue;                                        // sujeira
-    if ((bw <= 4 && bh > bw * 3) || (bh <= 4 && bw > bh * 3)) continue; // linha de corte (tracejado)
+    if (n < 25) continue;                                        // sujeira / pontinhos do pontilhado
+    const fino = Math.max(4, Math.round(a.w * 0.006));
+    if ((bw <= fino && bh > bw * 3) || (bh <= fino && bw > bh * 3)) continue; // linha de corte (tracejado/pontilhado)
     x0 = Math.min(x0, a0); y0 = Math.min(y0, b0); x1 = Math.max(x1, a1); y1 = Math.max(y1, b1);
   }
   if (x1 < 0) return null;
@@ -173,11 +208,12 @@ function caixaDaArte(a, r, selos, fundo) {
 function corParaTransparente(c, fundo) {
   const x = c.getContext('2d', { willReadFrequently: true });
   const img = x.getImageData(0, 0, c.width, c.height), p = img.data;
+  const escuro = lum(fundo) < 80; // fundo escuro: o que é ainda mais escuro também some
   for (let i = 0; i < p.length; i += 4) {
     let al = 0;
     for (let k = 0; k < 3; k++) {
       const v = p[i + k], b = fundo[k];
-      al = Math.max(al, v > b ? (v - b) / (255 - b || 1) : v < b ? (b - v) / (b || 1) : 0);
+      al = Math.max(al, v > b ? (v - b) / (255 - b || 1) : v < b && !escuro ? (b - v) / (b || 1) : 0);
     }
     if (al < 0.06) { p[i + 3] = 0; continue; } // ruído do JPG no fundo
     if (al < 1) for (let k = 0; k < 3; k++) p[i + k] = Math.max(0, Math.min(255, Math.round((p[i + k] - fundo[k]) / al + fundo[k])));
@@ -214,7 +250,9 @@ export function separarPorCodigo(pag) {
   const { k, a, selos } = r;
   const lista = [];
   for (const ar of areas(selos, a.w, a.h)) {
-    const fundo = corFundo(a.p, a.w, ar);
+    // Fundo = cor que mais aparece na área (o fundo da imagem da arte, que pode
+    // ser um "quase preto" diferente do preto da página)
+    const fundo = corFundo(a.p, a.w, ar, true);
     const cx = caixaDaArte(a, ar, selos, fundo);
     if (!cx) continue;
     const X0 = Math.floor(cx.x0 / k), Y0 = Math.floor(cx.y0 / k), X1 = Math.ceil(cx.x1 / k), Y1 = Math.ceil(cx.y1 / k);
@@ -223,7 +261,7 @@ export function separarPorCodigo(pag) {
     ctx.drawImage(pag, X0, Y0, arte.width, arte.height, 0, 0, arte.width, arte.height);
     // Selos que caem dentro do recorte (a arte começa ao lado do selo): pinta com o fundo
     ctx.fillStyle = `rgb(${fundo.map(Math.round).join(',')})`;
-    for (const s of selos) ctx.fillRect((s.x0 - 3) / k - X0, (s.y0 - 3) / k - Y0, (s.x1 - s.x0 + 7) / k, (s.y1 - s.y0 + 7) / k);
+    for (const s of selos) ctx.fillRect((s.x0 - 5) / k - X0, (s.y0 - 5) / k - Y0, (s.x1 - s.x0 + 11) / k, (s.y1 - s.y0 + 11) / k);
     corParaTransparente(arte, fundo);
     lista.push({ arte, selo: imagemDoSelo(pag, ar.selo, k), fundo });
   }
