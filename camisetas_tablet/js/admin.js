@@ -18,7 +18,7 @@ import { $, $$, esc, num, aviso, janela, confirmar, pedirSenha, progressoJanela 
 import { importar, urlDa, urlMiniatura, limparUrls, exportarCatalogo, importarCatalogo, lib } from './catalog.js';
 import { credito } from './fontes.js';
 import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo, imagemLado } from './order.js';
-import { precosDe, dinheiro } from './precos.js';
+import { precosDe, dinheiro, dtfDe, custoEstampa } from './precos.js';
 import { configEnvio, testarChave, enviarPendentes, SENHA_INICIAL, VERSAO_ENVIO } from './sync.js';
 import { arquivosTexto } from './textoVetor.js';
 import { modelo } from './shirt.js';
@@ -757,7 +757,7 @@ const lerValor = v => {
 const mostrarValor = v => (+v ? (+v).toFixed(2).replace('.', ',') : '');
 
 ABAS.precos = el => {
-  const pr = precosDe(App.S.cfg);
+  const pr = precosDe(App.S.cfg), dtf = dtfDe(App.S.cfg);
   const temAcrescimo = m => Object.values(pr.tamanhos?.[m.id] || {}).some(v => +v);
   el.innerHTML = `
     <div class="adminCaixa formPrecos">
@@ -783,13 +783,43 @@ ABAS.precos = el => {
         <span class="campoDinheiro"><i>+R$</i><input inputmode="decimal" id="pCostas" value="${mostrarValor(pr.costas)}" placeholder="0,00"></span></label>
       <label class="campoPeq"><span>Acréscimo por <b>texto</b> adicionado (por peça; vale também nas camisetas prontas)</span>
         <span class="campoDinheiro"><i>+R$</i><input inputmode="decimal" id="pTexto" value="${mostrarValor(pr.texto)}" placeholder="0,00"></span></label>
+      <fieldset class="precoModelo precoDtf">
+        <legend>${icone('arte', 20)} Custo da estampa (DTF)</legend>
+        <label class="checkLinha"><input type="checkbox" id="dAtivo" ${dtf.ativo ? 'checked' : ''}> <b>Somar o custo do DTF de cada estampa</b> no preço da peça</label>
+        <p class="textoAjuda">Cada estampa custa a parte da folha que ela ocupa: <b>largura × altura da estampa ÷ (largura × altura da folha) × valor da folha</b>.
+          O cliente vê o custo de cada estampa na hora, enquanto aumenta ou diminui. Com isto ligado, o preço do modelo acima é o da <b>camiseta</b> (sem a estampa).</p>
+        <div class="formLinha">
+          <label class="campoPeq"><span>Largura da folha (cm)</span><input inputmode="decimal" id="dLarg" value="${mostrarValor(dtf.largura)}"></label>
+          <label class="campoPeq"><span>Altura da folha (cm)</span><input inputmode="decimal" id="dAlt" value="${mostrarValor(dtf.altura)}"></label>
+          <label class="campoPeq"><span>Valor da folha</span><span class="campoDinheiro"><i>R$</i><input inputmode="decimal" id="dValor" value="${mostrarValor(dtf.valor)}"></span></label>
+        </div>
+        <div class="formLinha">
+          <label class="campoPeq"><span>Margem sobre o DTF <small>(%, opcional)</small></span><input inputmode="decimal" id="dMargem" value="${mostrarValor(dtf.margem)}" placeholder="0"></label>
+          <label class="campoPeq"><span>Mínimo por estampa <small>(opcional)</small></span><span class="campoDinheiro"><i>R$</i><input inputmode="decimal" id="dMinimo" value="${mostrarValor(dtf.minimo)}" placeholder="0,00"></span></label>
+        </div>
+        <p class="textoAjuda" id="dExemplo"></p>
+      </fieldset>
       <button type="button" class="btn btnEscuro btnGrande" id="pSalvar">${icone('check')} Salvar preços</button>
     </div>`;
+  // Exemplo ao vivo: quanto custam estampas de tamanhos comuns
+  const lerDtf = () => ({ ativo: $('#dAtivo', el).checked, largura: lerValor($('#dLarg', el).value), altura: lerValor($('#dAlt', el).value),
+    valor: lerValor($('#dValor', el).value), margem: lerValor($('#dMargem', el).value), minimo: lerValor($('#dMinimo', el).value) });
+  const exemplo = () => {
+    const d = lerDtf(), cfgT = { precos: { dtf: d } };
+    const c = (w, h) => dinheiro(custoEstampa(cfgT, 'Masculina', { cm: w, w, h }));
+    $('#dExemplo', el).innerHTML = d.ativo && d.largura && d.altura && d.valor
+      ? `Exemplos: estampa <b>10 × 10 cm</b> = ${c(10, 10)} · <b>28 × 35 cm</b> (frente comum) = ${c(28, 35)} · <b>38 × 42 cm</b> (máxima) = ${c(38, 42)}`
+      : 'Preencha a folha e o valor para ver exemplos.';
+  };
+  $$('#dAtivo, #dLarg, #dAlt, #dValor, #dMargem, #dMinimo', el).forEach(i => i.addEventListener('input', exemplo));
+  exemplo();
   $('#pSalvar', el).onclick = async () => {
     const base = {}, tamanhos = {};
     $$('[data-base]', el).forEach(i => { const [m, x] = i.dataset.base.split('|'); const v = lerValor(i.value); if (v) (base[m] ||= {})[x] = v; });
     $$('[data-tam]', el).forEach(i => { const [m, t] = i.dataset.tam.split('|'); const v = lerValor(i.value); if (v) (tamanhos[m] ||= {})[t] = v; });
-    const precos = { mostrar: $('#pMostrar', el).checked, base, tamanhos, costas: lerValor($('#pCostas', el).value), texto: lerValor($('#pTexto', el).value) };
+    const d = lerDtf();
+    if (d.ativo && !(d.largura && d.altura && d.valor)) return aviso('Preencha a largura, a altura e o valor da folha de DTF.', 'erro');
+    const precos = { mostrar: $('#pMostrar', el).checked, base, tamanhos, costas: lerValor($('#pCostas', el).value), texto: lerValor($('#pTexto', el).value), dtf: d };
     if (precos.mostrar && !Object.keys(base).length) aviso('Preencha pelo menos um preço para o cliente ver.', 'erro');
     const nova = { ...App.S.cfg, precos };
     await DB.salvarConfig(nova);

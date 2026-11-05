@@ -454,6 +454,9 @@ input[type="range"]::-moz-range-thumb { width: 2rem; height: 2rem; border-radius
 .painelCompacto .btnIcone { width: 2.875rem; height: 2.875rem; }
 .rotuloLinha { display: flex; align-items: center; gap: 0.375rem; margin-top: 0.5rem; font-size: 0.9375rem; }
 .rotuloLinha .medidas { margin: 0 0 0 auto; font-size: 0.9375rem; font-weight: 800; text-align: right; }
+.custoEstampa { display: block; font-size: 0.875rem; font-weight: 600; color: var(--cinza-escuro); }
+.custoEstampa b { color: var(--preto); font-weight: 800; }
+.precoDtf .formLinha { flex-wrap: wrap; }
 .painelCompacto .tamanhoArte { gap: 0.5rem; }
 .painelCompacto .tamanhoArte input[type="range"] { height: 3rem; }
 .painelCompacto .btnRedondo { width: 3.125rem; height: 3.125rem; }

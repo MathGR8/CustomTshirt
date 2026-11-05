@@ -27,7 +27,7 @@ import { qualidade, ICONE_QUALIDADE, buscarImagens, baixarImagem, credito } from
 import { abrirTabela, resumoMedidas } from './medidas.js';
 import { enviarPendentes, vigiarEnvio, configEnvio } from './sync.js';
 import { desenharTexto, editorTexto } from './texto.js';
-import { mostrarPrecos, dinheiro, aPartirDe, precoBase, precoPeca, precoItem, precoTexto, acrescimoTamanho, valorItem, valorTotal } from './precos.js';
+import { mostrarPrecos, dinheiro, aPartirDe, precoBase, precoPeca, precoItem, precoTexto, acrescimoTamanho, valorItem, valorTotal, custoEstampa, mostrarCustoDtf } from './precos.js';
 import { maxCm, textoMedidas, medidas, totalPecas, salvarPedido, numeroPedido, escalaInfantil, ladosDo } from './order.js';
 
 // ---------- Estado ----------
@@ -71,10 +71,20 @@ async function previaPronta(resumo, modeloId, cor) {
 
 /** Preços visíveis para o cliente? */
 const comPreco = () => mostrarPrecos(S.cfg);
+/** "Estampa: R$ 4,32" (custo do DTF da estampa, em tempo real). */
+const textoCusto = (modeloId, a) => (mostrarCustoDtf(S.cfg) && custoEstampa(S.cfg, modeloId, a) ? dinheiro(custoEstampa(S.cfg, modeloId, a)) : '');
 /** " (+R$ 10,00)" do texto, quando há preço. */
 const extraTexto = (antes = ' (+', depois = ')') => (comPreco() && precoTexto(S.cfg) ? `${antes}${dinheiro(precoTexto(S.cfg))}${depois}` : '');
 /** Preço de uma camiseta pronta numa cor (preço próprio ou o do modelo/malha). */
-const precoDaPronta = (r, modeloId, cor) => +r.fixo?.preco > 0 ? +r.fixo.preco : precoBase(S.cfg, modeloId, malhaDaCor(cor));
+const precoDaPronta = (r, modeloId, cor) => {
+  if (+r.fixo?.preco > 0) return +r.fixo.preco;
+  const base = precoBase(S.cfg, modeloId, malhaDaCor(cor));
+  if (!base || !r.w || !r.h) return base;
+  // + DTF da estampa no tamanho definido para a camiseta pronta (mesma conta de arteFixa)
+  const cfg = { ...FIXO_PADRAO, ...(r.cmW ? { cm: r.cmW } : {}), ...(r.fixo || {}) }, m = modelo(modeloId);
+  const a = { w: r.w, h: r.h, cm: 0 }; a.cm = Math.min(maxCm(modeloId, a), cfg.cm * m.area.w / 38);
+  return base + custoEstampa(S.cfg, modeloId, a);
+};
 
 // ---------- Estrutura da tela ----------
 
@@ -635,7 +645,7 @@ async function verPronta(lista, i) {
     $$('#verCores [data-cor]', j.el).forEach(b => (b.onclick = () => { cor = b.dataset.cor; pintar(); }));
     $$('#verLados [data-lado]', j.el).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lado === lado)));
     const a = artes.find(x => x.lado === lado) || artes[0];
-    $('#verMedida', j.el).innerHTML = (a ? `${icone('regua', 16)} Estampa de ${textoMedidas(it.modelo, a, true)}` : '')
+    $('#verMedida', j.el).innerHTML = (a ? `${icone('regua', 16)} Estampa de ${textoMedidas(it.modelo, a, true)}${!r.fixo?.preco && textoCusto(it.modelo, a) ? ` · <b>${textoCusto(it.modelo, a)}</b>` : ''}` : '')
       + (comPreco() && precoDaPronta(r, it.modelo, cor) ? `<span class="preco precoGrande">${dinheiro(precoPeca(S.cfg, { modelo: it.modelo, malha: malhaDaCor(cor), modo: 'pronta', precoPronta: r.fixo?.preco, artes }, null))}</span>` : '');
   };
   const carregar = async () => {
@@ -992,7 +1002,10 @@ TELAS.personalizar = () => {
   const pintarMedidas = () => {
     if (!a) return;
     const linhas = a.tipo === 'texto' ? a.texto.split('\n').length : 0;
-    $('#medidas').innerHTML = `${textoMedidas(it.modelo, a)}${linhas ? `<small>letras com ~${num(a.cm * a.h / a.w / linhas * 0.72)} cm de altura</small>` : ''}`;
+    const custo = textoCusto(it.modelo, a);
+    $('#medidas').innerHTML = `${textoMedidas(it.modelo, a)}${linhas ? `<small>letras com ~${num(a.cm * a.h / a.w / linhas * 0.72)} cm de altura</small>` : ''}`
+      + (custo ? `<span class="custoEstampa">Estampa: <b>${custo}</b></span>` : '');
+    const pp = $('#precoPecaAoVivo'); if (pp) pp.textContent = dinheiro(precoItem(S.cfg, it));
     $('#medidas').title = `Máximo ${m.area.w} × ${m.area.h} cm`;
     const box = $('#qualidadeAjuste'), novo = caixaQualidade(a);
     if (box.dataset.html !== novo) { box.dataset.html = novo; box.innerHTML = novo; }
@@ -1128,7 +1141,7 @@ TELAS.personalizar = () => {
   rodape({
     voltar: { texto: 'Estampa', acao: () => irPara('estampa') },
     meio: (it.artes.length ? `${it.artes.length} arte${it.artes.length > 1 ? 's' : ''} · ${['Frente', 'Costas'].filter(l => conta(l)).join(' e ')}` : '')
-      + (comPreco() && precoItem(S.cfg, it) ? `${it.artes.length ? ' · ' : ''}<b>${dinheiro(precoItem(S.cfg, it))}</b> a peça` : ''),
+      + (comPreco() && precoItem(S.cfg, it) ? `${it.artes.length ? ' · ' : ''}<b id="precoPecaAoVivo">${dinheiro(precoItem(S.cfg, it))}</b> a peça` : ''),
     avancar: S.editando ? { texto: 'Revisar', acao: () => irPara('revisar') } : { texto: 'Tamanhos', acao: () => irPara('tamanhos') }
   });
   if (!S.coachVisto && a) {
@@ -1215,7 +1228,7 @@ TELAS.revisar = () => {
             ${comPreco() && valorItem(S.cfg, it).total ? `<p class="precoItem">${valorItem(S.cfg, it).linhas.map(l => `${l.qtd}× ${l.t} ${dinheiro(l.unit)}`).join(' · ')} = <b>${dinheiro(valorItem(S.cfg, it).total)}</b></p>` : ''}
             <ul class="itemArtes">
               ${it.modo === 'pronta' ? `<li>${icone('estrela', 16)} <b>Camiseta pronta</b></li>` : ''}
-              ${it.artes.length ? it.artes.map(a => `<li>${icone(a.tipo === 'texto' ? 'editar' : 'arte', 16)} <b>${a.lado}:</b> ${esc(a.nome)} <small>${textoMedidas(it.modelo, a, true)}</small></li>`).join('') : `<li>${icone('camisa', 16)} Camiseta lisa (sem estampa)</li>`}</ul>
+              ${it.artes.length ? it.artes.map(a => `<li>${icone(a.tipo === 'texto' ? 'editar' : 'arte', 16)} <b>${a.lado}:</b> ${esc(a.nome)} <small>${textoMedidas(it.modelo, a, true)}${textoCusto(it.modelo, a) && !(a.fixa && it.precoPronta) ? ` · ${textoCusto(it.modelo, a)}` : ''}</small></li>`).join('') : `<li>${icone('camisa', 16)} Camiseta lisa (sem estampa)</li>`}</ul>
             <div class="linhaBotoes">
               <button type="button" class="btn btnClaro" data-editar="${i}">${icone('editar', 20)} Editar</button>
               ${S.itens.length > 1 ? `<button type="button" class="btn btnClaro btnPerigoTexto" data-remover="${i}">${icone('lixo', 20)} Remover</button>` : ''}
