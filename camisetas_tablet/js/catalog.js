@@ -42,6 +42,7 @@ export async function lib(nome) {
         return window.pdfjsLib;
       }
       if (nome === 'jszip') { if (!window.JSZip) await script(LIBS.jszip); return window.JSZip; }
+      if (nome === 'qrcode') { if (!window.qrcode) await script(LIBS.qrcode); return window.qrcode; }
       if (nome === 'jspdf') {
         if (!window.jspdf) await script(LIBS.jspdf);
         if (!window.jspdf.jsPDF.API.autoTable) await script(LIBS.autotable);

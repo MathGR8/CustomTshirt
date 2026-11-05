@@ -4,7 +4,7 @@
  * As artes ficam no IndexedDB do tablet (não passam por aqui).
  * Ao publicar uma versão nova, troque VERSAO para os tablets baixarem os arquivos novos.
  */
-const VERSAO = 'camisetas-tablet-v21';
+const VERSAO = 'camisetas-tablet-v23';
 const APP = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/admin.js', 'js/catalog.js', 'js/config.js', 'js/db.js',
@@ -20,7 +20,8 @@ const LIBS = [
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js'
 ];
 
 self.addEventListener('install', e => {

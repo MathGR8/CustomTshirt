@@ -466,6 +466,20 @@ async function editarArte(id, temas, depois) {
 
 // ---------- Pedidos ----------
 
+/** Cliente que quer usar a própria arte e deixou o WhatsApp. */
+function artigoContato(p) {
+  const d = new Date(p.data);
+  return `<article class="pedidoAdmin contatoAdmin">
+    <div class="pedidoInfo">
+      <strong>${icone('whatsapp', 18)} Contato — ${esc(p.cliente?.nome || 'Sem nome')}</strong>
+      <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · ${esc(p.cliente?.telefone || '')} · quer usar a própria arte</small>
+      ${p.cliente?.obs ? `<small>“${esc(p.cliente.obs)}”</small>` : ''}
+      ${configEnvio(App.S.cfg).ativo ? (p.enviado ? `<small class="seloEnvio ok">${icone('check', 14)} Enviado para a confecção</small>` : `<small class="seloEnvio">${icone('upload', 14)} Aguardando envio${p.erroEnvio ? ` (${esc(p.erroEnvio)})` : ''}</small>`) : ''}
+    </div>
+    <div class="linhaBotoes"><button type="button" class="btnIcone" data-apagar="${p.id}" aria-label="Apagar contato">${icone('lixo', 20)}</button></div>
+  </article>`;
+}
+
 ABAS.pedidos = async el => {
   const lista = (await DB.todos('pedidos')).sort((a, b) => b.id - a.id);
   el.innerHTML = `
@@ -474,6 +488,7 @@ ABAS.pedidos = async el => {
         ${configEnvio(App.S.cfg).ativo && lista.some(p => !p.enviado) ? `<button type="button" class="btn btnEscuro" id="enviarAgora">${icone('upload', 20)} Enviar agora</button>` : ''}
         ${lista.length ? `<button type="button" class="btn btnClaro btnPerigoTexto" id="apagarTodos">${icone('lixo', 20)} Apagar todos</button>` : ''}</div>
       ${lista.length ? `<div class="listaPedidos">${lista.map(p => {
+        if (p.tipo === 'contato') return artigoContato(p);
         const d = new Date(p.data), total = p.itens.reduce((s, it) => s + totalPecas(it), 0);
         const img = Object.values(p.itens[0]?.imagens || {})[0];
         const doCliente = p.itens.flatMap(it => it.artes).filter(a => a.origem && a.origem !== 'catalogo');
@@ -634,7 +649,7 @@ export async function verPedido(p, acoes = {}) {
                 <li>
                   <button type="button" class="arteMini" data-vista="arte|${i}|${k}" style="--fundo:${CORES[it.cor]?.hex || '#ddd'}"><img data-arte="${i}|${k}" alt=""></button>
                   <div class="arteDesc">
-                    <span class="arteLado">${a.lado} · ${esc(a.medidas || '')}</span>
+                    <span class="arteLado">${a.lado} · ${esc(a.medidas || '')}${a.foraArea ? ' · <b>fora da área padrão</b>' : ''}</span>
                     ${descArte(a)}
                     ${a.qualidade ? `<small class="${/Baixa/.test(a.qualidade) ? 'alertaPedido' : ''}">Qualidade: ${esc(a.qualidade)}</small>` : ''}
                     ${a.tipo === 'texto' && a.texto ? `<span class="botoesTexto">
@@ -838,9 +853,15 @@ ABAS.config = el => {
       <label class="campoPeq"><span>Nome da loja (aparece no topo e no PDF)</span><input id="cLoja" value="${esc(c.loja)}"></label>
       <label class="campoPeq"><span>Frase da tela inicial</span><input id="cSlogan" value="${esc(c.slogan)}"></label>
       <label class="checkLinha"><input type="checkbox" id="cEnvio" ${c.permitirEnvio !== false ? 'checked' : ''}> Cliente pode <b>enviar a própria arte</b></label>
+      <p class="textoAjuda">Desligado: quem tocar em "Imagem" vê as opções de texto, arte pronta ou falar com o responsável abaixo (e pode deixar o WhatsApp para a confecção chamar).</p>
+      <div class="formLinha">
+        <label class="campoPeq"><span>Responsável pelas artes próprias <small>(nome)</small></span><input id="cResp" value="${esc(c.nomeResponsavel || '')}" placeholder="Ex.: Marcos"></label>
+        <label class="campoPeq"><span>WhatsApp do responsável</span><input id="cZap" type="tel" inputmode="tel" value="${esc(c.whatsResponsavel || '')}" placeholder="(00) 00000-0000"></label>
+      </div>
       <label class="checkLinha"><input type="checkbox" id="cBusca" ${c.permitirBusca !== false ? 'checked' : ''}> Cliente pode <b>buscar imagens na internet</b> (só imagens com licença livre para uso comercial)</label>
       <label class="checkLinha"><input type="checkbox" id="cTela" ${c.telaLigada !== false ? 'checked' : ''}> <b>Manter a tela sempre ligada</b> enquanto o app está aberto</label>
       <label class="campoPeq"><span>Voltar ao início depois de quantos minutos parado</span><input id="cIdle" type="number" min="1" max="30" value="${c.inatividadeMin}"></label>
+      <label class="campoPeq"><span>Escurecer a tela (descanso) depois de quantos minutos sem toque <small>(0 = nunca; o app continua aberto no mesmo lugar)</small></span><input id="cDescanso" type="number" min="0" max="30" value="${c.descansoMin ?? 2}"></label>
       <label class="campoPeq"><span>Nova senha do administrador (deixe vazio para manter)</span><input id="cSenha" inputmode="numeric" maxlength="6" placeholder="4 a 6 números"></label>
       <button type="button" class="btn btnEscuro btnGrande" id="cSalvar">${icone('check')} Salvar configurações</button>
     </div>
@@ -915,7 +936,10 @@ ABAS.config = el => {
       loja: $('#cLoja', el).value.trim() || PADRAO.loja,
       slogan: $('#cSlogan', el).value.trim() || PADRAO.slogan,
       inatividadeMin: Math.max(1, Math.min(30, +$('#cIdle', el).value || 3)),
+      descansoMin: Math.max(0, Math.min(30, Math.round(+$('#cDescanso', el).value || 0))),
       permitirEnvio: $('#cEnvio', el).checked,
+      nomeResponsavel: $('#cResp', el).value.trim(),
+      whatsResponsavel: $('#cZap', el).value.trim(),
       permitirBusca: $('#cBusca', el).checked,
       telaLigada: $('#cTela', el).checked,
       senha: senha || c.senha

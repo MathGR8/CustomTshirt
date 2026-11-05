@@ -126,7 +126,7 @@ export function textoResumo(pedido, loja, comPrecos = true) {
     linhas.push('', `*${i + 1}) ${modelo(it.modelo).nome} · ${it.malha} · ${cor}${it.modo === 'pronta' ? ' · camiseta pronta' : ''}*`, `Tamanhos: ${tam}`);
     it.artes.forEach(a => linhas.push(a.tipo === 'texto'
       ? `• ${a.lado}: texto "${a.texto.replace(/\n/g, ' / ')}" (${a.medidas}) — ${a.descricao}`
-      : `• ${a.lado}: ${a.nome}${a.codigo ? ` [${a.codigo}]` : ''} (${a.medidas})${a.origem === 'cliente' ? ' — arte do cliente' : a.origem === 'internet' ? ' — imagem da internet' : ''}${a.qualidade ? ` · qualidade ${a.qualidade}` : ''}`));
+      : `• ${a.lado}: ${a.nome}${a.codigo ? ` [${a.codigo}]` : ''} (${a.medidas})${a.foraArea ? ' — fora da área padrão (posição escolhida pelo cliente)' : ''}${a.origem === 'cliente' ? ' — arte do cliente' : a.origem === 'internet' ? ' — imagem da internet' : ''}${a.qualidade ? ` · qualidade ${a.qualidade}` : ''}`));
   });
   const total = pedido.itens.reduce((s, it) => s + totalPecas(it), 0);
   linhas.push('', `Total: ${total} peça${total === 1 ? '' : 's'}${comPrecos && pedido.total ? ` · *${dinheiro(pedido.total)}*` : ''}`);

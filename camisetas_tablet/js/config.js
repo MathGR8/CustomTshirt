@@ -13,9 +13,12 @@ export const PADRAO = {
   slogan: 'Crie a sua camiseta em poucos toques',
   senha: '1234',           // senha da área do administrador
   inatividadeMin: 3,       // minutos parado até perguntar "Ainda está aí?"
+  descansoMin: 2,          // minutos parado até escurecer a tela (descanso; 0 = nunca)
   permitirEnvio: true,     // cliente pode enviar a própria arte
   permitirBusca: true,     // cliente pode buscar imagens na internet
   telaLigada: true,        // não deixa a tela do tablet apagar com o app aberto
+  nomeResponsavel: '',     // quem atende pedidos com arte própria
+  whatsResponsavel: '',    // WhatsApp desse responsável (aparece para o cliente)
 };
 
 /**
@@ -74,7 +77,8 @@ export const LIBS = {
   pdfjsWorker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
   jspdf:       'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   autotable:   'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js',
-  jszip:       'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+  jszip:       'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+  qrcode:      'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js'
 };
 
 /** Tamanhos das imagens geradas na importação (px do lado maior). */

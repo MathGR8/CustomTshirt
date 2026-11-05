@@ -126,6 +126,28 @@ ficam listados em `cdr-nao-convertidos.txt`, e para eles o app continua usando a
 No Mac/Linux, o comando equivalente é
 `soffice --headless --convert-to pdf --outdir <pasta> <arquivo>.cdr`.
 
+## Novidades do uso no tablet
+
+- **Tela sem rolagem**: o topo (etapas) e o rodapé (Voltar / Avançar) ficam sempre na tela; o
+  teclado só passa por cima. A altura é medida pelo próprio app (funciona também em Chrome antigo).
+- **Desistiu de fazer outra camiseta?** Na primeira etapa da camiseta nova, **Meu pedido** volta
+  para o pedido com as camisetas já montadas.
+- **Zoom na camiseta** ao personalizar: botões − / + (canto de cima), dois dedos fora da arte e
+  arrastar o fundo para mover.
+- **Estampa em qualquer lugar da camiseta** (até mangas), em escala real. O tracejado é a área
+  **recomendada**: fora dela aparece um aviso com o botão **Ajustar**, mas o cliente pode manter.
+  O pedido avisa a confecção quando a posição é fora da área padrão.
+- **Galeria em tela cheia**: botão **Tela cheia** nas camisetas prontas — camiseta grande no
+  centro, deslize para o lado (ou use as setas) para ver as outras estampas.
+- **Arte própria desligada** (Configurações → "Cliente pode enviar a própria arte"): ao tocar em
+  Imagem o cliente vê as opções **Escrever um texto**, **Escolher uma arte pronta** ou **Quero
+  usar a minha arte** (mostra o WhatsApp do responsável com QR code e deixa o cliente pedir para
+  ser chamado). Preencha **Responsável** e **WhatsApp do responsável** em Configurações. Quem
+  deixar o contato aparece para a confecção como **Contato** (com aviso de novo contato, botão
+  "Chamar no WhatsApp" e "Marcar como atendido").
+- **Descanso de tela**: depois de alguns minutos sem toque (Configurações; padrão 2, 0 = nunca)
+  a tela escurece sem fechar nada; um toque volta exatamente onde estava.
+
 ## Pedidos no computador da confecção
 
 Os pedidos são feitos no tablet da loja e podem ser vistos em qualquer computador:
