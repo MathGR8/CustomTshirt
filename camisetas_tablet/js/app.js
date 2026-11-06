@@ -27,7 +27,7 @@ import { qualidade, ICONE_QUALIDADE, buscarImagens, baixarImagem, credito } from
 import { abrirTabela, resumoMedidas } from './medidas.js';
 import { enviarPendentes, vigiarEnvio, configEnvio } from './sync.js';
 import { desenharTexto, editorTexto } from './texto.js';
-import { mostrarPrecos, dinheiro, aPartirDe, precoBase, precoPeca, precoItem, precoTexto, acrescimoTamanho, valorItem, valorTotal, custoEstampa, mostrarCustoDtf } from './precos.js';
+import { mostrarPrecos, dinheiro, aPartirDe, precoBase, precoPeca, precoItem, precoTexto, acrescimoTamanho, valorItem, valorTotal, custoEstampa, mostrarCustoDtf, aplicarMinimo } from './precos.js';
 import { maxCm, textoMedidas, medidas, totalPecas, salvarPedido, numeroPedido, escalaInfantil, ladosDo } from './order.js';
 
 // ---------- Estado ----------
@@ -83,7 +83,7 @@ const precoDaPronta = (r, modeloId, cor) => {
   // + DTF da estampa no tamanho definido para a camiseta pronta (mesma conta de arteFixa)
   const cfg = { ...FIXO_PADRAO, ...(r.cmW ? { cm: r.cmW } : {}), ...(r.fixo || {}) }, m = modelo(modeloId);
   const a = { w: r.w, h: r.h, cm: 0 }; a.cm = Math.min(maxCm(modeloId, a), cfg.cm * m.area.w / 38);
-  return base + custoEstampa(S.cfg, modeloId, a);
+  return aplicarMinimo(S.cfg, modeloId, malhaDaCor(cor), base + custoEstampa(S.cfg, modeloId, a));
 };
 
 // ---------- Estrutura da tela ----------
@@ -274,12 +274,8 @@ function abaixoDasOutras(a, it = item()) {
   const outros = it.artes.filter(x => x.lado === a.lado && x.uid !== a.uid);
   a.fx = 0.5;
   a.fy = outros.length ? Math.max(...outros.map(x => x.fy + meia(x))) + meia(a) + 0.03 : 0.04 + meia(a);
-  if (a.fy + meia(a) > 1) { // não cabe embaixo: diminui até caber (mínimo 5 cm)
-    const livre = Math.max(0, 1 - (a.fy - meia(a)));
-    const novoCm = Math.max(5, a.cm * livre / (2 * meia(a)));
-    a.cm = Math.min(a.cm, novoCm);
-    a.fy = 1 - meia(a);
-  }
+  // Mantém o tamanho escolhido: se não couber embaixo dentro do tracejado, fica abaixo dele
+  // (a estampa pode ir para qualquer lugar da camiseta); encaixar só não deixa sair da camiseta
   return encaixar(a, it);
 }
 
@@ -1130,7 +1126,8 @@ TELAS.personalizar = () => {
           <div class="segmento segPeq" id="ladoArte" role="group" aria-label="Lado da arte">${['Frente', 'Costas'].map(l => `<button type="button" data-lado-arte="${l}" aria-pressed="${a.lado === l}">${l}</button>`).join('')}</div>
           <div class="rotuloLinha">${icone('centro', 18)} <b>Posição</b></div>
           <div class="chipsPos">
-            ${Object.entries(POSICOES).map(([k, p]) => `<button type="button" class="chipPos" data-pos="${k}">${p.nome}</button>`).join('')}
+            <button type="button" class="chipPos" data-centralizar title="Centraliza só na horizontal (não mexe na altura)">↔ Centralizar</button>
+            ${Object.entries(POSICOES).filter(([k]) => k !== 'centro').map(([k, p]) => `<button type="button" class="chipPos" data-pos="${k}">${p.nome}</button>`).join('')}
           </div>` : `
           ${pronta ? `<div class="avisoPronta">${icone('estrela', 22)}<div><b>Camiseta pronta: ${esc(resumoPronta.nome || '')}</b><span>A estampa fica do jeito que a loja definiu. Você pode adicionar textos (nome, frase, número), mudar a cor e o lado.</span></div></div>`
             : `<div class="vazio vazioPainel">${icone('arte', 40)}<p>Nenhuma arte ${S.lado === 'Costas' ? 'nas costas' : 'na frente'} ainda.</p></div>`}`}
@@ -1320,6 +1317,12 @@ TELAS.personalizar = () => {
       encaixar(a); redesenhar(); $('#btnDesfazer').disabled = false;
       conferirDepois();
     }));
+    $('[data-centralizar]') && ($('[data-centralizar]').onclick = () => {
+      salvarDesfazer();
+      a.fx = 0.5; // meio da camiseta, na mesma altura
+      encaixar(a); redesenhar(); $('#btnDesfazer').disabled = false;
+      conferirDepois();
+    });
     $$('[data-pos]').forEach(b => (b.onclick = () => {
       salvarDesfazer();
       const p = POSICOES[b.dataset.pos], area = areaImpressao(it.modelo, a.lado);
@@ -1663,8 +1666,8 @@ function vigiarInatividade() {
 // ---------- Descanso de tela ----------
 
 /**
- * Depois de um tempo sem toques a tela escurece (o app continua aberto, no
- * mesmo lugar). Qualquer toque clareia de novo, sem mexer em nada.
+ * Na página inicial, depois de um tempo sem toques a tela escurece (o app
+ * continua aberto). Qualquer toque clareia de novo, sem mexer em nada.
  */
 function vigiarDescanso() {
   let ultimo = Date.now();
@@ -1696,6 +1699,8 @@ function vigiarDescanso() {
   ['pointerdown', 'keydown', 'input'].forEach(t => document.addEventListener(t, () => { ultimo = Date.now(); }, { passive: true, capture: true }));
   setInterval(() => {
     const min = +S.cfg.descansoMin;
+    // Só na página inicial; durante a navegação vale o aviso "Ainda está aí?" (volta ao início)
+    if (S.tela !== 'inicio' || document.querySelector('dialog[open]')) { if (tela.isConnected && S.tela !== 'inicio') esconder(); return; }
     if (min > 0 && Date.now() - ultimo > min * 60000 && !tela.isConnected) mostrar();
   }, 5000);
 }
@@ -1761,6 +1766,9 @@ async function iniciar() {
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
     return (await import('./painel.js')).iniciar();
   }
+  // Sem o menu de segurar o dedo na imagem (copiar, baixar, compartilhar…) e sem arrastar imagens
+  document.addEventListener('contextmenu', e => { if (!e.target.closest('input, textarea')) e.preventDefault(); });
+  document.addEventListener('dragstart', e => { if (e.target.closest('img, image, svg')) e.preventDefault(); });
   ajustarTela();
   window.addEventListener('resize', ajustarTela);
   window.addEventListener('orientationchange', () => setTimeout(ajustarTela, 250));

@@ -779,6 +779,7 @@ ABAS.precos = el => {
       <h3>${icone('dinheiro', 22)} Preços das camisetas</h3>
       <label class="chaveGrande"><input type="checkbox" id="pMostrar" ${pr.mostrar ? 'checked' : ''}>
         <span><b>Mostrar preços para o cliente</b><small>Desligado: o cliente não vê nenhum preço. Os pedidos continuam com o valor aqui no administrador.</small></span></label>
+      <label class="checkLinha"><input type="checkbox" id="pUsarMinimo" ${pr.usarMinimo ? 'checked' : ''}> <span><b>Preço mínimo por peça estampada</b> — toda peça com estampa que der menos que o mínimo do produto sai pelo mínimo (ex.: R$ 69,97)</span></label>
       <p class="textoAjuda">Preço de <b>uma peça</b> com estampa. Vazio = sem preço (não aparece). Camisetas prontas podem ter preço próprio (toque na arte, na aba Artes).</p>
       ${MODELOS.map(m => `
         <fieldset class="precoModelo">
@@ -786,6 +787,10 @@ ABAS.precos = el => {
           <div class="formLinha">${MALHAS.map(x => `
             <label class="campoPeq"><span>${esc(x.nome)}</span>
               <span class="campoDinheiro"><i>R$</i><input inputmode="decimal" data-base="${esc(m.id)}|${esc(x.id)}" value="${mostrarValor(pr.base?.[m.id]?.[x.id])}" placeholder="0,00"></span></label>`).join('')}
+          </div>
+          <div class="formLinha minimoLinha" ${pr.usarMinimo ? '' : 'hidden'}>${MALHAS.map(x => `
+            <label class="campoPeq"><span>Mínimo por peça estampada · ${esc(x.nome)}</span>
+              <span class="campoDinheiro"><i>R$</i><input inputmode="decimal" data-min="${esc(m.id)}|${esc(x.id)}" value="${mostrarValor(pr.minimo?.[m.id]?.[x.id])}" placeholder="—"></span></label>`).join('')}
           </div>
           <details class="acrescimos" ${temAcrescimo(m) ? 'open' : ''}>
             <summary>${icone('mais', 18)} Acréscimo por tamanho <small>(ex.: tamanhos grandes custam mais)</small></summary>
@@ -816,6 +821,7 @@ ABAS.precos = el => {
       </fieldset>
       <button type="button" class="btn btnEscuro btnGrande" id="pSalvar">${icone('check')} Salvar preços</button>
     </div>`;
+  $('#pUsarMinimo', el).onchange = e => $$('.minimoLinha', el).forEach(x => (x.hidden = !e.target.checked));
   // Exemplo ao vivo: quanto custam estampas de tamanhos comuns
   const lerDtf = () => ({ ativo: $('#dAtivo', el).checked, largura: lerValor($('#dLarg', el).value), altura: lerValor($('#dAlt', el).value),
     valor: lerValor($('#dValor', el).value), margem: lerValor($('#dMargem', el).value), minimo: lerValor($('#dMinimo', el).value) });
@@ -829,12 +835,14 @@ ABAS.precos = el => {
   $$('#dAtivo, #dLarg, #dAlt, #dValor, #dMargem, #dMinimo', el).forEach(i => i.addEventListener('input', exemplo));
   exemplo();
   $('#pSalvar', el).onclick = async () => {
-    const base = {}, tamanhos = {};
+    const base = {}, tamanhos = {}, minimo = {};
+    $$('[data-min]', el).forEach(i => { const [m, x] = i.dataset.min.split('|'); const v = lerValor(i.value); if (v) (minimo[m] ||= {})[x] = v; });
     $$('[data-base]', el).forEach(i => { const [m, x] = i.dataset.base.split('|'); const v = lerValor(i.value); if (v) (base[m] ||= {})[x] = v; });
     $$('[data-tam]', el).forEach(i => { const [m, t] = i.dataset.tam.split('|'); const v = lerValor(i.value); if (v) (tamanhos[m] ||= {})[t] = v; });
     const d = lerDtf();
     if (d.ativo && !(d.largura && d.altura && d.valor)) return aviso('Preencha a largura, a altura e o valor da folha de DTF.', 'erro');
-    const precos = { mostrar: $('#pMostrar', el).checked, base, tamanhos, costas: lerValor($('#pCostas', el).value), texto: lerValor($('#pTexto', el).value), dtf: d };
+    const precos = { mostrar: $('#pMostrar', el).checked, base, tamanhos, costas: lerValor($('#pCostas', el).value), texto: lerValor($('#pTexto', el).value), dtf: d,
+      usarMinimo: $('#pUsarMinimo', el).checked, minimo };
     if (precos.mostrar && !Object.keys(base).length) aviso('Preencha pelo menos um preço para o cliente ver.', 'erro');
     const nova = { ...App.S.cfg, precos };
     await DB.salvarConfig(nova);
