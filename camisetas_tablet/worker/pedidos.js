@@ -16,6 +16,14 @@
  *   DELETE /api/pedidos/:id                    apaga o pedido e os arquivos
  *   PUT    /api/pedidos/:id/arquivos/:nome     grava um arquivo (corpo binário)
  *   GET    /api/pedidos/:id/arquivos/:nome     baixa o arquivo
+ *   GET    /api/pedidos/aviso                  aviso no WhatsApp do gestor (sem a chave)
+ *   POST   /api/pedidos/aviso                  {telefone, apikey?, ativo, contatos} salva
+ *   POST   /api/pedidos/aviso/teste            manda uma mensagem de teste
+ *
+ * Aviso no WhatsApp: a cada pedido novo (e, se ligado, a cada contato) o
+ * servidor manda uma mensagem para o gestor pelo CallMeBot (grátis; o gestor
+ * ativa uma vez no próprio celular e recebe a chave). O tablet não precisa de
+ * chip nem de WhatsApp.
  */
 
 import { DurableObject } from 'cloudflare:workers';
@@ -24,6 +32,34 @@ const PEDACO = 1024 * 1024;            // o SQLite do Durable Object guarda até
 const MAX_ARQUIVO = 40 * 1024 * 1024;
 const MAX_PEDIDO = 30 * 1024 * 1024;
 const SENHA_INICIAL = '000000';
+const CALLMEBOT = 'https://api.callmebot.com/whatsapp.php';
+
+const reais = v => (+v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const soDigitos = t => String(t || '').replace(/\D/g, '');
+/** "+5512999999999" (DDD + número viram +55…) */
+const telInternacional = t => { const d = soDigitos(t); return d ? '+' + (d.length <= 11 ? '55' + d : d) : ''; };
+
+/** Texto do aviso de um pedido (ou contato) novo. */
+function textoAviso(p, link) {
+  const c = p.cliente || {};
+  if (p.tipo === 'contato') {
+    return [`📞 *Novo contato* — quer camiseta com a própria arte`, `${c.nome || 'Sem nome'} · ${c.telefone || ''}`,
+      c.obs ? `Obs.: ${c.obs}` : '', c.telefone ? `Responder: https://wa.me/${telInternacional(c.telefone).slice(1)}` : '', link ? `Ver: ${link}` : '']
+      .filter(Boolean).join('\n');
+  }
+  const itens = p.itens || [];
+  const pecas = itens.reduce((s, it) => s + Object.values(it.quantidades || {}).reduce((a, n) => a + (+n || 0), 0), 0);
+  const linhas = itens.slice(0, 6).map((it, i) => {
+    const tam = Object.entries(it.quantidades || {}).filter(([, q]) => q > 0).map(([t, q]) => `${t}×${q}`).join(' ');
+    const artes = (it.artes || []).map(a => (a.tipo === 'texto' ? `texto "${String(a.texto || '').replace(/\s+/g, ' ').slice(0, 30)}"` : a.codigo || a.nome)).filter(Boolean).join(', ');
+    return `${i + 1}) ${it.modelo} ${it.malha || ''} ${it.cor || ''} — ${tam}${artes ? ` — ${artes}` : ''}`.replace(/\s+/g, ' ');
+  });
+  if (itens.length > 6) linhas.push(`… e mais ${itens.length - 6} camiseta(s)`);
+  return [`🧾 *Novo pedido nº ${String(p.numero || 0).padStart(4, '0')}*`,
+    `Cliente: ${c.nome || 'Sem nome'}${c.telefone ? ' · ' + c.telefone : ''}`,
+    `${itens.length} camiseta${itens.length === 1 ? '' : 's'} · ${pecas} peça${pecas === 1 ? '' : 's'}${p.total ? ' · ' + reais(p.total) : ''}`,
+    ...linhas, c.obs ? `Obs.: ${c.obs}` : '', link ? `Ver: ${link}` : ''].filter(Boolean).join('\n');
+}
 const STATUS = ['novo', 'producao', 'pronto', 'entregue'];
 
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
@@ -119,10 +155,25 @@ export class Pedidos extends DurableObject {
       }
       this.acertou(ip);
 
+      // Aviso no WhatsApp do gestor
+      if (partes[0] === 'aviso') {
+        if (req.method === 'GET' && !partes[1]) { const a = this.lerAviso(); return json({ telefone: a.telefone || '', ativo: !!a.ativo, contatos: a.contatos !== false, temChave: !!a.apikey }); }
+        if (req.method === 'POST' && !partes[1]) {
+          const d = await req.json().catch(() => ({})), a = this.lerAviso();
+          const novo = { telefone: String(d.telefone || '').slice(0, 30), ativo: !!d.ativo, contatos: d.contatos !== false, apikey: String(d.apikey || '').trim().slice(0, 60) || a.apikey || '' };
+          this.sql.exec("INSERT OR REPLACE INTO cfg (k, v) VALUES ('aviso', ?)", JSON.stringify(novo));
+          return json({ ok: true, temChave: !!novo.apikey });
+        }
+        if (req.method === 'POST' && partes[1] === 'teste') {
+          const r = await this.mandarAviso(`✅ Teste: os avisos de pedido da loja estão chegando neste WhatsApp.\nVer pedidos: ${url.origin}/#confeccao`, true);
+          return json(r, r.ok ? 200 : 502);
+        }
+      }
+
       const [id, sub, nome] = partes;
       if (!id && req.method === 'GET') return this.lista(url);
       if (id && !sub) {
-        if (req.method === 'PUT') return this.gravar(id, req);
+        if (req.method === 'PUT') return this.gravar(id, req, url.origin);
         if (req.method === 'GET') return this.ler(id);
         if (req.method === 'PATCH') return this.mudar(id, req);
         if (req.method === 'DELETE') return this.apagar(id);
@@ -149,7 +200,27 @@ export class Pedidos extends DurableObject {
     return json({ pedidos: rows });
   }
 
-  async gravar(id, req) {
+  lerAviso() {
+    try { return JSON.parse(this.um("SELECT v FROM cfg WHERE k = 'aviso'")?.v || '{}'); } catch { return {}; }
+  }
+
+  /** Manda uma mensagem para o WhatsApp do gestor (CallMeBot). */
+  async mandarAviso(texto, teste = false) {
+    const a = this.lerAviso();
+    if (!teste && !a.ativo) return { ok: false, erro: 'aviso desligado' };
+    if (!a.telefone || !a.apikey) return { ok: false, erro: 'preencha o WhatsApp do gestor e a chave do CallMeBot' };
+    const base = this.env.CALLMEBOT_URL || CALLMEBOT;
+    const u = `${base}?phone=${encodeURIComponent(telInternacional(a.telefone))}&text=${encodeURIComponent(texto.slice(0, 1500))}&apikey=${encodeURIComponent(a.apikey)}`;
+    try {
+      const r = await fetch(u, { headers: { 'user-agent': 'camisetas-tablet' } });
+      const corpo = (await r.text()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+      const ok = r.ok && !/error|invalid|apikey is not/i.test(corpo);
+      this.sql.exec("INSERT OR REPLACE INTO cfg (k, v) VALUES ('aviso_ultimo', ?)", JSON.stringify({ quando: Date.now(), ok, status: r.status, corpo }));
+      return ok ? { ok: true } : { ok: false, erro: `CallMeBot respondeu: ${corpo || r.status}` };
+    } catch (e) { return { ok: false, erro: 'sem conexão com o CallMeBot' }; }
+  }
+
+  async gravar(id, req, origem = '') {
     const txt = await req.text();
     if (txt.length > MAX_PEDIDO) return json({ erro: 'pedido grande demais' }, 413);
     const p = JSON.parse(txt);
@@ -169,6 +240,11 @@ export class Pedidos extends DurableObject {
         +p.total || 0, pecas, (p.itens || []).length, antigo?.status || 'novo', miniatura, antigo?.recebido || Date.now(), n, alerta,
         p.tipo === 'contato' ? 'contato' : 'pedido');
     });
+    // Pedido (ou contato) novo: avisa o gestor no WhatsApp, sem segurar a resposta ao tablet
+    if (!antigo) {
+      const a = this.lerAviso();
+      if (a.ativo && (p.tipo !== 'contato' || a.contatos !== false)) this.ctx.waitUntil(this.mandarAviso(textoAviso(p, origem ? `${origem}/#confeccao` : '')));
+    }
     return json({ ok: true });
   }
 
