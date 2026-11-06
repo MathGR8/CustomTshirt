@@ -19,7 +19,7 @@ import { importar, urlDa, urlMiniatura, limparUrls, exportarCatalogo, importarCa
 import { credito } from './fontes.js';
 import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo, imagemLado } from './order.js';
 import { precosDe, dinheiro, dtfDe, custoEstampa } from './precos.js';
-import { configEnvio, testarChave, enviarPendentes, SENHA_INICIAL, VERSAO_ENVIO } from './sync.js';
+import { configEnvio, testarChave, enviarPendentes, SENHA_INICIAL, VERSAO_ENVIO, lerAviso, salvarAviso, testarAviso } from './sync.js';
 import { arquivosTexto } from './textoVetor.js';
 import { modelo } from './shirt.js';
 
@@ -889,7 +889,45 @@ ABAS.config = el => {
         <span class="textoAjuda" id="eEstado"></span>
       </div>
       <p class="estadoEnvio" id="eSituacao"></p>
+    </div>
+    <div class="adminCaixa formConfig">
+      <h3>${icone('whatsapp', 22)} Aviso de pedido no WhatsApp do gestor</h3>
+      <p class="textoAjuda">A cada pedido novo, o servidor do app manda uma mensagem para o WhatsApp do gestor (o tablet não precisa de chip nem de WhatsApp).
+        Usa o <b>CallMeBot</b>, grátis: no celular do gestor, salve o contato do CallMeBot (o número está em <b>callmebot.com</b> → WhatsApp),
+        mande a mensagem <b>I allow callmebot to send me messages</b> e copie aqui a chave (<i>apikey</i>) que ele responder.</p>
+      <label class="checkLinha"><input type="checkbox" id="zAtivo"> <b>Avisar no WhatsApp a cada pedido novo</b></label>
+      <label class="checkLinha"><input type="checkbox" id="zContatos" checked> Avisar também quando um cliente deixar o contato (arte própria)</label>
+      <div class="formLinha">
+        <label class="campoPeq"><span>WhatsApp do gestor</span><input id="zTel" type="tel" inputmode="tel" placeholder="(12) 99999-9999"></label>
+        <label class="campoPeq"><span>Chave do CallMeBot (apikey)</span><input id="zChave" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Ex.: 1234567"></label>
+      </div>
+      <div class="linhaBotoes">
+        <button type="button" class="btn btnEscuro" id="zSalvar">${icone('check', 20)} Salvar</button>
+        <button type="button" class="btn btnClaro" id="zTestar">${icone('whatsapp', 20)} Mandar mensagem de teste</button>
+        <span class="textoAjuda" id="zEstado"></span>
+      </div>
     </div>`;
+  // Aviso no WhatsApp: dados ficam no servidor (a chave não volta para a tela)
+  const zEstado = t => { $('#zEstado', el).textContent = t; };
+  lerAviso(App.S.cfg).then(a => {
+    $('#zAtivo', el).checked = !!a.ativo; $('#zContatos', el).checked = a.contatos !== false; $('#zTel', el).value = a.telefone || '';
+    $('#zChave', el).placeholder = a.temChave ? 'Chave já salva (deixe vazio para manter)' : 'Ex.: 1234567';
+  }).catch(e => zEstado(navigator.onLine ? `Não deu para ler o aviso: ${e.message}` : 'Sem internet.'));
+  const salvarZap = async () => {
+    const tel = $('#zTel', el).value.trim();
+    if ($('#zAtivo', el).checked && tel.replace(/\D/g, '').length < 10) throw new Error('Digite o WhatsApp do gestor com DDD.');
+    const r = await salvarAviso(App.S.cfg, { telefone: tel, apikey: $('#zChave', el).value.trim(), ativo: $('#zAtivo', el).checked, contatos: $('#zContatos', el).checked });
+    if ($('#zAtivo', el).checked && !r.temChave) throw new Error('Falta a chave do CallMeBot.');
+    $('#zChave', el).value = ''; $('#zChave', el).placeholder = 'Chave já salva (deixe vazio para manter)';
+  };
+  $('#zSalvar', el).onclick = async () => {
+    try { zEstado('Salvando…'); await salvarZap(); zEstado('Salvo.'); aviso('Aviso no WhatsApp salvo.', 'ok'); }
+    catch (e) { zEstado(''); aviso(e.message, 'erro'); }
+  };
+  $('#zTestar', el).onclick = async () => {
+    try { zEstado('Enviando teste…'); await salvarZap(); await testarAviso(App.S.cfg); zEstado('Teste enviado: confira o WhatsApp do gestor.'); aviso('Mensagem de teste enviada.', 'ok'); }
+    catch (e) { zEstado(''); aviso(`Não foi: ${e.message}`, 'erro'); }
+  };
   // Situação dos pedidos no tablet (enviados / aguardando) e botão de atualizar
   const situacao = async () => {
     const caixa = $('#eSituacao', el); if (!caixa) return;
