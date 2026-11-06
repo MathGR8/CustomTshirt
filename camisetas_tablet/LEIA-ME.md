@@ -153,20 +153,28 @@ No Mac/Linux, o comando equivalente é
 - **↔ Centralizar**: centraliza a estampa só na horizontal (mantém a altura).
 - **Imagens protegidas**: segurar o dedo numa imagem não abre mais o menu de copiar/baixar/compartilhar.
 
-## Aviso de pedido no WhatsApp do gestor
+## Aviso de pedido no computador do gestor
 
-A cada pedido novo (e, se quiser, a cada cliente que deixar o contato) o **servidor do app** manda
-uma mensagem para o WhatsApp do gestor, com número do pedido, cliente, camisetas, tamanhos, valor e
-o link para ver. O tablet **não precisa de chip nem de WhatsApp**. Usa o **CallMeBot** (grátis):
+A cada pedido novo (e a cada cliente que deixar o contato) aparece um **alerta com som** no
+computador do gestor (no canto da tela, no Windows) ou na barra de notificações do celular,
+**mesmo com a página dos pedidos fechada**: basta o Chrome/Edge estar aberto (por exemplo, com o
+WhatsApp Web). Clicando no alerta, abre o pedido. É **grátis**, usa a notificação do próprio
+navegador (sem WhatsApp, sem serviço de terceiros e sem chip no tablet).
 
-1. No celular do gestor: abra **callmebot.com** → WhatsApp e salve o número do CallMeBot nos contatos.
-2. Mande para esse contato: `I allow callmebot to send me messages`. Ele responde com a **apikey**.
-3. No tablet: **Administrador → Configurações → Aviso de pedido no WhatsApp do gestor**: marque o
-   aviso, preencha o WhatsApp do gestor e a chave e toque em **Mandar mensagem de teste**.
+Para ativar (uma vez por aparelho):
 
-O CallMeBot só manda mensagens para o número que fez a ativação. É um serviço gratuito e não
-oficial: bom para aviso interno, sem garantia de entrega. Os dados ficam no servidor (a chave não
-aparece de volta na tela).
+1. No computador do gestor, abra os pedidos da confecção (o endereço do app + `#confeccao`) e
+   entre com a senha da confecção, marcando **Lembrar neste aparelho**.
+2. Clique em **🔔 Avisos → Ativar neste aparelho** e, quando o navegador perguntar, em **Permitir**.
+   Chega um aviso de teste na hora.
+
+Com a página dos pedidos aberta (mesmo em outra aba), o pedido novo também **toca um som** (repete
+até alguém clicar no painel), **pisca o título da aba** e fica **destacado** na lista.
+
+Se o alerta não aparecer: desligue o "Não perturbe" do Windows, deixe as notificações do
+Chrome/Edge ligadas em Configurações do Windows → Sistema → Notificações e, no Chrome, deixe ligado
+"Continuar executando apps em segundo plano". No tablet, em **Administrador → Configurações**, dá
+para ver os aparelhos cadastrados e mandar um aviso de teste.
 
 ## Pedidos no computador da confecção
 
