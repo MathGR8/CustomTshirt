@@ -22,7 +22,9 @@ export const PRECOS_PADRAO = {
   tamanhos: {},     // { 'Masculina': { 'X1': 5, … }, … }  acréscimo por tamanho
   costas: 0,        // acréscimo por peça com estampa na frente e nas costas
   texto: 0,         // acréscimo por texto, por peça
-  dtf: {}           // custo do DTF (ver DTF_PADRAO)
+  dtf: {},          // custo do DTF (ver DTF_PADRAO)
+  usarMinimo: false,// preço mínimo por peça estampada ligado?
+  minimo: {}        // { 'Masculina': { '100% algodão': 69.97, … }, … }
 };
 
 /** DTF terceirizado: folha (cm) e valor; margem (%) e mínimo por estampa opcionais. */
@@ -94,6 +96,12 @@ const doisLados = it => ['Frente', 'Costas'].every(l => (it.artes || []).some(a 
 export const precoTexto = cfg => n(precosDe(cfg).texto);
 const qtdTextos = it => (it.artes || []).filter(a => a.tipo === 'texto').length;
 
+/** Preço mínimo de uma peça estampada do modelo/malha (0 = sem mínimo). */
+export const precoMinimo = (cfg, modeloId, malhaId) => (precosDe(cfg).usarMinimo ? n(precosDe(cfg).minimo?.[modeloId]?.[malhaId]) : 0);
+
+/** Valor da peça estampada respeitando o preço mínimo do produto. */
+export const aplicarMinimo = (cfg, modeloId, malhaId, v) => (v > 0 ? Math.max(v, precoMinimo(cfg, modeloId, malhaId)) : v);
+
 /** Preço de uma peça do item no tamanho t (0 = sem preço). */
 export function precoPeca(cfg, it, t) {
   const proprio = it.modo === 'pronta' ? n(it.precoPronta) : 0;
@@ -102,7 +110,10 @@ export function precoPeca(cfg, it, t) {
   const costas = !proprio && doisLados(it) ? n(precosDe(cfg).costas) : 0;
   // DTF: todas as estampas (na pronta com preço próprio, só os textos que o cliente pôs)
   const dtf = proprio ? custoEstampas(cfg, { ...it, artes: (it.artes || []).filter(a => a.tipo === 'texto') }, t) : custoEstampas(cfg, it, t);
-  return Math.round(Math.max(0, base + costas + dtf + precoTexto(cfg) * qtdTextos(it) + acrescimoTamanho(cfg, it.modelo, t)) * 100) / 100;
+  let v = Math.max(0, base + costas + dtf + precoTexto(cfg) * qtdTextos(it) + acrescimoTamanho(cfg, it.modelo, t));
+  // Preço mínimo por peça estampada (ex.: tudo abaixo de R$ 69,97 sai por R$ 69,97)
+  if ((it.artes || []).length) v = aplicarMinimo(cfg, it.modelo, it.malha, v);
+  return Math.round(v * 100) / 100;
 }
 
 /** Preço "por peça" sem acréscimo de tamanho (para mostrar enquanto monta). */

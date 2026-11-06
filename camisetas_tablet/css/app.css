@@ -29,7 +29,9 @@ html { font-size: clamp(10px, min(1.25vw, 2vh), 18px); }
 @media (max-aspect-ratio: 1/1) { html { font-size: clamp(10px, min(2vw, 1.25vh), 18px); } }
 * { box-sizing: border-box; margin: 0; }
 html, body { height: 100%; background: var(--fundo); overscroll-behavior: none; }
-body { -webkit-user-select: none; user-select: none; touch-action: manipulation; -webkit-font-smoothing: antialiased; }
+body { -webkit-user-select: none; user-select: none; touch-action: manipulation; -webkit-font-smoothing: antialiased; -webkit-touch-callout: none; }
+/* Imagens: sem o menu de segurar o dedo (copiar, baixar, compartilhar) e sem arrastar */
+img, svg, image { -webkit-touch-callout: none; -webkit-user-drag: none; user-drag: none; -webkit-user-select: none; user-select: none; }
 input, textarea { -webkit-user-select: text; user-select: text; font: inherit; color: inherit; }
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
 button:disabled { cursor: default; opacity: .4; }

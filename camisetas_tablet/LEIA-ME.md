@@ -145,8 +145,13 @@ No Mac/Linux, o comando equivalente é
   ser chamado). Preencha **Responsável** e **WhatsApp do responsável** em Configurações. Quem
   deixar o contato aparece para a confecção como **Contato** (com aviso de novo contato, botão
   "Chamar no WhatsApp" e "Marcar como atendido").
-- **Descanso de tela**: depois de alguns minutos sem toque (Configurações; padrão 2, 0 = nunca)
-  a tela escurece sem fechar nada; um toque volta exatamente onde estava.
+- **Descanso de tela** (só na página inicial): depois de alguns minutos sem toque
+  (Configurações; padrão 2, 0 = nunca) a tela escurece sem fechar nada; um toque volta. Durante a
+  navegação continua valendo o aviso "Ainda está aí?" que volta ao início.
+- **Preço mínimo por peça estampada** (aba Preços): ligue a opção e preencha o mínimo de cada
+  modelo e malha (ex.: R$ 69,97). Toda peça com estampa que der menos sai pelo mínimo.
+- **↔ Centralizar**: centraliza a estampa só na horizontal (mantém a altura).
+- **Imagens protegidas**: segurar o dedo numa imagem não abre mais o menu de copiar/baixar/compartilhar.
 
 ## Pedidos no computador da confecção
 
