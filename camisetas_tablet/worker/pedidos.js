@@ -16,49 +16,44 @@
  *   DELETE /api/pedidos/:id                    apaga o pedido e os arquivos
  *   PUT    /api/pedidos/:id/arquivos/:nome     grava um arquivo (corpo binário)
  *   GET    /api/pedidos/:id/arquivos/:nome     baixa o arquivo
- *   GET    /api/pedidos/aviso                  aviso no WhatsApp do gestor (sem a chave)
- *   POST   /api/pedidos/aviso                  {telefone, apikey?, ativo, contatos} salva
- *   POST   /api/pedidos/aviso/teste            manda uma mensagem de teste
+ *   GET    /api/pedidos/notificacoes           chave pública + aparelhos que recebem avisos
+ *   POST   /api/pedidos/notificacoes           {endpoint, keys, nome} cadastra este aparelho
+ *   DELETE /api/pedidos/notificacoes/:id       para de avisar o aparelho
+ *   POST   /api/pedidos/notificacoes/teste     manda um aviso de teste para todos
  *
- * Aviso no WhatsApp: a cada pedido novo (e, se ligado, a cada contato) o
- * servidor manda uma mensagem para o gestor pelo CallMeBot (grátis; o gestor
- * ativa uma vez no próprio celular e recebe a chave). O tablet não precisa de
- * chip nem de WhatsApp.
+ * Aviso de pedido: a cada pedido (ou contato) novo o servidor manda uma
+ * notificação do navegador (Web Push) para cada computador/celular que ativou
+ * "Receber avisos" no painel da confecção. Grátis e sem serviço de terceiros
+ * (ver worker/push.js). O tablet não precisa de chip nem de WhatsApp.
  */
 
 import { DurableObject } from 'cloudflare:workers';
+import { novasChaves, enviarPush } from './push.js';
 
 const PEDACO = 1024 * 1024;            // o SQLite do Durable Object guarda até 2 MB por valor
 const MAX_ARQUIVO = 40 * 1024 * 1024;
 const MAX_PEDIDO = 30 * 1024 * 1024;
 const SENHA_INICIAL = '000000';
-const CALLMEBOT = 'https://api.callmebot.com/whatsapp.php';
 
 const reais = v => (+v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const soDigitos = t => String(t || '').replace(/\D/g, '');
-/** "+5512999999999" (DDD + número viram +55…) */
-const telInternacional = t => { const d = soDigitos(t); return d ? '+' + (d.length <= 11 ? '55' + d : d) : ''; };
 
-/** Texto do aviso de um pedido (ou contato) novo. */
-function textoAviso(p, link) {
+/** Notificação de um pedido (ou contato) novo: { titulo, texto, url, tag } */
+export function avisoDoPedido(p, origem = '') {
   const c = p.cliente || {};
+  const url = `${origem}/?pedido=${encodeURIComponent(p.id)}#confeccao`;
   if (p.tipo === 'contato') {
-    return [`📞 *Novo contato* — quer camiseta com a própria arte`, `${c.nome || 'Sem nome'} · ${c.telefone || ''}`,
-      c.obs ? `Obs.: ${c.obs}` : '', c.telefone ? `Responder: https://wa.me/${telInternacional(c.telefone).slice(1)}` : '', link ? `Ver: ${link}` : '']
-      .filter(Boolean).join('\n');
+    return { titulo: '📞 Novo contato — arte própria', tag: `p-${p.id}`, url,
+      texto: [`${c.nome || 'Sem nome'}${c.telefone ? ' · ' + c.telefone : ''}`, 'Quer fazer camiseta com a própria arte: chame no WhatsApp.', c.obs ? `Obs.: ${c.obs}` : ''].filter(Boolean).join('\n') };
   }
   const itens = p.itens || [];
   const pecas = itens.reduce((s, it) => s + Object.values(it.quantidades || {}).reduce((a, n) => a + (+n || 0), 0), 0);
-  const linhas = itens.slice(0, 6).map((it, i) => {
+  const linhas = itens.slice(0, 3).map(it => {
     const tam = Object.entries(it.quantidades || {}).filter(([, q]) => q > 0).map(([t, q]) => `${t}×${q}`).join(' ');
-    const artes = (it.artes || []).map(a => (a.tipo === 'texto' ? `texto "${String(a.texto || '').replace(/\s+/g, ' ').slice(0, 30)}"` : a.codigo || a.nome)).filter(Boolean).join(', ');
-    return `${i + 1}) ${it.modelo} ${it.malha || ''} ${it.cor || ''} — ${tam}${artes ? ` — ${artes}` : ''}`.replace(/\s+/g, ' ');
+    return `${it.modelo || ''} ${it.cor || ''} — ${tam}`.replace(/\s+/g, ' ').trim();
   });
-  if (itens.length > 6) linhas.push(`… e mais ${itens.length - 6} camiseta(s)`);
-  return [`🧾 *Novo pedido nº ${String(p.numero || 0).padStart(4, '0')}*`,
-    `Cliente: ${c.nome || 'Sem nome'}${c.telefone ? ' · ' + c.telefone : ''}`,
-    `${itens.length} camiseta${itens.length === 1 ? '' : 's'} · ${pecas} peça${pecas === 1 ? '' : 's'}${p.total ? ' · ' + reais(p.total) : ''}`,
-    ...linhas, c.obs ? `Obs.: ${c.obs}` : '', link ? `Ver: ${link}` : ''].filter(Boolean).join('\n');
+  if (itens.length > 3) linhas.push(`… e mais ${itens.length - 3} camiseta(s)`);
+  return { titulo: `🧾 Novo pedido nº ${String(p.numero || 0).padStart(4, '0')}`, tag: `p-${p.id}`, url,
+    texto: [`${c.nome || 'Sem nome'} · ${pecas} peça${pecas === 1 ? '' : 's'}${p.total ? ' · ' + reais(p.total) : ''}`, ...linhas, c.obs ? `Obs.: ${c.obs}` : ''].filter(Boolean).join('\n') };
 }
 const STATUS = ['novo', 'producao', 'pronto', 'entregue'];
 
@@ -91,7 +86,9 @@ export class Pedidos extends DurableObject {
       CREATE TABLE IF NOT EXISTS arquivos (pedido TEXT, nome TEXT, tipo TEXT, tamanho INTEGER, partes INTEGER, PRIMARY KEY (pedido, nome));
       CREATE TABLE IF NOT EXISTS arquivo_partes (pedido TEXT, nome TEXT, idx INTEGER, dados BLOB, PRIMARY KEY (pedido, nome, idx));
       CREATE TABLE IF NOT EXISTS tentativas (ip TEXT PRIMARY KEY, n INTEGER, ate INTEGER);
+      CREATE TABLE IF NOT EXISTS aparelhos (id TEXT PRIMARY KEY, endpoint TEXT, p256dh TEXT, auth TEXT, nome TEXT, criado INTEGER, ultimo INTEGER, erro TEXT);
     `);
+    this.sql.exec("DELETE FROM cfg WHERE k IN ('aviso', 'aviso_ultimo')"); // aviso antigo pelo CallMeBot
     // Tipo do registro ("pedido" ou "contato": cliente que quer usar a própria arte)
     try { this.sql.exec("ALTER TABLE pedidos ADD COLUMN tipo TEXT DEFAULT 'pedido'"); } catch { /* já existe */ }
     // Uma vez só: apaga a senha gravada pelas versões antigas (a 1ª senha usada
@@ -155,20 +152,8 @@ export class Pedidos extends DurableObject {
       }
       this.acertou(ip);
 
-      // Aviso no WhatsApp do gestor
-      if (partes[0] === 'aviso') {
-        if (req.method === 'GET' && !partes[1]) { const a = this.lerAviso(); return json({ telefone: a.telefone || '', ativo: !!a.ativo, contatos: a.contatos !== false, temChave: !!a.apikey }); }
-        if (req.method === 'POST' && !partes[1]) {
-          const d = await req.json().catch(() => ({})), a = this.lerAviso();
-          const novo = { telefone: String(d.telefone || '').slice(0, 30), ativo: !!d.ativo, contatos: d.contatos !== false, apikey: String(d.apikey || '').trim().slice(0, 60) || a.apikey || '' };
-          this.sql.exec("INSERT OR REPLACE INTO cfg (k, v) VALUES ('aviso', ?)", JSON.stringify(novo));
-          return json({ ok: true, temChave: !!novo.apikey });
-        }
-        if (req.method === 'POST' && partes[1] === 'teste') {
-          const r = await this.mandarAviso(`✅ Teste: os avisos de pedido da loja estão chegando neste WhatsApp.\nVer pedidos: ${url.origin}/#confeccao`, true);
-          return json(r, r.ok ? 200 : 502);
-        }
-      }
+      // Avisos de pedido no navegador (computador/celular do gestor)
+      if (partes[0] === 'notificacoes') return await this.notificacoes(req, partes[1], url.origin);
 
       const [id, sub, nome] = partes;
       if (!id && req.method === 'GET') return this.lista(url);
@@ -200,24 +185,56 @@ export class Pedidos extends DurableObject {
     return json({ pedidos: rows });
   }
 
-  lerAviso() {
-    try { return JSON.parse(this.um("SELECT v FROM cfg WHERE k = 'aviso'")?.v || '{}'); } catch { return {}; }
+  // ---------- Avisos no navegador (Web Push) ----------
+
+  async chavesPush(origem) {
+    const salvo = this.um("SELECT v FROM cfg WHERE k = 'vapid'");
+    if (salvo) return JSON.parse(salvo.v);
+    const c = { ...(await novasChaves()), contato: origem.startsWith('https://') ? origem : 'mailto:avisos@example.com' };
+    this.sql.exec("INSERT OR REPLACE INTO cfg (k, v) VALUES ('vapid', ?)", JSON.stringify(c));
+    return c;
   }
 
-  /** Manda uma mensagem para o WhatsApp do gestor (CallMeBot). */
-  async mandarAviso(texto, teste = false) {
-    const a = this.lerAviso();
-    if (!teste && !a.ativo) return { ok: false, erro: 'aviso desligado' };
-    if (!a.telefone || !a.apikey) return { ok: false, erro: 'preencha o WhatsApp do gestor e a chave do CallMeBot' };
-    const base = this.env.CALLMEBOT_URL || CALLMEBOT;
-    const u = `${base}?phone=${encodeURIComponent(telInternacional(a.telefone))}&text=${encodeURIComponent(texto.slice(0, 1500))}&apikey=${encodeURIComponent(a.apikey)}`;
-    try {
-      const r = await fetch(u, { headers: { 'user-agent': 'camisetas-tablet' } });
-      const corpo = (await r.text()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
-      const ok = r.ok && !/error|invalid|apikey is not/i.test(corpo);
-      this.sql.exec("INSERT OR REPLACE INTO cfg (k, v) VALUES ('aviso_ultimo', ?)", JSON.stringify({ quando: Date.now(), ok, status: r.status, corpo }));
-      return ok ? { ok: true } : { ok: false, erro: `CallMeBot respondeu: ${corpo || r.status}` };
-    } catch (e) { return { ok: false, erro: 'sem conexão com o CallMeBot' }; }
+  async notificacoes(req, sub, origem) {
+    const lista = () => this.sql.exec('SELECT id, nome, criado, ultimo, erro FROM aparelhos ORDER BY criado').toArray();
+    if (req.method === 'GET' && !sub) return json({ chave: (await this.chavesPush(origem)).publica, aparelhos: lista() });
+    if (req.method === 'POST' && !sub) {
+      const d = await req.json().catch(() => ({}));
+      const endpoint = String(d.endpoint || ''), p256dh = String(d.keys?.p256dh || ''), auth = String(d.keys?.auth || '');
+      if (!/^https:\/\//.test(endpoint) && !(this.env.PUSH_LIVRE && /^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(endpoint))) return json({ erro: 'endereço de notificação inválido' }, 400);
+      if (endpoint.length > 2000 || p256dh.length < 80 || p256dh.length > 120 || auth.length < 16 || auth.length > 40) return json({ erro: 'dados da notificação inválidos' }, 400);
+      const id = (await sha256(endpoint)).slice(0, 16);
+      const antigo = this.um('SELECT criado FROM aparelhos WHERE id = ?', id);
+      this.sql.exec('INSERT OR REPLACE INTO aparelhos (id, endpoint, p256dh, auth, nome, criado, ultimo, erro) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)',
+        id, endpoint, p256dh, auth, String(d.nome || 'Aparelho').slice(0, 60), antigo?.criado || Date.now());
+      return json({ ok: true, id, aparelhos: lista() });
+    }
+    if (req.method === 'DELETE' && sub) {
+      this.sql.exec('DELETE FROM aparelhos WHERE id = ?', sub);
+      return json({ ok: true, aparelhos: lista() });
+    }
+    if (req.method === 'POST' && sub === 'teste') {
+      const r = await this.avisarTodos({ titulo: '🔔 Teste: avisos de pedido ligados', texto: 'Quando chegar um pedido novo da loja, o aviso aparece assim.', url: `${origem}/#confeccao`, tag: 'teste' }, origem);
+      return json({ ...r, aparelhos: lista() }, r.enviados ? 200 : (r.total ? 502 : 400));
+    }
+    return json({ erro: 'rota desconhecida' }, 404);
+  }
+
+  /** Manda o aviso para todos os aparelhos cadastrados. */
+  async avisarTodos(dados, origem) {
+    const aparelhos = this.sql.exec('SELECT * FROM aparelhos').toArray();
+    if (!aparelhos.length) return { total: 0, enviados: 0, erro: 'nenhum aparelho cadastrado para receber avisos' };
+    const chaves = await this.chavesPush(origem);
+    let enviados = 0;
+    const falhas = [];
+    await Promise.all(aparelhos.map(async a => {
+      const r = await enviarPush(a, dados, chaves, chaves.contato);
+      if (r.ok) { enviados++; this.sql.exec('UPDATE aparelhos SET ultimo = ?, erro = NULL WHERE id = ?', Date.now(), a.id); return; }
+      if (r.sumiu) this.sql.exec('DELETE FROM aparelhos WHERE id = ?', a.id);
+      else this.sql.exec('UPDATE aparelhos SET erro = ? WHERE id = ?', `${r.status || 'sem conexão'} ${r.detalhe || ''}`.trim().slice(0, 200), a.id);
+      falhas.push(`${a.nome}: ${r.sumiu ? 'o navegador cancelou os avisos (ative de novo nele)' : r.status || 'sem conexão'}`);
+    }));
+    return { total: aparelhos.length, enviados, falhas, erro: enviados ? undefined : falhas.join('; ') };
   }
 
   async gravar(id, req, origem = '') {
@@ -240,11 +257,8 @@ export class Pedidos extends DurableObject {
         +p.total || 0, pecas, (p.itens || []).length, antigo?.status || 'novo', miniatura, antigo?.recebido || Date.now(), n, alerta,
         p.tipo === 'contato' ? 'contato' : 'pedido');
     });
-    // Pedido (ou contato) novo: avisa o gestor no WhatsApp, sem segurar a resposta ao tablet
-    if (!antigo) {
-      const a = this.lerAviso();
-      if (a.ativo && (p.tipo !== 'contato' || a.contatos !== false)) this.ctx.waitUntil(this.mandarAviso(textoAviso(p, origem ? `${origem}/#confeccao` : '')));
-    }
+    // Pedido (ou contato) novo: avisa os aparelhos do gestor, sem segurar a resposta ao tablet
+    if (!antigo) { p.id = id; this.ctx.waitUntil(this.avisarTodos(avisoDoPedido(p, origem), origem).catch(() => {})); }
     return json({ ok: true });
   }
 

@@ -8,6 +8,7 @@
  * busca, e o pedido em tela cheia (camisetas, tamanhos, cada arte e texto),
  * com PDF, arquivos das artes e a situação (novo → em produção → pronto → entregue).
  * Entra com a senha da confecção (a mesma configurada no tablet).
+ * "🔔 Avisos": alerta do navegador a cada pedido novo (ver avisos.js).
  */
 
 import { $, $$, esc, aviso, confirmar, ajudarTeclado, janela } from './ui.js';
@@ -17,6 +18,7 @@ import { pdfPedido, baixar, numeroPedido } from './order.js';
 import { dinheiro } from './precos.js';
 import { lib } from './catalog.js';
 import { arquivosTexto } from './textoVetor.js';
+import { janelaAvisos, situacao, renovar, alertar, parar, temSuporte } from './avisos.js';
 
 const API = 'api/pedidos';
 const SITUACOES = [
@@ -24,7 +26,7 @@ const SITUACOES = [
 ];
 const nomeSituacao = s => (SITUACOES.find(x => x[0] === s) || SITUACOES[0])[1];
 
-const E = { chave: '', pedidos: [], filtro: 'abertos', busca: '', vistos: new Set(), primeira: true };
+const E = { chave: '', pedidos: [], filtro: 'abertos', busca: '', vistos: new Set(), primeira: true, novos: new Set() };
 
 // ---------- Acesso ----------
 
@@ -96,10 +98,16 @@ function iniciarPainel() {
         </div>
         <label class="busca">${icone('busca')}<input type="search" id="busca" placeholder="Nome, telefone ou nº…" value="${esc(E.busca)}"></label>
         <div class="linhaBotoes">
+          <button type="button" class="btn btnClaro" id="btnAvisos">${icone('sino', 20)} Avisos <i class="pontoAviso" id="pontoAviso"></i></button>
           <button type="button" class="btn btnClaro" id="atualizar">${icone('virar', 20)} Atualizar</button>
           <button type="button" class="btnIcone" id="sair" title="Sair" aria-label="Sair">${icone('sair', 22)}</button>
         </div>
       </header>
+      <div class="faixaAvisos" id="faixaAvisos" hidden>
+        ${icone('sino', 22)} <span><b>Receba um alerta com som a cada pedido novo</b>, mesmo com esta página fechada (basta o navegador aberto).</span>
+        <button type="button" class="btn btnEscuro" id="faixaAtivar">Ativar avisos</button>
+        <button type="button" class="btnTexto" id="faixaDepois">Agora não</button>
+      </div>
       <main class="painelLista" id="lista"><div class="vazio"><span class="girando"></span></div></main>
     </div>`;
   $$('[data-filtro]').forEach(b => (b.onclick = () => { E.filtro = b.dataset.filtro; $$('[data-filtro]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); pintarLista(); }));
@@ -107,15 +115,45 @@ function iniciarPainel() {
   $('#busca').oninput = e => { clearTimeout(t); t = setTimeout(() => { E.busca = e.target.value; pintarLista(); }, 200); };
   $('#atualizar').onclick = () => carregar(true);
   $('#sair').onclick = async () => { if (await confirmar('Sair dos pedidos da confecção e voltar para o app da loja? Vai precisar da senha de novo.', { sim: 'Sair' })) voltarLoja(); };
-  carregar();
+  $('#btnAvisos').onclick = () => janelaAvisos(E.chave, estadoAvisos);
+  $('#faixaAtivar').onclick = () => janelaAvisos(E.chave, estadoAvisos);
+  $('#faixaDepois').onclick = () => { try { sessionStorage.setItem('faixaAvisos', '0'); } catch { /* ok */ } $('#faixaAvisos').hidden = true; };
+  carregar().then(() => abrirDoEndereco());
   setInterval(() => { if (!document.querySelector('dialog[open]')) carregar(); }, 30000);
+  renovar(E.chave).then(estadoAvisos);
+  // Aviso que chegou pelo navegador com o painel aberto: atualiza na hora; clique no aviso: abre o pedido
+  navigator.serviceWorker?.addEventListener('message', e => {
+    if (e.data?.tipo === 'pedidoNovo') carregar();
+    if (e.data?.tipo === 'abrir') { window.focus(); abrirDoEndereco(e.data.url); }
+  });
+}
+
+/** Botão "Avisos" com ponto verde (ativo neste aparelho) e faixa convidando a ativar. */
+async function estadoAvisos() {
+  const s = await situacao();
+  const ponto = $('#pontoAviso'); if (ponto) ponto.classList.toggle('ligado', !!s.ativo);
+  let depois = false; try { depois = sessionStorage.getItem('faixaAvisos') === '0'; } catch { /* ok */ }
+  const faixa = $('#faixaAvisos'); if (faixa) faixa.hidden = !temSuporte() || s.ativo || depois;
+}
+
+/** Endereço com ?pedido=ID (veio de um clique no aviso): abre esse pedido. */
+function abrirDoEndereco(endereco = location.href) {
+  let id = null;
+  try { id = new URL(endereco, location.href).searchParams.get('pedido'); } catch { /* ok */ }
+  if (!id) return;
+  if (endereco === location.href) history.replaceState(null, '', location.pathname + '#confeccao');
+  document.querySelectorAll('dialog[open] [data-fechar]').forEach(b => b.click());
+  E.novos.delete(id); parar(); pintarLista();
+  setTimeout(() => abrir(id), 200);
 }
 
 async function carregar(avisar = false) {
   try {
     const { pedidos } = await (await api()).json();
+    const primeira = E.primeira;
     const novos = pedidos.filter(p => !E.vistos.has(p.id));
     const novosPed = novos.filter(p => p.tipo !== 'contato'), novosCont = novos.filter(p => p.tipo === 'contato');
+    if (!E.primeira && novos.length) novos.forEach(p => E.novos.add(String(p.id)));
     if (!E.primeira && novosPed.length) aviso(`${novosPed.length} pedido${novosPed.length > 1 ? 's' : ''} novo${novosPed.length > 1 ? 's' : ''} chegou${novosPed.length > 1 ? 'ram' : ''}!`, 'ok');
     if (!E.primeira && novosCont.length) aviso(`${novosCont.length === 1 ? `${novosCont[0].nome || 'Um cliente'} quer` : `${novosCont.length} clientes querem`} fazer camiseta com a própria arte: chame no WhatsApp.`, 'ok');
     pedidos.forEach(p => E.vistos.add(p.id));
@@ -124,7 +162,10 @@ async function carregar(avisar = false) {
     const abertos = pedidos.filter(p => p.status !== 'entregue').length;
     document.title = `${abertos ? `(${abertos}) ` : ''}Pedidos · Confecção`;
     pintarLista();
+    // Som + aba piscando (depois de atualizar o título, que é o que volta quando para de piscar)
+    if (!primeira && novos.length) alertar(novosPed.length ? (novosPed.length > 1 ? `${novosPed.length} PEDIDOS NOVOS` : 'NOVO PEDIDO') : 'NOVO CONTATO');
     if (avisar) aviso('Lista atualizada.');
+    return pedidos;
   } catch (e) {
     if (E.chave) aviso(navigator.onLine ? e.message : 'Sem internet.', 'erro');
   }
@@ -143,19 +184,20 @@ function pintarLista() {
   const lista = filtrados();
   $('#lista').innerHTML = lista.length ? `<div class="gradePedidos">${lista.map(p => {
     const d = new Date(p.data);
-    if (p.tipo === 'contato') return `<button type="button" class="cartaoPedido contatoCartao st-${esc(p.status)}" data-id="${esc(p.id)}">
+    const novo = E.novos.has(String(p.id)) ? ' cartaoNovo' : '';
+    if (p.tipo === 'contato') return `<button type="button" class="cartaoPedido contatoCartao st-${esc(p.status)}${novo}" data-id="${esc(p.id)}">
       <span class="cpImg">${icone('whatsapp', 48)}</span>
       <span class="cpInfo">
-        <span class="cpTopo"><strong>Contato</strong><span class="chipSituacao st-${esc(p.status)}">${p.status === 'entregue' ? 'Atendido' : 'Chamar'}</span></span>
+        <span class="cpTopo"><strong>Contato</strong>${novo ? '<span class="seloNovo">CHEGOU AGORA</span>' : ''}<span class="chipSituacao st-${esc(p.status)}">${p.status === 'entregue' ? 'Atendido' : 'Chamar'}</span></span>
         <span class="cpNome">${esc(p.nome || 'Sem nome')}</span>
         <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${p.telefone ? ' · ' + esc(p.telefone) : ''}</small>
         <small>Quer fazer camiseta com a própria arte</small>
       </span>
     </button>`;
-    return `<button type="button" class="cartaoPedido st-${esc(p.status)}" data-id="${esc(p.id)}">
+    return `<button type="button" class="cartaoPedido st-${esc(p.status)}${novo}" data-id="${esc(p.id)}">
       <span class="cpImg">${p.miniatura ? `<img src="${esc(p.miniatura)}" alt="">` : icone('camisa', 48)}</span>
       <span class="cpInfo">
-        <span class="cpTopo"><strong>Nº ${numeroPedido(p.numero)}</strong><span class="chipSituacao st-${esc(p.status)}">${nomeSituacao(p.status)}</span></span>
+        <span class="cpTopo"><strong>Nº ${numeroPedido(p.numero)}</strong>${novo ? '<span class="seloNovo">CHEGOU AGORA</span>' : ''}<span class="chipSituacao st-${esc(p.status)}">${nomeSituacao(p.status)}</span></span>
         <span class="cpNome">${esc(p.nome || 'Sem nome')}</span>
         <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${p.telefone ? ' · ' + esc(p.telefone) : ''}</small>
         <small>${p.camisetas} camiseta${p.camisetas === 1 ? '' : 's'} · ${p.pecas} peça${p.pecas === 1 ? '' : 's'}${p.total ? ` · <b>${dinheiro(p.total)}</b>` : ''}</small>
@@ -164,7 +206,7 @@ function pintarLista() {
     </button>`;
   }).join('')}</div>`
     : `<div class="vazio">${icone('lista', 48)}<p>${E.pedidos.length ? 'Nenhum pedido neste filtro.' : 'Nenhum pedido ainda. Assim que o tablet enviar, aparece aqui (a lista atualiza sozinha).'}</p></div>`;
-  $$('#lista [data-id]').forEach(b => (b.onclick = () => abrir(b.dataset.id)));
+  $$('#lista [data-id]').forEach(b => (b.onclick = () => { if (E.novos.delete(b.dataset.id)) pintarLista(); parar(); abrir(b.dataset.id); }));
 }
 
 // ---------- Contato (cliente que quer usar a própria arte) ----------

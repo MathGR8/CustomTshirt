@@ -34,21 +34,6 @@ export async function testarChave(chave, nova) {
   return d; // { ok, trocada? }
 }
 
-/** Aviso no WhatsApp do gestor (guardado no servidor). */
-export async function lerAviso(cfg) {
-  return (await api('aviso', configEnvio(cfg).chave)).json();
-}
-export async function salvarAviso(cfg, dados) {
-  return (await api('aviso', configEnvio(cfg).chave, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(dados) })).json();
-}
-export async function testarAviso(cfg) {
-  const r = await buscar(`${API}/aviso/teste`, { method: 'POST', headers: { 'x-chave': configEnvio(cfg).chave } });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok || !d.ok) throw new Error(d.erro || `erro ${r.status}`);
-  return d;
-}
-
-/** fetch com tempo máximo (internet lenta não trava o envio para sempre). */
 async function buscar(url, opc = {}, ms = 90000) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), ms);

@@ -4,12 +4,12 @@
  * As artes ficam no IndexedDB do tablet (não passam por aqui).
  * Ao publicar uma versão nova, troque VERSAO para os tablets baixarem os arquivos novos.
  */
-const VERSAO = 'camisetas-tablet-v25';
+const VERSAO = 'camisetas-tablet-v26';
 const APP = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/admin.js', 'js/catalog.js', 'js/config.js', 'js/db.js',
   'js/icons.js', 'js/order.js', 'js/shirt.js', 'js/ui.js', 'js/fontes.js',
-  'js/medidas.js', 'js/texto.js', 'js/precos.js', 'js/sync.js', 'js/textoVetor.js', 'js/painel.js', 'js/codigoArtes.js',
+  'js/medidas.js', 'js/texto.js', 'js/precos.js', 'js/sync.js', 'js/textoVetor.js', 'js/painel.js', 'js/codigoArtes.js', 'js/avisos.js',
   'vendor/opentype.min.js',
   ...['montserrat', 'bebas-neue', 'anton', 'oswald', 'bangers', 'permanent-marker', 'pacifico', 'lobster',
     'dancing-script', 'righteous', 'black-ops-one', 'rye', 'unifrakturmaguntia'].map(f => `fontes/${f}.woff`),
@@ -62,3 +62,32 @@ self.addEventListener('fetch', e => {
     })));
   }
 });
+
+// ---------- Avisos de pedido novo (computador/celular do gestor) ----------
+// O servidor manda uma notificação (Web Push) a cada pedido; aparece mesmo com
+// a página fechada, desde que o navegador esteja aberto.
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { texto: e.data ? e.data.text() : '' }; }
+  e.waitUntil((async () => {
+    await self.registration.showNotification(d.titulo || 'Novo pedido', {
+      body: d.texto || '', icon: 'icons/icone-192.png', badge: 'icons/icone-192.png',
+      tag: d.tag || 'pedido', renotify: true, requireInteraction: d.tag !== 'teste', // fica na tela até clicar
+      vibrate: [200, 100, 200, 100, 400], data: { url: d.url || './#confeccao' }
+    });
+    for (const c of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) c.postMessage({ tipo: 'pedidoNovo' });
+  })());
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = new URL(e.notification.data?.url || './#confeccao', self.registration.scope).href;
+  e.waitUntil((async () => {
+    const abertas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const painel = abertas.find(c => ehPainel(c.url));
+    if (painel) { await painel.focus().catch(() => {}); painel.postMessage({ tipo: 'abrir', url }); return; }
+    await self.clients.openWindow(url);
+  })());
+});
+// Aba que já está no painel da confecção (endereço com #confeccao ou ?pedido=)
+const ehPainel = u => /#confeccao|[?&]pedido=/.test(u);
