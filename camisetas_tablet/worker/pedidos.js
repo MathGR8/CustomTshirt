@@ -20,6 +20,9 @@
  *   POST   /api/pedidos/notificacoes           {endpoint, keys, nome} cadastra este aparelho
  *   DELETE /api/pedidos/notificacoes/:id       para de avisar o aparelho
  *   POST   /api/pedidos/notificacoes/teste     manda um aviso de teste para todos
+ *   GET    /api/pedidos/espaco?meses=N         espaço usado + quanto a limpeza liberaria
+ *   POST   /api/pedidos/espaco/limpar          {meses} apaga os ARQUIVOS dos pedidos entregues
+ *                                              há mais de N meses (os dados do pedido ficam)
  *
  * Aviso de pedido: a cada pedido (ou contato) novo o servidor manda uma
  * notificação do navegador (Web Push) para cada computador/celular que ativou
@@ -34,6 +37,10 @@ const PEDACO = 1024 * 1024;            // o SQLite do Durable Object guarda até
 const MAX_ARQUIVO = 40 * 1024 * 1024;
 const MAX_PEDIDO = 30 * 1024 * 1024;
 const SENHA_INICIAL = '000000';
+// Espaço do plano grátis da Cloudflare: 1 GB por Durable Object (o número mais conservador da documentação).
+// Variável ESPACO_LIMITE_MB no Worker muda o limite (ex.: no plano pago, 10240).
+const LIMITE_PADRAO_MB = 1024;
+const MES = 30 * 24 * 3600 * 1000;
 
 const reais = v => (+v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -91,6 +98,8 @@ export class Pedidos extends DurableObject {
     this.sql.exec("DELETE FROM cfg WHERE k IN ('aviso', 'aviso_ultimo')"); // aviso antigo pelo CallMeBot
     // Tipo do registro ("pedido" ou "contato": cliente que quer usar a própria arte)
     try { this.sql.exec("ALTER TABLE pedidos ADD COLUMN tipo TEXT DEFAULT 'pedido'"); } catch { /* já existe */ }
+    // Quando os arquivos do pedido foram apagados para liberar espaço
+    try { this.sql.exec('ALTER TABLE pedidos ADD COLUMN limpo INTEGER'); } catch { /* já existe */ }
     // Uma vez só: apaga a senha gravada pelas versões antigas (a 1ª senha usada
     // ficava valendo) e volta para a senha inicial 000000. Os pedidos ficam.
     if (!this.um("SELECT v FROM cfg WHERE k = 'senha_inicial_v2'")) {
@@ -155,6 +164,16 @@ export class Pedidos extends DurableObject {
       // Avisos de pedido no navegador (computador/celular do gestor)
       if (partes[0] === 'notificacoes') return await this.notificacoes(req, partes[1], url.origin);
 
+      // Espaço usado e limpeza dos arquivos de pedidos antigos
+      if (partes[0] === 'espaco') {
+        if (req.method === 'GET' && !partes[1]) return json(this.espaco(+url.searchParams.get('meses') || 0));
+        if (req.method === 'POST' && partes[1] === 'limpar') {
+          const { meses } = await req.json().catch(() => ({}));
+          if (!(+meses >= 1)) return json({ erro: 'escolha de quantos meses' }, 400);
+          return json(this.limpar(+meses));
+        }
+      }
+
       const [id, sub, nome] = partes;
       if (!id && req.method === 'GET') return this.lista(url);
       if (id && !sub) {
@@ -178,11 +197,48 @@ export class Pedidos extends DurableObject {
   lista(url) {
     const status = url.searchParams.get('status');
     const rows = this.sql.exec(
-      `SELECT p.id, p.numero, p.data, p.nome, p.telefone, p.total, p.pecas, p.camisetas, p.status, p.miniatura, p.recebido, p.alerta, p.tipo,
+      `SELECT p.id, p.numero, p.data, p.nome, p.telefone, p.total, p.pecas, p.camisetas, p.status, p.miniatura, p.recebido, p.alerta, p.tipo, p.limpo,
               (SELECT COUNT(*) FROM arquivos a WHERE a.pedido = p.id) AS arquivos
          FROM pedidos p ${status && STATUS.includes(status) ? 'WHERE p.status = ?' : ''}
         ORDER BY p.recebido DESC LIMIT 500`, ...(status && STATUS.includes(status) ? [status] : [])).toArray();
     return json({ pedidos: rows });
+  }
+
+  // ---------- Espaço ----------
+
+  /** Pedidos entregues há mais de N meses que ainda têm arquivos. */
+  antigos(meses) {
+    return this.sql.exec(`SELECT p.id, (SELECT COALESCE(SUM(a.tamanho), 0) FROM arquivos a WHERE a.pedido = p.id) AS bytes
+      FROM pedidos p WHERE p.status = 'entregue' AND p.recebido < ? AND EXISTS (SELECT 1 FROM arquivos a WHERE a.pedido = p.id)`,
+    Date.now() - meses * MES).toArray();
+  }
+
+  espaco(meses = 0) {
+    const um = q => this.um(q)?.n || 0;
+    const arquivos = um('SELECT COALESCE(SUM(tamanho), 0) AS n FROM arquivos');
+    const dados = um('SELECT COALESCE(SUM(LENGTH(dados)), 0) AS n FROM pedido_partes') + um('SELECT COALESCE(SUM(LENGTH(miniatura)), 0) AS n FROM pedidos');
+    const limite = (+this.env.ESPACO_LIMITE_MB || LIMITE_PADRAO_MB) * 1048576;
+    const usado = arquivos + dados;
+    const r = {
+      usado, limite, arquivos, dados, banco: this.ctx.storage.sql.databaseSize || null,
+      pedidos: um('SELECT COUNT(*) AS n FROM pedidos'), entregues: um("SELECT COUNT(*) AS n FROM pedidos WHERE status = 'entregue'"),
+      porPedido: um("SELECT COUNT(*) AS n FROM pedidos WHERE tipo != 'contato'") ? Math.round(usado / um("SELECT COUNT(*) AS n FROM pedidos WHERE tipo != 'contato'")) : 0
+    };
+    if (meses) { const l = this.antigos(meses); r.limpeza = { meses, pedidos: l.length, bytes: l.reduce((s, x) => s + x.bytes, 0) }; }
+    return r;
+  }
+
+  /** Apaga os arquivos (imagens das artes) dos pedidos entregues há mais de N meses. Os dados ficam. */
+  limpar(meses) {
+    const l = this.antigos(meses), agora = Date.now();
+    this.ctx.storage.transactionSync(() => {
+      for (const { id } of l) {
+        this.sql.exec('DELETE FROM arquivo_partes WHERE pedido = ?', id);
+        this.sql.exec('DELETE FROM arquivos WHERE pedido = ?', id);
+        this.sql.exec('UPDATE pedidos SET limpo = ? WHERE id = ?', agora, id);
+      }
+    });
+    return { ok: true, pedidos: l.length, bytes: l.reduce((s, x) => s + x.bytes, 0), espaco: this.espaco() };
   }
 
   // ---------- Avisos no navegador (Web Push) ----------
@@ -263,11 +319,11 @@ export class Pedidos extends DurableObject {
   }
 
   ler(id) {
-    const cab = this.um('SELECT status, recebido FROM pedidos WHERE id = ?', id);
+    const cab = this.um('SELECT status, recebido, limpo FROM pedidos WHERE id = ?', id);
     if (!cab) return json({ erro: 'pedido não encontrado' }, 404);
     const dados = this.sql.exec('SELECT dados FROM pedido_partes WHERE id = ? ORDER BY idx', id).toArray().map(r => r.dados).join('');
     const p = JSON.parse(dados);
-    p.status = cab.status; p.recebido = cab.recebido;
+    p.status = cab.status; p.recebido = cab.recebido; if (cab.limpo) p.limpo = cab.limpo;
     p.arquivos = this.sql.exec('SELECT nome, tipo, tamanho FROM arquivos WHERE pedido = ? ORDER BY nome', id).toArray();
     return json(p);
   }

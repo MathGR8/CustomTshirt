@@ -86,6 +86,64 @@ function telaEntrar(msg = '') {
   };
 }
 
+// ---------- Espaço na nuvem ----------
+
+const mb = b => (b >= 1073741824 ? `${(b / 1073741824).toFixed(2).replace('.', ',')} GB` : `${Math.max(b > 0 ? 0.1 : 0, b / 1048576).toFixed(b < 10485760 ? 1 : 0).replace('.', ',')} MB`);
+const pct = e => Math.min(100, Math.round(e.usado / e.limite * 100));
+
+/** Botão "Espaço: 12%" e faixa de aviso a partir de 70%. */
+async function estadoEspaco() {
+  try {
+    const e = await (await api('espaco')).json();
+    const p = pct(e);
+    $('#espacoTxt') && ($('#espacoTxt').textContent = `Espaço: ${p}%`);
+    $('#btnEspaco')?.classList.toggle('espacoAlto', p >= 70);
+    const f = $('#faixaEspaco'); if (!f) return;
+    f.hidden = p < 70;
+    f.classList.toggle('critico', p >= 90);
+    f.innerHTML = p >= 70 ? `${icone('pasta', 22)} <span><b>O espaço dos pedidos está em ${p}%</b> (${mb(e.usado)} de ${mb(e.limite)}). ${p >= 90 ? 'Quando encher, os pedidos novos ficam esperando no tablet.' : 'Libere espaço apagando os arquivos de pedidos antigos já entregues.'}</span>
+      <button type="button" class="btn btnEscuro" id="faixaLimpar">Liberar espaço</button>` : '';
+    $('#faixaLimpar') && ($('#faixaLimpar').onclick = () => janelaEspaco());
+  } catch { /* sem internet: tenta na próxima */ }
+}
+
+async function janelaEspaco() {
+  let meses = 6;
+  const j = janela({ titulo: `${icone('pasta')} Espaço dos pedidos`, classe: 'janelaPequena janelaEspaco', html: '<div class="vazio"><span class="girando"></span></div>' });
+  const corpo = j.el.querySelector('.janelaCorpo');
+  const pintar = async () => {
+    let e;
+    try { e = await (await api(`espaco?meses=${meses}`)).json(); } catch (err) { corpo.innerHTML = `<p class="alertaPedido">${esc(err.message)}</p>`; return; }
+    const p = pct(e), l = e.limpeza;
+    corpo.innerHTML = `
+      <p class="textoAjuda">Os pedidos (dados e imagens das artes) ficam guardados na nuvem da Cloudflare. No plano grátis cabem <b>${mb(e.limite)}</b>.
+        O catálogo de artes fica no tablet e não ocupa este espaço.</p>
+      <div class="barraEspaco ${p >= 90 ? 'critico' : p >= 70 ? 'alto' : ''}" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}" aria-label="Espaço usado"><i style="width:${Math.max(p, 1)}%"></i></div>
+      <p class="numEspaco"><b>${p}% usado</b> · ${mb(e.usado)} de ${mb(e.limite)}</p>
+      <p class="textoAjuda">${e.pedidos} pedido${e.pedidos === 1 ? '' : 's'} guardado${e.pedidos === 1 ? '' : 's'}${e.porPedido ? ` · cerca de ${mb(e.porPedido)} por pedido` : ''}
+        ${e.porPedido && (e.limite - e.usado) / e.porPedido >= 1 ? ` · ainda cabem uns <b>${Math.floor((e.limite - e.usado) / e.porPedido).toLocaleString('pt-BR')}</b> pedidos` : ''}</p>
+      <h4>Liberar espaço</h4>
+      <p class="textoAjuda">Apaga só as <b>imagens das artes</b> dos pedidos já <b>entregues</b>. O pedido continua na lista com cliente, camisetas, tamanhos e valores.</p>
+      <label class="campoPeq"><span>Pedidos entregues há mais de</span>
+        <select id="esMeses">${[1, 3, 6, 12, 24].map(m => `<option value="${m}" ${m === meses ? 'selected' : ''}>${m} ${m === 1 ? 'mês' : 'meses'}</option>`).join('')}</select></label>
+      <p class="previaLimpeza">${l.pedidos ? `<b>${l.pedidos} pedido${l.pedidos === 1 ? '' : 's'}</b> · libera <b>${mb(l.bytes)}</b>` : 'Nenhum pedido entregue nesse período com arquivos guardados.'}</p>
+      <div class="linhaBotoes">
+        <button type="button" class="btn btnClaro" data-fechar>Fechar</button>
+        <button type="button" class="btn btnEscuro btnPerigo" id="esLimpar" ${l.pedidos ? '' : 'disabled'}>${icone('lixo', 20)} Apagar arquivos</button>
+      </div>`;
+    $('#esMeses', j.el).onchange = ev => { meses = +ev.target.value; pintar(); };
+    $('#esLimpar', j.el).onclick = async () => {
+      if (!(await confirmar(`Apagar as imagens das artes de ${l.pedidos} pedido${l.pedidos === 1 ? '' : 's'} entregue${l.pedidos === 1 ? '' : 's'} há mais de ${meses} ${meses === 1 ? 'mês' : 'meses'}? Os dados dos pedidos continuam. Não dá para desfazer.`, { sim: 'Apagar arquivos', perigo: true }))) return;
+      try {
+        const r = await (await api('espaco/limpar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ meses }) })).json();
+        aviso(`Liberado ${mb(r.bytes)} (${r.pedidos} pedido${r.pedidos === 1 ? '' : 's'}).`, 'ok');
+        await pintar(); estadoEspaco(); carregar();
+      } catch (err) { aviso(err.message, 'erro'); }
+    };
+  };
+  await pintar();
+}
+
 // ---------- Lista ----------
 
 function iniciarPainel() {
@@ -99,6 +157,7 @@ function iniciarPainel() {
         <label class="busca">${icone('busca')}<input type="search" id="busca" placeholder="Nome, telefone ou nº…" value="${esc(E.busca)}"></label>
         <div class="linhaBotoes">
           <button type="button" class="btn btnClaro" id="btnAvisos">${icone('sino', 20)} Avisos <i class="pontoAviso" id="pontoAviso"></i></button>
+          <button type="button" class="btn btnClaro" id="btnEspaco" title="Espaço dos pedidos na nuvem">${icone('pasta', 20)} <span id="espacoTxt">Espaço</span></button>
           <button type="button" class="btn btnClaro" id="atualizar">${icone('virar', 20)} Atualizar</button>
           <button type="button" class="btnIcone" id="sair" title="Sair" aria-label="Sair">${icone('sair', 22)}</button>
         </div>
@@ -108,6 +167,7 @@ function iniciarPainel() {
         <button type="button" class="btn btnEscuro" id="faixaAtivar">Ativar avisos</button>
         <button type="button" class="btnTexto" id="faixaDepois">Agora não</button>
       </div>
+      <div class="faixaEspaco" id="faixaEspaco" hidden></div>
       <main class="painelLista" id="lista"><div class="vazio"><span class="girando"></span></div></main>
     </div>`;
   $$('[data-filtro]').forEach(b => (b.onclick = () => { E.filtro = b.dataset.filtro; $$('[data-filtro]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); pintarLista(); }));
@@ -116,6 +176,8 @@ function iniciarPainel() {
   $('#atualizar').onclick = () => carregar(true);
   $('#sair').onclick = async () => { if (await confirmar('Sair dos pedidos da confecção e voltar para o app da loja? Vai precisar da senha de novo.', { sim: 'Sair' })) voltarLoja(); };
   $('#btnAvisos').onclick = () => janelaAvisos(E.chave, estadoAvisos);
+  $('#btnEspaco').onclick = () => janelaEspaco();
+  estadoEspaco();
   $('#faixaAtivar').onclick = () => janelaAvisos(E.chave, estadoAvisos);
   $('#faixaDepois').onclick = () => { try { sessionStorage.setItem('faixaAvisos', '0'); } catch { /* ok */ } $('#faixaAvisos').hidden = true; };
   carregar().then(() => abrirDoEndereco());
@@ -200,6 +262,7 @@ function pintarLista() {
         <span class="cpTopo"><strong>Nº ${numeroPedido(p.numero)}</strong>${novo ? '<span class="seloNovo">CHEGOU AGORA</span>' : ''}<span class="chipSituacao st-${esc(p.status)}">${nomeSituacao(p.status)}</span></span>
         <span class="cpNome">${esc(p.nome || 'Sem nome')}</span>
         <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${p.telefone ? ' · ' + esc(p.telefone) : ''}</small>
+        ${p.limpo ? '<small class="seloLimpo">arquivos apagados</small>' : ''}
         <small>${p.camisetas} camiseta${p.camisetas === 1 ? '' : 's'} · ${p.pecas} peça${p.pecas === 1 ? '' : 's'}${p.total ? ` · <b>${dinheiro(p.total)}</b>` : ''}</small>
         ${p.alerta ? `<small class="alertaPedido">${icone('fechar', 14)} Arte com qualidade baixa</small>` : ''}
       </span>
@@ -259,6 +322,8 @@ async function abrir(id) {
 
 function verPedidoPainel(p, nomeArq) {
   const id = String(p.id);
+  const nomes = new Set((p.arquivos || []).map(f => f.nome));
+  const tem = n => nomes.has(n);
   return verPedido(p, {
     pdf: async () => {
       try { baixar(await pdfPedido(p, p.loja || 'Pedido'), `${nomeArq}.pdf`); }
@@ -282,10 +347,10 @@ function verPedidoPainel(p, nomeArq) {
       } catch (e) { aviso('Não foi possível baixar: ' + e.message, 'erro'); }
     },
     // Imagem de cada arte: texto (já vem no pedido) ou a prévia enviada pelo tablet
-    fonteArte: async a => (a.tipo === 'texto' ? a.url : a.arquivos?.previa ? urlArquivo(id, a.arquivos.previa) : null),
-    extraArte: a => (a.arquivos?.original || a.arquivos?.previa)
+    fonteArte: async a => (a.tipo === 'texto' ? a.url : a.arquivos?.previa && tem(a.arquivos.previa) ? urlArquivo(id, a.arquivos.previa) : null),
+    extraArte: a => (!p.limpo && (a.arquivos?.original || a.arquivos?.previa))
       ? `<button type="button" class="btnTexto btnArquivo" data-arq="${esc(a.arquivos.original || a.arquivos.previa)}">${icone('baixar', 16)} ${a.arquivos.original ? 'Baixar arquivo original' : 'Baixar imagem'}</button>` : '',
-    topo: `<div class="situacaoPedido">
+    topo: `${p.limpo ? `<p class="avisoLimpo">${icone('pasta', 18)} As imagens das artes deste pedido foram apagadas em ${new Date(p.limpo).toLocaleDateString('pt-BR')} para liberar espaço. Os dados continuam.</p>` : ''}<div class="situacaoPedido">
         <span>Situação:</span>
         <div class="segmento" id="dSituacao">${SITUACOES.map(([v, n]) => `<button type="button" data-st="${v}" aria-pressed="${p.status === v}">${n}</button>`).join('')}</div>
         <button type="button" class="btn btnClaro btnPerigoTexto" id="dApagar">${icone('lixo', 20)} Apagar</button>

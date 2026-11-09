@@ -233,6 +233,19 @@ Os pedidos ficam guardados no próprio Worker do Cloudflare (Durable Object com 
 no plano grátis; nada a criar no painel). Se preferir, crie no Worker a variável secreta
 `PEDIDOS_SENHA`: ela passa a valer no lugar da senha gravada.
 
+## Espaço dos pedidos na nuvem
+
+Os pedidos (dados e imagens das artes) ficam na nuvem da Cloudflare; no plano grátis cabe
+**1 GB** (cerca de 1.000 pedidos com arte do catálogo; foto enviada pelo cliente ocupa mais).
+O catálogo de artes fica no tablet e não ocupa esse espaço.
+
+- No painel da confecção, o botão **Espaço: X%** mostra o uso. A partir de **70%** aparece um
+  aviso; em **90%** ele fica vermelho.
+- **Liberar espaço**: apaga só as **imagens das artes** dos pedidos **entregues** há mais de
+  1, 3, 6, 12 ou 24 meses. O pedido continua na lista (cliente, camisetas, tamanhos, valores),
+  com o aviso "arquivos apagados".
+- Plano pago da Cloudflare: crie a variável `ESPACO_LIMITE_MB` no Worker (ex.: `10240`).
+
 ## Teclado do tablet
 
 - Com o app em tela cheia não há a barra do Android para baixar o teclado: aparece o botão
