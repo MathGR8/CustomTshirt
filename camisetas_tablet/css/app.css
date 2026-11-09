@@ -1131,3 +1131,20 @@ html:has(body.paginaPainel) { font-size: 16px; }
 .janelaVerAdmin .verInfo .linhaBotoes { margin-top: 0.5rem; }
 .dicaSwipeNormal { bottom: 0.5rem; }
 .verPalcoAdmin figure:only-child figcaption { display: none; }
+
+/* ---------- Espaço dos pedidos (painel da confecção) ---------- */
+#btnEspaco { white-space: nowrap; }
+#btnEspaco.espacoAlto { border-color: #e8c547; background: #fff7d6; }
+.faixaEspaco { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 0.75rem 1.25rem 0; padding: 0.75rem 1rem; background: #fff7d6; border: 2px solid #e8c547; border-radius: var(--raio); }
+.faixaEspaco.critico { background: #fde8e6; border-color: var(--perigo); }
+.faixaEspaco[hidden] { display: none; }
+.faixaEspaco > span { flex: 1 1 18rem; }
+.janelaEspaco .janelaCorpo { display: grid; gap: 0.75rem; }
+.barraEspaco { height: 1.25rem; border-radius: 1rem; background: var(--fundo); overflow: hidden; border: 1px solid var(--linha); }
+.barraEspaco i { display: block; height: 100%; background: #2f6b3a; border-radius: 1rem; }
+.barraEspaco.alto i { background: #c9a227; }
+.barraEspaco.critico i { background: var(--perigo); }
+.numEspaco { font-size: 1.125rem; }
+.previaLimpeza { padding: 0.75rem 1rem; border-radius: 0.75rem; background: var(--fundo); }
+.avisoLimpo { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 0.75rem; background: #fff7d6; margin-bottom: 0.5rem; }
+.seloLimpo { color: #7a4b00; font-weight: 700; }
