@@ -41,6 +41,7 @@ import { DragModule }      from './events/dragModule.js';
 import { TextoModule }     from './image/textoModule.js';
 import { TabelaMedidasModule } from './ui/tabelaMedidasModule.js';
 import { TutorialModule }  from './ui/tutorialModule.js';
+import { EtapasModule }   from './ui/etapasModule.js';
 import { registerGlobalEvents, initConfigurator } from './events/globalEvents.js';
 
 // ============================================================
@@ -66,7 +67,8 @@ window._modules = {
   DragModule,
   TextoModule,
   TabelaMedidasModule,
-  TutorialModule
+  TutorialModule,
+  EtapasModule
 };
 
 // ============================================================
@@ -90,6 +92,7 @@ window.DragModule       = DragModule;
 window.TextoModule      = TextoModule;
 window.TabelaMedidasModule = TabelaMedidasModule;
 window.TutorialModule   = TutorialModule;
+window.EtapasModule     = EtapasModule;
 
 // ValidationModule exposto para compatibilidade (lógica inline no HTML original)
 window.ValidationModule = {
@@ -121,6 +124,8 @@ document.addEventListener("DOMContentLoaded", () => {
   registerGlobalEvents(window._modules);
   // Inicializa a aplicação (popula UI, configura estado inicial)
   initConfigurator();
+  // Tela única por etapas (Produto → Arte → Tamanhos → Pedido)
+  EtapasModule.init();
   // Carrega o pedido salvo no navegador e desenha "Itens do pedido"
   OrderModule.init();
   // Atalhos de teclado e histórico de desfazer (a partir do estado inicial)

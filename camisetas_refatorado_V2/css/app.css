@@ -1,0 +1,337 @@
+/* =============================================================
+   ArtRock · Tela única por etapas (mobile-first)
+   Produto → Arte → Tamanhos → Pedido. A página não rola: a altura
+   vem da área visível (--altura, ver etapasModule.js). No celular a
+   camiseta fica em cima e a etapa embaixo; no computador, lado a lado.
+   Janelas (editar arte, texto, medidas, contato) continuam em styles.css.
+   ============================================================= */
+:root {
+  --ar: #ED3051;          /* vermelho ArtRock */
+  --ar-escuro: #B8173A;
+  --ar-claro: #FFF0F3;
+  --preto: #121212;
+  --fundo: #F3F4F6;
+  --cartao: #FFFFFF;
+  --linha: #E2E4E8;
+  --texto: #1F2023;
+  --suave: #6A6E75;
+  --raio: 14px;
+  --sombra: 0 2px 10px rgba(0, 0, 0, .07);
+}
+
+html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+body { background: var(--fundo); color: var(--texto); font-size: 15px; -webkit-tap-highlight-color: transparent; }
+button, label, select { touch-action: manipulation; }
+
+/* ---------- Grade da tela ---------- */
+#overallContainer.app {
+  width: 100%; max-width: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; overflow: hidden;
+  height: var(--altura, 100dvh); background: var(--fundo);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "topo" "palco" "painel" "rodape";
+}
+
+/* ---------- Topo ---------- */
+.app .appHeader {
+  grid-area: topo; height: auto; min-height: 52px; gap: 8px; justify-content: space-between;
+  padding: 6px 10px; padding-top: max(6px, env(safe-area-inset-top));
+  background: linear-gradient(120deg, var(--ar) 0%, #8E0F2C 55%, #000 100%);
+}
+.app .marca { display: flex; align-items: center; flex: none; }
+.app .marca img { height: 30px; width: auto; display: block; }
+.etapas { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; }
+.etapas button {
+  display: flex; align-items: center; gap: 6px; background: none; border: 0; color: #fff; opacity: .72;
+  font: 700 13px var(--font-base); padding: 6px 4px; cursor: pointer; white-space: nowrap; border-radius: 99px;
+}
+.etapas button b {
+  width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  border: 2px solid rgba(255, 255, 255, .75); font-size: 12px;
+}
+.etapas button.feita { opacity: .9; }
+.etapas button.feita b { background: rgba(255, 255, 255, .22); }
+.etapas button[aria-current] { opacity: 1; }
+.etapas button[aria-current] b { background: #fff; border-color: #fff; color: var(--ar); }
+.etapas i { width: 14px; height: 2px; background: rgba(255, 255, 255, .45); flex: none; }
+.hdrAcoes { display: flex; align-items: center; gap: 4px; flex: none; }
+.app .hdrIcon {
+  width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, .45);
+  background: rgba(255, 255, 255, .08); color: #fff; font-size: 16px; display: grid; place-items: center; cursor: pointer;
+}
+.app .hdrIcon:disabled { opacity: .35; }
+.hdrPedido {
+  display: flex; align-items: center; gap: 4px; height: 36px; padding: 0 10px; border-radius: 99px; border: 0;
+  background: #fff; color: var(--preto); font: 800 14px var(--font-base); cursor: pointer;
+}
+#orderCount { min-width: 1ch; }
+
+/* ---------- Camiseta ---------- */
+.palco { grid-area: palco; min-height: 0; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 2px; }
+.app .previewContainer {
+  flex: 1; min-height: 0; width: 100%; max-width: none; height: auto; margin: 0;
+  border-radius: 18px; border: 1px solid var(--linha); background: radial-gradient(circle at 50% 40%, #EDEEF0 0%, #D9DBDF 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6);
+}
+.app img#baseShirtImg { padding: 10px; }
+.app #currentSideBadge { top: 8px; left: 10px; font-size: 11px; background: rgba(18, 18, 18, .7); }
+.app #btnToggleView {
+  right: 8px; bottom: 8px; top: auto; left: auto; height: 38px; padding: 0 14px; border-radius: 99px; border: 0;
+  background: rgba(18, 18, 18, .82); color: #fff; font: 700 13px var(--font-base); box-shadow: var(--sombra);
+}
+.app #alignHud {
+  left: 8px; right: auto; bottom: 8px; top: auto; flex-direction: row; align-items: flex-end; gap: 6px;
+  background: rgba(255, 255, 255, .92); padding: 6px; border-radius: 14px; box-shadow: var(--sombra);
+}
+.app #alignHud .centerCol { gap: 4px; }
+.app #alignHud .align-button { min-height: 32px; padding: 0 8px; font-size: 12px; }
+.app .infoExemplo { font-size: 11px; line-height: 1.3; margin: 2px 0 0; text-align: center; color: var(--suave); }
+
+/* ---------- Etapa atual ---------- */
+.painel {
+  grid-area: painel; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  max-height: calc(var(--altura, 100dvh) * .47);
+  background: var(--cartao); border-radius: 20px 20px 0 0; box-shadow: 0 -4px 18px rgba(0, 0, 0, .06);
+  padding: 14px 14px 10px; margin-top: 6px;
+}
+.etapa { display: flex; flex-direction: column; gap: 12px; }
+.etapa[hidden] { display: none !important; }
+.etapaTitulo { font-size: 16px; font-weight: 800; margin: 0; }
+.etapaTopo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.campo { display: flex; flex-direction: column; gap: 6px; }
+.rotulo { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--suave); display: flex; align-items: center; gap: 6px; }
+#setor1 { display: flex; flex-direction: column; gap: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  flex: 1 1 auto; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 2px solid var(--linha);
+  background: #fff; color: var(--texto); font: 700 14px var(--font-base); cursor: pointer; transition: border-color .15s, background .15s;
+}
+.chip[aria-checked="true"] { border-color: var(--ar); background: var(--ar-claro); color: var(--ar-escuro); }
+.linkBtn {
+  align-self: flex-start; background: none; border: 0; padding: 6px 0; color: var(--preto); font: 700 13px var(--font-base);
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.linkBtn.perigo { color: #C0262D; }
+
+/* Cores */
+.app #colorOptionsContainer { display: flex; flex-wrap: wrap; gap: 4px 2px; border: 0; padding: 0; background: none; justify-content: flex-start; }
+.app .colorOption { min-width: 64px; padding: 4px 2px; border-radius: 12px; }
+.app .colorCircle { width: 38px; height: 38px; }
+.app .colorOption span, .app .colorOption small { font-size: 11px; }
+
+/* Arte: enviar / texto */
+.enviar { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+.enviarBtn, .app .textoBtn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 86px;
+  border-radius: 16px; cursor: pointer; text-align: center; padding: 8px; margin: 0; width: auto;
+}
+.enviarBtn { border: 2px dashed var(--ar); background: var(--ar-claro); color: var(--ar-escuro); }
+.enviarBtn:active { background: #FFE0E6; }
+.app .textoBtn { border: 2px solid var(--preto); background: var(--preto); color: #fff; }
+.enviarBtn b, .app .textoBtn b { font: 800 16px var(--font-base); }
+.enviarBtn small, .app .textoBtn small { font: 500 12px var(--font-base); color: inherit; opacity: .75; }
+.enviarIcone { font: 900 20px var(--font-base); line-height: 1; }
+.enviar.chamar { animation: chamar .5s ease 2; }
+@keyframes chamar { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+.listaTopo { display: flex; align-items: center; justify-content: space-between; min-height: 28px; }
+.app .badge { background: var(--ar); color: #fff; border-radius: 99px; padding: 1px 8px; font-size: 12px; }
+.app #stampsList { display: flex; flex-direction: column; gap: 8px; }
+.app #stampsList > p { padding: 6px 0 !important; }
+.app .stampItem {
+  display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 4px 10px; align-items: start;
+  padding: 8px; border-radius: 14px; border: 2px solid var(--linha); margin: 0; background: #fff;
+}
+.app .stampItem.active { border-color: var(--ar); background: #FFF8F9; }
+.app .stampThumb { width: 56px; height: 56px; grid-row: span 3; border-radius: 10px; }
+.app .stampMeta { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.app .stampSizeInfo { margin: 0; font-size: 12px; }
+.app .stampRowBtns { flex-wrap: wrap; }
+.app .stampRowBtns button { min-height: 36px; padding: 0 12px; border-radius: 10px; font-size: 13px; }
+
+.campoLinha { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.campoMini { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--suave); }
+.app select, .app input[type="number"], .app input[type="text"], .app textarea { font-size: 16px; } /* 16px: o iPhone não dá zoom ao tocar */
+.campoMini select { min-height: 44px; border-radius: 12px; border: 2px solid var(--linha); padding: 0 10px; background: #fff; font-family: var(--font-base); font-weight: 600; color: var(--texto); }
+.opcoesPreview { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--suave); }
+.opcoesPreview label { display: flex; align-items: center; gap: 6px; min-height: 32px; }
+
+/* Tamanhos: cartões com + e − */
+.app .tableSizes { border: 0; width: 100%; }
+.app .tableSizes thead { display: none; }
+.app .tableSizes tbody { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.app .tableSizes tr { display: flex; align-items: center; justify-content: space-between; gap: 6px; border: 2px solid var(--linha); border-radius: 14px; padding: 6px 6px 6px 12px; background: #fff; }
+.app .tableSizes td { border: 0; padding: 0; background: none !important; font-weight: 800; font-size: 15px; }
+.app .tableSizes td.quantityControl { font-weight: 400; }
+.app .stepper { border-radius: 12px; }
+.app .stepper button.stepBtn { min-width: 40px; min-height: 40px; font-size: 18px; }
+.app .stepper input[type="number"] { width: 44px; }
+.totalPecas { font-weight: 800; text-align: right; min-height: 1.2em; }
+
+/* Pedido */
+.app #orderList { gap: 10px; }
+.outroModelo {
+  min-height: 52px; border-radius: 14px; border: 2px dashed var(--preto); background: #fff; font: 800 15px var(--font-base);
+  color: var(--preto); cursor: pointer;
+}
+
+/* ---------- Rodapé: voltar / resumo / avançar ---------- */
+.app .rodape {
+  grid-area: rodape; display: flex; align-items: center; gap: 8px; border: 0; margin: 0;
+  padding: 8px 12px; padding-bottom: max(8px, env(safe-area-inset-bottom)); background: var(--cartao); border-top: 1px solid var(--linha);
+  position: static; box-shadow: none;
+}
+.resumo { flex: 1; min-width: 0; margin: 0; font-size: 12px; font-weight: 600; color: var(--suave); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btnVoltar, .btnAvancar {
+  min-height: 48px; border-radius: 14px; font: 800 15px var(--font-base); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
+}
+.btnVoltar { padding: 0 14px; border: 2px solid var(--linha); background: #fff; color: var(--texto); }
+.btnAvancar { padding: 0 20px; border: 0; background: var(--ar); color: #fff; box-shadow: 0 4px 14px rgba(237, 48, 81, .35); }
+.btnAvancar:active { background: var(--ar-escuro); }
+.btnAvancar:disabled { background: #C9CBD0; box-shadow: none; cursor: not-allowed; }
+.app .rodape .btnAvancar { display: none; }
+.app[data-etapa="produto"] #btnAvancar, .app[data-etapa="arte"] #btnAvancar { display: flex; }
+.app[data-etapa="tamanhos"] #btnSaveItem { display: flex; }
+.app[data-etapa="pedido"] #btnGerarPdf { display: flex; }
+.app[data-etapa="produto"] #btnVoltar { visibility: hidden; }
+.app:not([data-etapa="tamanhos"]) #btnCancelEdit { display: none !important; }
+.app[data-etapa="tamanhos"] #btnCancelEdit:not([style*="none"]) ~ #btnSaveItem { padding: 0 14px; }
+
+/* ---------- Telas pequenas ---------- */
+@media (max-width: 640px) {
+  .etapas button:not([aria-current]) span { display: none; }
+  .etapas i { width: 8px; }
+  .soPc { display: none !important; }
+}
+@media (max-width: 380px) {
+  .app .marca img { height: 24px; }
+  #btnRedo { display: none; }
+  .btnVoltar span { display: none; }
+  .resumo { font-size: 11px; }
+}
+@media (max-height: 640px) {
+  .app .infoExemplo { display: none; }
+  .painel { padding-top: 10px; }
+  .etapa { gap: 10px; }
+  .enviarBtn, .app .textoBtn { min-height: 72px; }
+}
+
+/* ---------- Computador / tablet deitado: camiseta à esquerda, etapa à direita ---------- */
+@media (min-width: 860px) and (min-aspect-ratio: 1/1) {
+  #overallContainer.app {
+    grid-template-columns: minmax(0, 1fr) clamp(360px, 32vw, 460px);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "topo topo" "palco painel" "palco rodape";
+  }
+  .palco { padding: 16px 8px 8px 16px; }
+  .painel { max-height: none; margin: 16px 16px 0 8px; border-radius: 20px 20px 0 0; padding: 18px; }
+  .app .rodape { margin: 0 16px 16px 8px; border-radius: 0 0 20px 20px; border-top: 1px solid var(--linha); }
+  .etapaTitulo { font-size: 18px; }
+  .app .marca img { height: 34px; }
+}
+@media (prefers-reduced-motion: reduce) { .enviar.chamar { animation: none; } }
+
+/* ---------- Boas-vindas (primeira visita), compactas ---------- */
+.tutBoasVindas .bvCaixa { max-width: 420px; padding: 20px 20px 14px; max-height: calc(var(--altura, 100dvh) - 32px); overflow: auto; }
+.tutBoasVindas h2 { font-size: 20px; line-height: 1.25; }
+.tutBoasVindas .bvSub { margin: 4px 0 10px; }
+.bvEtapas { list-style: none; padding: 0; display: grid; gap: 8px; margin: 0 0 14px; }
+.bvEtapas li { display: flex; align-items: center; gap: 12px; padding: 0; }
+.bvEtapas li > span {
+  width: 36px; height: 36px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  background: var(--ar); color: #fff; font: 900 16px var(--font-base);
+}
+.bvEtapas b { display: block; font-size: 15px; }
+.bvEtapas small { display: block; font-size: 13px; color: var(--suave); line-height: 1.3; }
+
+/* ---------- Desfazer / refazer na camiseta ---------- */
+.palcoAcoes { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 12; }
+.palcoBtn {
+  width: 38px; height: 38px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .92); color: var(--preto);
+  font-size: 18px; font-weight: 800; box-shadow: var(--sombra); cursor: pointer; display: grid; place-items: center;
+}
+.palcoBtn:disabled { opacity: .35; cursor: default; }
+
+/* ---------- Celular: tudo mais compacto ---------- */
+@media (max-width: 640px) {
+  .etapaTitulo { display: none; }
+  .etapaTopo .etapaTitulo { display: block; font-size: 15px; }
+  .painel { padding: 12px 12px 8px; }
+  .etapa, #setor1 { gap: 10px; }
+  .chips { flex-wrap: nowrap; gap: 6px; }
+  .chip { min-height: 40px; padding: 0 8px; font-size: 13px; flex: 1 1 0; }
+  .app .colorOption { min-width: 0; flex: 1 1 0; }
+  .app .colorCircle { width: 34px; height: 34px; }
+  #btnTabelaMedidas { padding: 0; }
+  .app .infoExemplo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app #btnToggleView { height: 34px; padding: 0 12px; font-size: 12px; }
+  .app #currentSideBadge { font-size: 10px; }
+  /* Ajuste fino menor */
+  .app #alignHud { padding: 4px; gap: 4px; border-radius: 12px; }
+  .app #alignHud .align-button { min-height: 28px; padding: 0 6px; font-size: 11px; }
+  .app #alignHud .dpad { width: auto; height: auto; padding: 2px; gap: 2px; grid-template-columns: repeat(3, 28px); grid-template-rows: repeat(3, 26px); }
+  .app #alignHud .dpad .cell { width: 28px; height: 26px; font-size: 11px; }
+  /* Enviar / texto mais baixos */
+  .enviarBtn, .app .textoBtn { min-height: 64px; flex-direction: row; flex-wrap: wrap; gap: 0 8px; padding: 6px 8px; }
+  .enviarBtn small, .app .textoBtn small { flex-basis: 100%; font-size: 11px; }
+  .enviarIcone { font-size: 18px; }
+  /* Cartão da arte compacto */
+  .app .stampItem { grid-template-columns: 48px minmax(0, 1fr); padding: 6px; gap: 4px 8px; }
+  .app .stampThumb { width: 48px; height: 48px; }
+  .app .stampMeta { gap: 4px 10px; font-size: 12px; }
+  .app .stampMeta select { min-height: 34px; padding: 0 6px; font-size: 16px; }
+  .app .stampMeta .stepper button.stepBtn { min-width: 32px; min-height: 34px; }
+  .app .stampMeta .stepper input[type="number"] { width: 40px; height: 34px; }
+  .app .stampRowBtns { grid-column: 1 / -1; }
+  .app .stampRowBtns button { min-height: 32px; padding: 0 10px; font-size: 12px; flex: 1; }
+  .btnVoltar { padding: 0 14px; }
+  .btnVoltar span { display: none; }
+  .btnAvancar { padding: 0 16px; }
+  .campoLinha { gap: 8px; }
+  .campoMini select { min-height: 40px; }
+}
+@media (max-width: 640px) {
+  /* A largura já está no cartão da arte; as opções de visualização ficam para o computador */
+  .app #stampSizeContainer, .opcoesPreview { display: none !important; }
+  /* Com arte enviada, "lado / tamanho pronto" (vale para a próxima) fica mais discreto */
+  .campoMini { font-size: 11px; }
+}
+@media (max-height: 600px) and (max-width: 640px) {
+  .app .tableSizes tbody { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+  .app .tableSizes tr { padding: 3px 4px 3px 10px; }
+  .app .stepper button.stepBtn { min-height: 34px; }
+}
+
+/* ---------- Correções sobre o styles.css antigo ---------- */
+.app .rodape button { flex: none; white-space: nowrap; }
+.app .rodape .btnAvancar { padding: 0 20px; font-size: 15px; }
+.app .rodape .btnVoltar { padding: 0 14px; font-size: 15px; }
+/* Aviso: logo abaixo do topo (não cobre a etapa nem o rodapé) */
+body #uiNotice { top: calc(env(safe-area-inset-top) + 58px); bottom: auto; border-radius: 12px; font-family: var(--font-base); }
+.app .marca img { max-width: 84px; object-fit: contain; }
+.etapas { overflow: hidden; }
+@media (max-width: 640px) {
+  .app .rodape .btnVoltar { width: 48px; padding: 0; }
+  .app .rodape .btnAvancar { padding: 0 18px; }
+  .app .marca img { max-width: 64px; height: 28px; }
+  .app .stampMeta .labelWrap:nth-child(3) { display: none; } /* "Visível": só no computador */
+  .app .stampMeta .labelWrap { font-size: 12px; gap: 6px; }
+}
+@media (max-width: 400px) {
+  .etapas button[aria-current] span { display: none; }
+  .etapas { gap: 2px; }
+}
+@media (max-width: 640px) {
+  /* Já tem arte: o cartão dela tem lado e largura; enviar outra fica mais baixo */
+  .app.temArte #locationSection { display: none; }
+  .app.temArte .enviarBtn, .app.temArte .textoBtn { min-height: 50px; }
+  .app.temArte .enviarBtn small, .app.temArte .textoBtn small { display: none; }
+}
+@media (max-height: 600px) and (max-width: 640px) {
+  .chip { min-height: 36px; }
+  .app .colorCircle { width: 30px; height: 30px; }
+  .app .stampItem { padding: 4px 6px; }
+  .app .stampRowBtns button { min-height: 30px; }
+}
+@media (max-width: 640px) { .app .infoExemplo { text-align: left; padding: 0 6px; } }
