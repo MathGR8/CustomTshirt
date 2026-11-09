@@ -11,7 +11,7 @@
  *  - Ajuda: como preparar as artes do Corel, instalar o app e travar o tablet
  */
 
-import { PADRAO, CORES, POSICOES, MODELOS, MALHAS } from './config.js';
+import { PADRAO, CORES, POSICOES, MODELOS, MALHAS, ordenarTemas, ordenarGrupos, compararArtes } from './config.js';
 import { DB } from './db.js';
 import { icone } from './icons.js';
 import { $, $$, esc, num, aviso, janela, confirmar, pedirSenha, progressoJanela } from './ui.js';
@@ -68,16 +68,20 @@ let obsAdmin = null;
 
 ABAS.artes = async el => {
   const lista = (await DB.artesResumo()).filter(a => !a.cliente);
-  const temas = [...new Set(lista.map(a => a.tema))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const temas = ordenarTemas([...new Set(lista.map(a => a.tema))], App.S.cfg);
+  const ordemArtes = compararArtes(App.S.cfg, lista);
   const espaco = DB.espaco(); // preenchido depois (não segura a tela)
   const mb = b => (b / 1048576).toFixed(0) + ' MB';
   const pasta = 'webkitdirectory' in document.createElement('input');
   el.innerHTML = `
     <div class="adminCaixa">
       <h3>${icone('upload', 22)} Importar artes</h3>
-      <p class="textoAjuda">Aceita <b>PDF</b>, <b>CorelDRAW (.cdr)</b>, PNG, JPG, SVG e <b>.ZIP</b> com pastas. O tema de cada arte vem do nome da pasta (ex.: <i>Rock/banda.pdf</i> → tema <b>Rock</b>). Arquivos soltos usam o tema abaixo.</p>
+      <p class="textoAjuda">Aceita <b>PDF</b>, <b>PNG</b>, JPG, SVG, <b>CorelDRAW (.cdr)</b> e <b>.ZIP</b> com pastas (pode misturar PDF e PNG).
+        A <b>categoria</b> e a <b>subcategoria</b> vêm das pastas: <i>Rock/Metallica/arte.png</i> → categoria <b>Rock</b>, subcategoria <b>Metallica</b>.
+        Nome do arquivo com código, como <i>ROCK-151 - Metallica – Logo.png</i>, vira o código <b>ROCK-151</b> e o nome <b>Metallica – Logo</b>.
+        Arquivos soltos usam a categoria abaixo.</p>
       <div class="formLinha">
-        <label class="campoPeq"><span>Tema dos arquivos soltos</span>
+        <label class="campoPeq"><span>Categoria dos arquivos soltos</span>
           <input id="temaPadrao" list="listaTemas" placeholder="Ex.: Rock, Futebol, Religioso…" value="${esc(temas[0] || '')}"></label>
         <datalist id="listaTemas">${temas.map(t => `<option value="${esc(t)}">`).join('')}</datalist>
       </div>
@@ -94,6 +98,7 @@ ABAS.artes = async el => {
         <h3>${icone('arte', 22)} Catálogo <small>${lista.length} arte${lista.length === 1 ? '' : 's'} em ${temas.length} tema${temas.length === 1 ? '' : 's'}<span id="espacoUsado"></span></small></h3>
         <div class="linhaBotoes">
           ${lista.length ? `<button type="button" class="btn ${selecao ? 'btnEscuro' : 'btnClaro'}" id="modoSelecao">${icone('check', 20)} ${selecao ? 'Concluir seleção' : 'Selecionar várias'}</button>` : ''}
+          ${temas.length > 1 || lista.some(a => a.grupo) ? `<button type="button" class="btn btnClaro" id="ordemTemas">${icone('lista', 20)} Ordem das categorias</button>` : ''}
           <button type="button" class="btn btnClaro" id="exportar" ${lista.length ? '' : 'disabled'}>${icone('baixar', 20)} Exportar cópia</button>
           ${lista.length ? `<button type="button" class="btn btnClaro btnPerigoTexto" id="apagarTodasArtes">${icone('lixo', 20)} Apagar todas</button>` : ''}
           <label class="btn btnClaro">${icone('upload', 20)} Importar cópia<input type="file" id="inCopia" accept=".zip,application/zip" hidden></label>
@@ -101,8 +106,7 @@ ABAS.artes = async el => {
       </div>
       ${selecao ? `<div class="dicaSelecao">${icone('mao', 18)} Toque nas artes para marcar. <button type="button" class="btnTexto" id="selTodas">Marcar todas</button> <button type="button" class="btnTexto" id="selNenhuma">Desmarcar</button></div>` : `<p class="dicaPequena dicaSegurar">Dica: segure o dedo numa arte para selecionar várias.</p>`}
       ${temas.length ? temas.map(t => {
-        const doTema = lista.filter(a => a.tema === t).sort((a, b) => ((a.grupo || '') === 'Diversos') - ((b.grupo || '') === 'Diversos')
-          || (a.grupo || '').localeCompare(b.grupo || '', 'pt-BR') || (a.ordem ?? 0) - (b.ordem ?? 0));
+        const doTema = lista.filter(a => a.tema === t).sort(ordemArtes);
         return `<details class="temaAdmin" open>
           <summary><strong>${esc(t)}</strong> <small>${doTema.length}</small>
             <span class="summaryAcoes">${selecao ? `<button type="button" class="btn btnClaro btnPeq" data-sel-tema="${esc(t)}">${icone('check', 18)} Marcar tema</button>` : ''}<button type="button" class="btnIcone" data-renomear-tema="${esc(t)}" aria-label="Renomear tema">${icone('editar', 20)}</button>
@@ -175,6 +179,7 @@ ABAS.artes = async el => {
     aviso(`${lista.length} artes apagadas.`, 'ok');
     ABAS.artes(el);
   });
+  $('#ordemTemas', el) && ($('#ordemTemas', el).onclick = () => ordemDasCategorias(lista, () => ABAS.artes(el)));
   $('#exportar', el).onclick = async () => {
     const p = progressoJanela('Gerando a cópia do catálogo');
     try {
@@ -246,6 +251,14 @@ ABAS.artes = async el => {
     const todas = (await DB.todos('artes')).filter(a => a.tema === velho);
     todas.forEach(a => (a.tema = novo));
     await DB.salvarVarios('artes', todas);
+    // Mantém a categoria no mesmo lugar da ordem
+    const cfg = App.S.cfg;
+    if ((cfg.ordemTemas || []).includes(velho) || cfg.ordemGrupos?.[velho]) {
+      const nova = { ...cfg, ordemTemas: (cfg.ordemTemas || []).map(t => (t === velho ? novo : t)), ordemGrupos: { ...(cfg.ordemGrupos || {}) } };
+      if (nova.ordemGrupos[velho]) { nova.ordemGrupos[novo] = nova.ordemGrupos[velho]; delete nova.ordemGrupos[velho]; }
+      await DB.salvarConfig(nova); App.aplicarConfig(nova);
+    }
+    await App.recarregarCatalogo();
     ABAS.artes(el);
   }));
   $$('[data-apagar-tema]', el).forEach(b => (b.onclick = async e => {
@@ -362,6 +375,71 @@ function perguntarTexto(titulo, valor = '', sugestoes = []) {
   inp.onkeydown = e => { if (e.key === 'Enter') j.fechar(inp.value.trim()); };
   $$('[data-sug]', j.el).forEach(b => (b.onclick = () => j.fechar(b.dataset.sug)));
   return j.aoFechar;
+}
+
+/**
+ * Lista com setas para mudar a ordem (toque). Resolve com a nova ordem ou null (cancelou).
+ * extra(item) → HTML de um botão a mais na linha (ex.: "Subcategorias").
+ */
+function ordenarNaTela({ titulo, ajuda, itens, conta = () => '', extra = () => '', aoExtra = null }) {
+  const lista = [...itens];
+  const j = janela({ titulo, classe: 'janelaPequena janelaOrdem', html: `
+    <p class="textoAjuda">${ajuda}</p>
+    <ol class="listaOrdem" id="listaOrdem"></ol>
+    <div class="linhaBotoes"><button type="button" class="btnTexto" id="ordemAlfa">Ordem alfabética</button>
+      <span class="espacador"></span>
+      <button type="button" class="btn btnClaro" data-fechar>Cancelar</button>
+      <button type="button" class="btn btnEscuro" id="okOrdem">${icone('check', 20)} Salvar ordem</button></div>` });
+  const pintar = foco => {
+    $('#listaOrdem', j.el).innerHTML = lista.map((t, i) => `<li data-i="${i}">
+      <span class="numOrdem">${i + 1}</span><span class="nomeOrdem"><b>${esc(t)}</b> <small>${conta(t)}</small></span>
+      ${extra(t)}
+      <button type="button" class="btnIcone" data-subir="${i}" ${i ? '' : 'disabled'} aria-label="Subir ${esc(t)}">▲</button>
+      <button type="button" class="btnIcone" data-descer="${i}" ${i < lista.length - 1 ? '' : 'disabled'} aria-label="Descer ${esc(t)}">▼</button>
+      <button type="button" class="btnTexto" data-topo="${i}" ${i ? '' : 'disabled'}>Primeira</button></li>`).join('');
+    const mover = (i, para) => { const [x] = lista.splice(i, 1); lista.splice(para, 0, x); pintar(para); };
+    $$('[data-subir]', j.el).forEach(b => (b.onclick = () => mover(+b.dataset.subir, +b.dataset.subir - 1)));
+    $$('[data-descer]', j.el).forEach(b => (b.onclick = () => mover(+b.dataset.descer, +b.dataset.descer + 1)));
+    $$('[data-topo]', j.el).forEach(b => (b.onclick = () => mover(+b.dataset.topo, 0)));
+    $$('[data-extra]', j.el).forEach(b => (b.onclick = () => aoExtra?.(b.dataset.extra)));
+    if (foco != null) $(`#listaOrdem [data-i="${foco}"]`, j.el)?.classList.add('movido');
+  };
+  pintar();
+  $('#ordemAlfa', j.el).onclick = () => { lista.sort((a, b) => (a === 'Diversos') - (b === 'Diversos') || a.localeCompare(b, 'pt-BR')); pintar(); };
+  $('#okOrdem', j.el).onclick = () => j.fechar([...lista]);
+  return j.aoFechar;
+}
+
+/** Ordem das categorias (e das subcategorias de cada uma) na galeria do cliente. */
+async function ordemDasCategorias(lista, depois) {
+  const cfg = App.S.cfg;
+  const temas = ordenarTemas([...new Set(lista.map(a => a.tema))], cfg);
+  const gruposDe = t => [...new Set(lista.filter(a => a.tema === t && a.grupo).map(a => a.grupo))];
+  const ordemGrupos = { ...(cfg.ordemGrupos || {}) };
+  const salvar = async mudanca => {
+    const nova = { ...App.S.cfg, ...mudanca };
+    await DB.salvarConfig(nova); App.aplicarConfig(nova); await App.recarregarCatalogo();
+  };
+  const nova = await ordenarNaTela({
+    titulo: `${icone('lista')} Ordem das categorias`,
+    ajuda: 'A primeira aparece primeiro para o cliente (e no "Todas"). Use as setas ou <b>Primeira</b> para mandar direto para o topo.',
+    itens: temas,
+    conta: t => { const n = lista.filter(a => a.tema === t).length; return `${n} arte${n === 1 ? '' : 's'}`; },
+    extra: t => (gruposDe(t).length > 1 ? `<button type="button" class="btn btnClaro btnPeq" data-extra="${esc(t)}">Subcategorias</button>` : ''),
+    aoExtra: async t => {
+      const g = await ordenarNaTela({
+        titulo: `${icone('lista')} Subcategorias de ${esc(t)}`,
+        ajuda: `Ordem dos botões dentro de <b>${esc(t)}</b> (ex.: bandas). As novas entram em ordem alfabética, depois destas.`,
+        itens: ordenarGrupos(t, gruposDe(t), { ordemGrupos }),
+        conta: g => `${lista.filter(a => a.tema === t && a.grupo === g).length}`
+      });
+      if (g) { ordemGrupos[t] = g; await salvar({ ordemGrupos }); aviso(`Ordem das subcategorias de ${t} salva.`, 'ok'); }
+    }
+  });
+  if (!nova) return;
+  await salvar({ ordemTemas: nova, ordemGrupos });
+  aviso('Ordem das categorias salva.', 'ok');
+  depois();
 }
 
 /** Padrão da camiseta pronta (igual ao do app). */

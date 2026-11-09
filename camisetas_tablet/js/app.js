@@ -17,7 +17,7 @@
  * esquerdo) ou segure o dedo nele por 2 segundos.
  */
 
-import { PADRAO, CORES, MALHAS, MODELOS, POSICOES } from './config.js';
+import { PADRAO, CORES, MALHAS, MODELOS, POSICOES, ordenarTemas, ordenarGrupos, compararArtes } from './config.js';
 import { DB } from './db.js';
 import { icone } from './icons.js';
 import { $, $$, esc, num, aviso, janela, confirmar, ajuda, coach, ajudarTeclado } from './ui.js';
@@ -550,10 +550,9 @@ function artesFiltradas() {
     && (!b || `${a.nome} ${a.tema} ${a.grupo || ''} ${a.codigo || ''}`.toLowerCase().includes(b)));
 }
 
-/** Subcategorias de um tema (ex.: bandas dentro de Rock), "Diversos" por último. */
+/** Subcategorias de um tema (ex.: bandas dentro de Rock), na ordem do admin ("Diversos" por último). */
 function gruposDoTema(tema) {
-  const g = [...new Set(S.catalogo.filter(a => a.tema === tema && a.grupo).map(a => a.grupo))];
-  return g.sort((a, b) => (a === 'Diversos') - (b === 'Diversos') || a.localeCompare(b, 'pt-BR'));
+  return ordenarGrupos(tema, [...new Set(S.catalogo.filter(a => a.tema === tema && a.grupo).map(a => a.grupo))], S.cfg);
 }
 
 let observador = null;
@@ -572,7 +571,7 @@ function carregarMiniaturas(raiz) {
 /** Galeria das camisetas prontas. */
 function galeriaProntas() {
   const it = item();
-  const temas = [...new Set(S.catalogo.map(a => a.tema))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const temas = ordenarTemas([...new Set(S.catalogo.map(a => a.tema))], S.cfg); // ordem escolhida no admin
   const cont = t => S.catalogo.filter(a => a.tema === t).length;
   $('#tela').innerHTML = `
     <section class="galeria">
@@ -1711,9 +1710,8 @@ async function recarregarCatalogo() {
   const lista = await DB.artesResumo();
   S.todasArtes = lista.filter(a => !a.cliente);
   const costas = new Set(S.todasArtes.map(a => a.fixo?.costas).filter(Boolean));
-  S.catalogo = lista.filter(a => !a.oculto && !a.cliente && !costas.has(a.id)).sort((a, b) => a.tema.localeCompare(b.tema, 'pt-BR')
-    || ((a.grupo || '') === 'Diversos') - ((b.grupo || '') === 'Diversos') || (a.grupo || '').localeCompare(b.grupo || '', 'pt-BR')
-    || (a.ordem ?? 0) - (b.ordem ?? 0));
+  S.catalogo = lista.filter(a => !a.oculto && !a.cliente && !costas.has(a.id));
+  S.catalogo.sort(compararArtes(S.cfg, S.catalogo)); // categoria e subcategoria na ordem escolhida no admin
 }
 
 function aplicarConfig(cfg) {

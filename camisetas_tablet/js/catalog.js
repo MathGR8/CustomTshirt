@@ -6,8 +6,11 @@
  * SVG e .ZIP (uma pasta compactada). Cada arte vira:
  *   - miniatura (grade da galeria, carrega rápido)
  *   - prévia em alta (camiseta e PDF do pedido)
- * O tema vem da pasta onde o arquivo está (ex.: "Rock/banda.pdf" → tema Rock)
- * ou do tema escolhido na hora de importar.
+ * Categoria e subcategoria vêm das pastas: "Rock/Metallica/arte.png" →
+ * categoria Rock, subcategoria Metallica ("Rock/arte.pdf" → só a categoria).
+ * Arquivos soltos usam a categoria escolhida na hora de importar.
+ * Nome do arquivo "ROCK-151 - Metallica – Master of Puppets.png" → código
+ * ROCK-151 e nome "Metallica – Master of Puppets".
  *
  * PDF: cada página vira uma arte (recortada em volta do desenho; opcional:
  *      separar várias artes da mesma página).
@@ -437,12 +440,34 @@ export function nomeBonito(arquivo) {
   return n ? n[0].toUpperCase() + n.slice(1) : 'Arte';
 }
 
-/** Tema pela pasta: "Artes/Rock/banda.pdf" → "Rock" (null se o arquivo está na raiz). */
-function temaDoCaminho(caminho) {
-  const partes = caminho.split(/[\\/]/).filter(Boolean);
-  if (partes.length < 2) return null;
-  // Ignora a pasta raiz escolhida quando há subpastas (ex.: "Artes/Rock/x.pdf" → Rock)
-  return partes[partes.length - 2];
+/** Pastas do caminho (sem o arquivo). */
+const pastasDe = caminho => caminho.split(/[\\/]/).filter(Boolean).slice(0, -1);
+
+/**
+ * Pasta "de fora" que só embrulha tudo (ex.: o .zip com a pasta "Artes" dentro):
+ * todos os arquivos estão nela e há subpastas. Não é tirada se já é o nome de uma
+ * categoria (ex.: a pasta "Rock" com as pastas das bandas dentro).
+ */
+export function raizEmbrulho(caminhos, temasConhecidos = []) {
+  const pastas = caminhos.map(pastasDe);
+  if (!pastas.length || pastas.some(p => !p.length)) return 0;
+  const raiz = pastas[0][0];
+  if (!pastas.every(p => p[0] === raiz) || !pastas.some(p => p.length >= 2)) return 0;
+  const conhecidos = new Set(temasConhecidos.map(t => t.toLowerCase()));
+  return conhecidos.has(raiz.toLowerCase()) ? 0 : 1;
+}
+
+/** Categoria e subcategoria pelas pastas: "Rock/Metallica/x.png" → { tema: 'Rock', grupo: 'Metallica' }. */
+export function temaDoCaminho(caminho, tirar = 0) {
+  const p = pastasDe(caminho).slice(tirar).map(x => x.trim()).filter(Boolean);
+  return { tema: p[0] || null, grupo: p[1] || null };
+}
+
+/** Código e nome pelo nome do arquivo: "ROCK-151 - Metallica – Logo.png" → { codigo: 'ROCK-151', nome: 'Metallica – Logo' }. */
+export function codigoDoArquivo(arquivo) {
+  const base = arquivo.replace(/^.*[\\/]/, '').replace(/\.[^.]+$/, '').trim();
+  const m = /^([A-Z]{2,10}-\d{1,5}[A-Z]?)(?:\s*[-–—_.]\s*|\s+)(.+)$/.exec(base);
+  return m ? { codigo: m[1], nome: m[2].replace(/_+/g, ' ').replace(/\s+/g, ' ').trim() } : null;
 }
 
 /** Abre arquivos .zip e devolve a lista de {file, caminho}. */
@@ -481,12 +506,15 @@ export async function importar(lista, opc, progresso, sinal = {}) {
   let importadas = 0;
   const existentes = new Map((await DB.artesResumo()).map(a => [a.id, a]));
   let ordem = existentes.size;
+  const tirar = raizEmbrulho(arquivos.map(a => a.caminho), [...new Set([...existentes.values()].map(a => a.tema)), opc.temaPadrao || ''].filter(Boolean));
 
   for (let i = 0; i < arquivos.length; i++) {
     if (sinal.cancelado) { avisos.push('Importação interrompida.'); break; }
     const { file, caminho } = arquivos[i];
     progresso?.({ feitos: i, total: arquivos.length, arquivo: caminho });
-    const tema = (temaDoCaminho(caminho) || opc.temaPadrao || 'Diversos').trim();
+    const pasta = temaDoCaminho(caminho, tirar);
+    const tema = (pasta.tema || opc.temaPadrao || 'Diversos').trim();
+    const doNome = codigoDoArquivo(caminho);
     try {
       const { artes, baixaRes, avisos: av, comCodigo } = await gerarArtes(file, caminho, opc, {},
         (pg, tot) => tot > 1 && progresso?.({ feitos: i, total: arquivos.length, arquivo: `${caminho} · página ${pg} de ${tot}`, fracao: (i + pg / tot) / arquivos.length }));
@@ -500,7 +528,9 @@ export async function importar(lista, opc, progresso, sinal = {}) {
         const antigo = existentes.get(id) || (a.pagina === 1 && a.parte === 1 ? doCdr : null);
         return {
           ...a, id, tema, origem: 'catalogo',
-          nome: antigo?.nome || a.codigo || nomeBonito(caminho) + (sufixo || ''),
+          ...(pasta.grupo ? { grupo: pasta.grupo } : antigo?.grupo ? { grupo: antigo.grupo } : {}),
+          ...(!a.codigo && doNome && a.parte === 1 && a.pagina === 1 ? { codigo: doNome.codigo } : {}),
+          nome: antigo?.nome || a.codigo || (doNome ? doNome.nome : nomeBonito(caminho)) + (sufixo || ''),
           oculto: antigo?.oculto || false,
           // Arte de catálogo com fundo: camiseta pronta só na cor do fundo (dá para mudar depois)
           ...(antigo?.fixo ? { fixo: antigo.fixo } : fixoSugerido ? { fixo: fixoSugerido } : {}),
