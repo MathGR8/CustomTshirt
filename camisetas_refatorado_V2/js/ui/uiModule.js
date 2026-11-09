@@ -19,11 +19,11 @@
  */
 
 import { AppState } from '../core/appState.js';
-import { BASE_IMAGES, CHEST_PRESET } from '../core/constants.js';
+import { BASE_IMAGES, CHEST_PRESET, MODELO_FOTOS } from '../core/constants.js';
 import { Logger } from '../core/logger.js';
 import { Utils } from '../utils/helpers.js';
 import { PreviewGeom } from '../preview/previewGeometry.js';
-import { medirUrl, medidaPronta, textoExemplo } from '../preview/medidaCamiseta.js';
+import { medirUrl, medidaPronta, registrarMedida, textoExemplo } from '../preview/medidaCamiseta.js';
 
 export const UIModule = {
   /**
@@ -332,13 +332,24 @@ export const UIModule = {
 
     if (!AppState.selectedColor) AppState.selectedColor = "Preto";
     const category = document.getElementById("category")?.value;
-    const imgData  = BASE_IMAGES?.[category]?.[AppState.selectedColor]?.[mainLoc];
+    // "No modelo": foto de uma pessoa vestindo (se houver para esta cor e lado)
+    const foto = this.fotoModelo(category, AppState.selectedColor, mainLoc);
+    const comModelo = AppState.vista === 'modelo' && !!foto;
+    const imgData  = comModelo ? foto.url : BASE_IMAGES?.[category]?.[AppState.selectedColor]?.[mainLoc];
+    if (comModelo) registrarMedida(foto.url, foto.medida);
+    const caixa = document.getElementById('previewContainer');
+    caixa?.classList.toggle('modoModelo', comModelo);
+    caixa?.classList.toggle('tecidoClaro', comModelo && /Branc/.test(AppState.selectedColor));
+    this._atualizarVista(category, mainLoc);
+    // Posição das estampas antes da troca de imagem: o primeiro reposicionamento
+    // (antes do enquadramento) recalcula s.rel sobre a área errada.
+    const relAntes = new Map(AppState.stamps.filter(s => s.rel).map(s => [s.id, { ...s.rel }]));
 
     const preview = document.getElementById("preview");
     if (!preview) return;
 
     preview.innerHTML = imgData
-      ? `<img src="${imgData}" alt="Camiseta ${category} ${AppState.selectedColor} ${mainLoc}">`
+      ? `<img src="${imgData}" alt="${comModelo ? 'Modelo vestindo a camiseta' : 'Camiseta'} ${category} ${AppState.selectedColor} ${mainLoc}">`
       : `<div style="width:100%;height:100%;background:#ccc;display:flex;align-items:center;justify-content:center;color:#888;font-size:13px;">Imagem não disponível</div>`;
 
     const baseImgEl = preview.querySelector("img");
@@ -361,7 +372,8 @@ export const UIModule = {
           this.updateShirtBoxOverlay();
           AppState.stamps.forEach(s => {
             if (s.side !== AppState.currentView || !StampModule) return;
-            if (s.rel) s.pendingRel = { ...s.rel };
+            const rel = relAntes.get(s.id) || s.rel;
+            if (rel) s.pendingRel = { ...rel };
             StampModule.applyStampCmToNode(s);
           });
         });
@@ -387,6 +399,35 @@ export const UIModule = {
   },
 
   /**
+   * Foto com modelo para a categoria/cor/lado (null se ainda não há).
+   * @returns {{url: string, medida: Object}|null}
+   */
+  fotoModelo(categoria, cor, lado) {
+    const f = MODELO_FOTOS?.[categoria]?.[cor]?.[lado];
+    if (!f) return null;
+    const url = new URL(f.src, document.baseURI).href;
+    return { url, medida: { topo: f.topo, base: f.base, corpoEsq: f.corpoEsq, corpoDir: f.corpoDir, esq: f.quadro.x0, dir: f.quadro.x1, quadro: f.quadro, foto: true } };
+  },
+
+  /** Troca entre a camiseta sozinha e a foto com modelo. */
+  setVista(v) {
+    AppState.vista = v === 'modelo' ? 'modelo' : 'camiseta';
+    try { localStorage.setItem('artrock_vista', AppState.vista); } catch { /* ok */ }
+    this.updateBasePreview();
+  },
+
+  /** Botões "Camiseta | No modelo" e o aviso quando a cor/lado ainda não tem foto. @private */
+  _atualizarVista(categoria, lado) {
+    const temFoto = !!this.fotoModelo(categoria, AppState.selectedColor, lado);
+    document.querySelectorAll('[data-vista]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.vista === AppState.vista)));
+    const aviso = document.getElementById('vistaAviso');
+    if (aviso) {
+      aviso.hidden = !(AppState.vista === 'modelo' && !temFoto);
+      aviso.textContent = `Sem foto no modelo em ${AppState.selectedColor}${lado === 'Costas' ? ' (costas)' : ''} ainda`;
+    }
+  },
+
+  /**
    * Enquadra a camiseta na caixa do preview: amplia e centraliza a silhueta
    * medida na foto (as fotos têm margens diferentes, e a caixa muda de formato
    * do celular para o computador). Antes era um zoom fixo só na feminina, que
@@ -409,12 +450,13 @@ export const UIModule = {
     const s0 = Math.min(iw / img.naturalWidth, ih / img.naturalHeight);
     const dw = img.naturalWidth * s0, dh = img.naturalHeight * s0;
     const ox = pl + (iw - dw) / 2, oy = pt + (ih - dh) / 2;
-    // Silhueta da camiseta como aparece sem zoom
-    const sx0 = ox + m.esq * dw, sx1 = ox + m.dir * dw, sy0 = oy + m.topo * dh, sy1 = oy + m.base * dh;
+    // Silhueta da camiseta como aparece sem zoom (na foto com modelo: o quadro cabeça → barra)
+    const q = m.quadro || { x0: m.esq, x1: m.dir, y0: m.topo, y1: m.base };
+    const sx0 = ox + q.x0 * dw, sx1 = ox + q.x1 * dw, sy0 = oy + q.y0 * dh, sy1 = oy + q.y1 * dh;
     const sw = sx1 - sx0, sh = sy1 - sy0;
     if (sw <= 0 || sh <= 0) return false;
-    const margem = 0.05;
-    const k = Math.max(1, Math.min(1.8, (W * (1 - 2 * margem)) / sw, (H * (1 - 2 * margem)) / sh));
+    const margem = m.quadro ? 0.01 : 0.05;
+    const k = Math.max(1, Math.min(m.quadro ? 3 : 1.8, (W * (1 - 2 * margem)) / sw, (H * (1 - 2 * margem)) / sh));
     const tx = -k * ((sx0 + sx1) / 2 - W / 2), ty = -k * ((sy0 + sy1) / 2 - H / 2);
     img.style.transformOrigin = 'center center';
     img.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${k.toFixed(4)})`;

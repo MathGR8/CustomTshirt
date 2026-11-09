@@ -123,6 +123,8 @@ export function initConfigurator() {
     Utils.stepper(stampSizeInput); // botões − e + ao lado do slider
   }
 
+  // Última visualização escolhida (camiseta sozinha ou no modelo)
+  try { if (localStorage.getItem('artrock_vista') === 'modelo') AppState.vista = 'modelo'; } catch { /* ok */ }
   UIModule.updateColorOptions();
   UIModule.populateSubLocations();
   UIModule.updateStampSizeDefault();

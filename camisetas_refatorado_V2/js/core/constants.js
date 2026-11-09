@@ -263,3 +263,248 @@ export const WHATSAPP = {
   number:  '5512982780352',
   message: 'Olá, finalizei minha personalização e gostaria de fazer uma cotação!'
 };
+
+// ============================================================
+//  FOTOS COM MODELO (visualização "No modelo")
+//  MODELO_FOTOS[categoria][cor][lado] = foto + medidas da camiseta na foto
+//  (frações da foto): topo = alto do ombro junto à gola, base = barra,
+//  corpoEsq/corpoDir = largura do corpo abaixo das axilas, quadro = parte
+//  da foto mostrada (cabeça até a barra). Com essas medidas a área de
+//  impressão e as estampas ficam na escala real (cm) sobre a foto.
+//  Cor/lado sem foto: mostra a camiseta sozinha.
+//  Para incluir uma foto: coloque em img/modelo/ e meça como as outras.
+// ============================================================
+export const MODELO_FOTOS = {
+  "Feminina": {
+    "Branco": {
+      "Costas": {
+        "src": "img/modelo/feminina-branco-costas.jpg",
+        "topo": 0.27,
+        "base": 0.61,
+        "corpoEsq": 0.3373,
+        "corpoDir": 0.5307,
+        "quadro": {
+          "x0": 0.231,
+          "x1": 0.637,
+          "y0": 0.005,
+          "y1": 0.67
+        }
+      },
+      "Frente": {
+        "src": "img/modelo/feminina-branco-frente.jpg",
+        "topo": 0.34,
+        "base": 0.88,
+        "corpoEsq": 0.338,
+        "corpoDir": 0.632,
+        "quadro": {
+          "x0": 0.176,
+          "x1": 0.794,
+          "y0": 0.006,
+          "y1": 0.94
+        }
+      }
+    },
+    "Preta Jaguar": {
+      "Costas": {
+        "src": "img/modelo/feminina-jaguar-costas.jpg",
+        "topo": 0.29,
+        "base": 0.72,
+        "corpoEsq": 0.267,
+        "corpoDir": 0.677,
+        "quadro": {
+          "x0": 0.041,
+          "x1": 0.903,
+          "y0": 0.022,
+          "y1": 0.78
+        }
+      },
+      "Frente": {
+        "src": "img/modelo/feminina-jaguar-frente.jpg",
+        "topo": 0.31,
+        "base": 0.79,
+        "corpoEsq": 0.359,
+        "corpoDir": 0.679,
+        "quadro": {
+          "x0": 0.183,
+          "x1": 0.855,
+          "y0": 0.017,
+          "y1": 0.85
+        }
+      }
+    },
+    "Preto": {
+      "Costas": {
+        "src": "img/modelo/feminina-preto-costas.jpg",
+        "topo": 0.3,
+        "base": 0.67,
+        "corpoEsq": 0.3547,
+        "corpoDir": 0.8347,
+        "quadro": {
+          "x0": 0.091,
+          "x1": 1,
+          "y0": 0.022,
+          "y1": 0.73
+        }
+      },
+      "Frente": {
+        "src": "img/modelo/feminina-preto-frente.jpg",
+        "topo": 0.38,
+        "base": 0.98,
+        "corpoEsq": 0.3093,
+        "corpoDir": 0.704,
+        "quadro": {
+          "x0": 0.092,
+          "x1": 0.921,
+          "y0": 0.111,
+          "y1": 1
+        }
+      }
+    }
+  },
+  "Infantil/Juvenil": {
+    "Branco": {
+      "Frente": {
+        "src": "img/modelo/infantil-branco-frente.jpg",
+        "topo": 0.27,
+        "base": 0.82,
+        "corpoEsq": 0.3547,
+        "corpoDir": 0.6893,
+        "quadro": {
+          "x0": 0.171,
+          "x1": 0.873,
+          "y0": 0.006,
+          "y1": 0.88
+        }
+      }
+    },
+    "Preta Jaguar": {
+      "Costas": {
+        "src": "img/modelo/infantil-jaguar-costas.jpg",
+        "topo": 0.29,
+        "base": 0.88,
+        "corpoEsq": 0.343,
+        "corpoDir": 0.657,
+        "quadro": {
+          "x0": 0.17,
+          "x1": 0.83,
+          "y0": 0.002,
+          "y1": 0.94
+        }
+      },
+      "Frente": {
+        "src": "img/modelo/infantil-jaguar-frente.jpg",
+        "topo": 0.29,
+        "base": 0.92,
+        "corpoEsq": 0.314,
+        "corpoDir": 0.691,
+        "quadro": {
+          "x0": 0.107,
+          "x1": 0.898,
+          "y0": 0.002,
+          "y1": 0.98
+        }
+      }
+    },
+    "Preto": {
+      "Costas": {
+        "src": "img/modelo/infantil-preto-costas.jpg",
+        "topo": 0.26,
+        "base": 0.82,
+        "corpoEsq": 0.341,
+        "corpoDir": 0.654,
+        "quadro": {
+          "x0": 0.169,
+          "x1": 0.826,
+          "y0": 0.006,
+          "y1": 0.88
+        }
+      },
+      "Frente": {
+        "src": "img/modelo/infantil-preto-frente.jpg",
+        "topo": 0.28,
+        "base": 0.88,
+        "corpoEsq": 0.348,
+        "corpoDir": 0.668,
+        "quadro": {
+          "x0": 0.172,
+          "x1": 0.844,
+          "y0": 0.003,
+          "y1": 0.94
+        }
+      }
+    }
+  },
+  "Masculina": {
+    "Branco": {
+      "Costas": {
+        "src": "img/modelo/masculina-branco-costas.jpg",
+        "topo": 0.24,
+        "base": 0.86,
+        "corpoEsq": 0.288,
+        "corpoDir": 0.6707,
+        "quadro": {
+          "x0": 0.078,
+          "x1": 0.881,
+          "y0": 0.006,
+          "y1": 0.92
+        }
+      },
+      "Frente": {
+        "src": "img/modelo/masculina-branco-frente.jpg",
+        "topo": 0.29,
+        "base": 0.86,
+        "corpoEsq": 0.339,
+        "corpoDir": 0.631,
+        "quadro": {
+          "x0": 0.178,
+          "x1": 0.792,
+          "y0": 0.014,
+          "y1": 0.92
+        }
+      }
+    },
+    "Preta Jaguar": {
+      "Costas": {
+        "src": "img/modelo/masculina-jaguar-costas.jpg",
+        "topo": 0.24,
+        "base": 0.88,
+        "corpoEsq": 0.336,
+        "corpoDir": 0.66,
+        "quadro": {
+          "x0": 0.158,
+          "x1": 0.838,
+          "y0": 0.009,
+          "y1": 0.94
+        }
+      }
+    },
+    "Preto": {
+      "Costas": {
+        "src": "img/modelo/masculina-preto-costas.jpg",
+        "topo": 0.26,
+        "base": 0.9,
+        "corpoEsq": 0.2827,
+        "corpoDir": 0.7293,
+        "quadro": {
+          "x0": 0.037,
+          "x1": 0.975,
+          "y0": 0.017,
+          "y1": 0.96
+        }
+      },
+      "Frente": {
+        "src": "img/modelo/masculina-preto-frente.jpg",
+        "topo": 0.25,
+        "base": 0.89,
+        "corpoEsq": 0.315,
+        "corpoDir": 0.648,
+        "quadro": {
+          "x0": 0.132,
+          "x1": 0.831,
+          "y0": 0,
+          "y1": 0.95
+        }
+      }
+    }
+  }
+};

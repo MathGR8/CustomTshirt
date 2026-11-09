@@ -71,7 +71,7 @@ export const EtapasModule = {
       ['undo', 'redo'].forEach(f => { const o = HistoryModule[f].bind(HistoryModule); HistoryModule[f] = (...a) => { const r = o(...a); this.sincronizar(); return r; }; });
     }
     // Resumo do rodapé sempre em dia (quantidades, artes, cor…)
-    ['input', 'change', 'click'].forEach(ev => document.addEventListener(ev, () => queueMicrotask(() => this.resumo()), true));
+    ['input', 'change', 'click'].forEach(ev => document.addEventListener(ev, () => setTimeout(() => this.resumo()), true));
 
     this.ir('produto', { inicio: true });
   },
