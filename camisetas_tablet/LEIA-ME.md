@@ -155,6 +155,12 @@ No Mac/Linux, o comando equivalente é
 
 ## Categorias, subcategorias e ordem
 
+- **Ver as artes em tela cheia** (Administrador → Artes → **Ver em tela cheia**, ou o ícone ⤢ ao
+  lado de cada categoria): a arte na camiseta, como o cliente vê. Passe com as **setas**,
+  **deslizando o dedo** para o lado ou com ← → no teclado. Dá para trocar a cor, **Editar** e
+  **Ocultar/Mostrar** ali mesmo.
+- No app do cliente, a janela da estampa (normal ou tela cheia) também passa **deslizando o dedo**.
+
 - **Ordem das categorias** (Administrador → Artes → **Ordem das categorias**): use as setas ou
   **Primeira** para escolher qual aparece primeiro para o cliente (ex.: Rock primeiro). Em
   **Subcategorias** dá para ordenar também as bandas/jogos/filmes de cada categoria. As que

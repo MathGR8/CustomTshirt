@@ -37,6 +37,34 @@ export function aviso(texto, tipo = 'info') {
  * @param {{titulo?: string, html: string, classe?: string, fechar?: boolean}} o
  * @returns {{el: HTMLDialogElement, fechar: Function, aoFechar: Promise}}
  */
+/**
+ * Deslizar o dedo para o lado (swipe) num elemento: passar(+1) = próxima, passar(-1) = anterior.
+ * Usa os eventos de toque (no tablet o navegador cancela os de "ponteiro" quando o
+ * dedo anda de lado) e, no computador, arrastar com o mouse.
+ */
+export function aoDeslizar(el, passar) {
+  let x0 = null, y0 = 0, t0 = 0;
+  const ini = (x, y) => { x0 = x; y0 = y; t0 = Date.now(); };
+  const fim = (x, y) => {
+    if (x0 == null) return;
+    const dx = x - x0, dy = y - y0; x0 = null;
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.2 && Date.now() - t0 < 1500) passar(dx < 0 ? 1 : -1);
+  };
+  el.addEventListener('touchstart', e => (e.touches.length === 1 ? ini(e.touches[0].clientX, e.touches[0].clientY) : (x0 = null)), { passive: true });
+  el.addEventListener('touchend', e => { const t = e.changedTouches[0]; if (t) fim(t.clientX, t.clientY); }, { passive: true });
+  el.addEventListener('touchcancel', () => { x0 = null; });
+  el.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button === 0) ini(e.clientX, e.clientY); });
+  el.addEventListener('pointerup', e => { if (e.pointerType === 'mouse') fim(e.clientX, e.clientY); });
+}
+
+/** Setas ← → do teclado dentro de uma janela (fora dos campos de texto). */
+export function setasDoTeclado(dialogo, passar) {
+  dialogo.addEventListener('keydown', e => {
+    if (e.target.closest('input, textarea, select') || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+    e.preventDefault(); passar(e.key === 'ArrowRight' ? 1 : -1);
+  });
+}
+
 export function janela({ titulo = '', html, classe = '', fechar = true }) {
   const d = document.createElement('dialog');
   d.className = 'janela ' + classe;
