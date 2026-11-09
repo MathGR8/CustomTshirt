@@ -19,7 +19,30 @@ export const PADRAO = {
   telaLigada: true,        // não deixa a tela do tablet apagar com o app aberto
   nomeResponsavel: '',     // quem atende pedidos com arte própria
   whatsResponsavel: '',    // WhatsApp desse responsável (aparece para o cliente)
+  ordemTemas: [],          // ordem das categorias de estampa (ex.: ['Rock', 'Games', 'Filmes'])
+  ordemGrupos: {}          // ordem das subcategorias de cada categoria (ex.: { Rock: ['Metallica', …] })
 };
+
+/**
+ * Ordem escolhida pelo administrador. Os que não estão na lista vão depois,
+ * em ordem alfabética ("Diversos" sempre por último).
+ */
+function ordenarPor(lista, ordem = []) {
+  const pos = x => { const i = ordem.indexOf(x); return i < 0 ? Infinity : i; };
+  return [...lista].sort((a, b) => (pos(a) - pos(b)) || ((a === 'Diversos') - (b === 'Diversos')) || a.localeCompare(b, 'pt-BR'));
+}
+/** Categorias (temas) na ordem da loja. */
+export const ordenarTemas = (temas, cfg) => ordenarPor(temas, cfg?.ordemTemas);
+/** Subcategorias (grupos) de uma categoria na ordem da loja. */
+export const ordenarGrupos = (tema, grupos, cfg) => ordenarPor(grupos, cfg?.ordemGrupos?.[tema]);
+/** Função de comparação de artes: categoria → subcategoria → ordem de importação. */
+export function compararArtes(cfg, artes) {
+  const temas = ordenarTemas([...new Set(artes.map(a => a.tema))], cfg);
+  const grupos = {};
+  for (const t of temas) grupos[t] = ordenarGrupos(t, [...new Set(artes.filter(a => a.tema === t && a.grupo).map(a => a.grupo))], cfg);
+  const pg = a => { const i = grupos[a.tema]?.indexOf(a.grupo); return a.grupo && i >= 0 ? i : (grupos[a.tema]?.length || 0) + 1; };
+  return (a, b) => temas.indexOf(a.tema) - temas.indexOf(b.tema) || pg(a) - pg(b) || (a.ordem ?? 0) - (b.ordem ?? 0);
+}
 
 /**
  * Cores das camisetas. hex = cor na tela; mescla = textura de malha mesclada.
