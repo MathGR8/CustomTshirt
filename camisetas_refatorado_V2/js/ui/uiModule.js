@@ -23,7 +23,7 @@ import { BASE_IMAGES, CHEST_PRESET } from '../core/constants.js';
 import { Logger } from '../core/logger.js';
 import { Utils } from '../utils/helpers.js';
 import { PreviewGeom } from '../preview/previewGeometry.js';
-import { medirUrl, textoExemplo } from '../preview/medidaCamiseta.js';
+import { medirUrl, medidaPronta, textoExemplo } from '../preview/medidaCamiseta.js';
 
 export const UIModule = {
   /**
@@ -357,6 +357,7 @@ export const UIModule = {
         // Mede a camiseta para a área de impressão ficar em escala real
         medirUrl(baseImgEl.currentSrc || baseImgEl.src).then(m => {
           if (!m || document.getElementById('baseShirtImg') !== baseImgEl) return;
+          this.enquadrarCamiseta(m);
           this.updateShirtBoxOverlay();
           AppState.stamps.forEach(s => {
             if (s.side !== AppState.currentView || !StampModule) return;
@@ -383,6 +384,41 @@ export const UIModule = {
       .forEach(s => {
         if (!s.node.parentNode) preview.appendChild(s.node);
       });
+  },
+
+  /**
+   * Enquadra a camiseta na caixa do preview: amplia e centraliza a silhueta
+   * medida na foto (as fotos têm margens diferentes, e a caixa muda de formato
+   * do celular para o computador). Antes era um zoom fixo só na feminina, que
+   * cortava a camiseta fora da caixa antiga. As estampas e a área de impressão
+   * são calculadas sobre a imagem já enquadrada (getBoundingClientRect), então
+   * a escala real em cm continua certa.
+   * @param {Object} [medida] - Silhueta (medirSilhueta); sem ela usa a já medida.
+   * @returns {boolean} true se enquadrou.
+   */
+  enquadrarCamiseta(medida) {
+    const img = document.getElementById('baseShirtImg');
+    const m = medida || (img && medidaPronta(img.currentSrc || img.src));
+    if (!img || !m || !img.naturalWidth) return false;
+    const W = img.offsetWidth, H = img.offsetHeight;
+    if (!W || !H) return false;
+    const cs = getComputedStyle(img);
+    const pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
+    const pt = parseFloat(cs.paddingTop) || 0, pb = parseFloat(cs.paddingBottom) || 0;
+    const iw = W - pl - pr, ih = H - pt - pb;
+    const s0 = Math.min(iw / img.naturalWidth, ih / img.naturalHeight);
+    const dw = img.naturalWidth * s0, dh = img.naturalHeight * s0;
+    const ox = pl + (iw - dw) / 2, oy = pt + (ih - dh) / 2;
+    // Silhueta da camiseta como aparece sem zoom
+    const sx0 = ox + m.esq * dw, sx1 = ox + m.dir * dw, sy0 = oy + m.topo * dh, sy1 = oy + m.base * dh;
+    const sw = sx1 - sx0, sh = sy1 - sy0;
+    if (sw <= 0 || sh <= 0) return false;
+    const margem = 0.05;
+    const k = Math.max(1, Math.min(1.8, (W * (1 - 2 * margem)) / sw, (H * (1 - 2 * margem)) / sh));
+    const tx = -k * ((sx0 + sx1) / 2 - W / 2), ty = -k * ((sy0 + sy1) / 2 - H / 2);
+    img.style.transformOrigin = 'center center';
+    img.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${k.toFixed(4)})`;
+    return true;
   },
 
   /**

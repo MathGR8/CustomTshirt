@@ -335,3 +335,6 @@ body #uiNotice { top: calc(env(safe-area-inset-top) + 58px); bottom: auto; borde
   .app .stampRowBtns button { min-height: 30px; }
 }
 @media (max-width: 640px) { .app .infoExemplo { text-align: left; padding: 0 6px; } }
+
+/* A camiseta é enquadrada pelo app (UIModule.enquadrarCamiseta); sem o zoom fixo antigo da feminina */
+.app img#baseShirtImg, .app img#baseShirtImg.feminine-shirt { transform: none; transition: none; }

@@ -90,9 +90,13 @@ export function registerGlobalEvents(modules) {
   // ---- ResizeObserver: recalcula overlay e dimensões ao redimensionar ----
 
   const _resizeObs = new ResizeObserver(Utils.debounce(() => {
+    // A caixa mudou de tamanho/formato: reenquadra a camiseta e recoloca as estampas no mesmo lugar
+    const reenquadrou = UIModule.enquadrarCamiseta();
     UIModule.updateShirtBoxOverlay();
     AppState.stamps.forEach(s => {
-      if (s.side === AppState.currentView) StampModule.applyStampCmToNode(s);
+      if (s.side !== AppState.currentView) return;
+      if (reenquadrou && s.rel) s.pendingRel = { ...s.rel };
+      StampModule.applyStampCmToNode(s);
     });
   }, 80));
 
