@@ -14,7 +14,7 @@
 import { PADRAO, CORES, POSICOES, MODELOS, MALHAS, ordenarTemas, ordenarGrupos, compararArtes } from './config.js';
 import { DB } from './db.js';
 import { icone } from './icons.js';
-import { $, $$, esc, num, aviso, janela, confirmar, pedirSenha, progressoJanela } from './ui.js';
+import { $, $$, esc, num, aviso, janela, confirmar, pedirSenha, progressoJanela, aoDeslizar, setasDoTeclado } from './ui.js';
 import { importar, urlDa, urlMiniatura, limparUrls, exportarCatalogo, importarCatalogo, lib } from './catalog.js';
 import { credito } from './fontes.js';
 import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo, imagemLado } from './order.js';
@@ -98,6 +98,7 @@ ABAS.artes = async el => {
         <h3>${icone('arte', 22)} Catálogo <small>${lista.length} arte${lista.length === 1 ? '' : 's'} em ${temas.length} tema${temas.length === 1 ? '' : 's'}<span id="espacoUsado"></span></small></h3>
         <div class="linhaBotoes">
           ${lista.length ? `<button type="button" class="btn ${selecao ? 'btnEscuro' : 'btnClaro'}" id="modoSelecao">${icone('check', 20)} ${selecao ? 'Concluir seleção' : 'Selecionar várias'}</button>` : ''}
+          ${lista.length ? `<button type="button" class="btn btnClaro" id="verTodas">${icone('expandir', 20)} Ver em tela cheia</button>` : ''}
           ${temas.length > 1 || lista.some(a => a.grupo) ? `<button type="button" class="btn btnClaro" id="ordemTemas">${icone('lista', 20)} Ordem das categorias</button>` : ''}
           <button type="button" class="btn btnClaro" id="exportar" ${lista.length ? '' : 'disabled'}>${icone('baixar', 20)} Exportar cópia</button>
           ${lista.length ? `<button type="button" class="btn btnClaro btnPerigoTexto" id="apagarTodasArtes">${icone('lixo', 20)} Apagar todas</button>` : ''}
@@ -109,7 +110,7 @@ ABAS.artes = async el => {
         const doTema = lista.filter(a => a.tema === t).sort(ordemArtes);
         return `<details class="temaAdmin" open>
           <summary><strong>${esc(t)}</strong> <small>${doTema.length}</small>
-            <span class="summaryAcoes">${selecao ? `<button type="button" class="btn btnClaro btnPeq" data-sel-tema="${esc(t)}">${icone('check', 18)} Marcar tema</button>` : ''}<button type="button" class="btnIcone" data-renomear-tema="${esc(t)}" aria-label="Renomear tema">${icone('editar', 20)}</button>
+            <span class="summaryAcoes">${selecao ? `<button type="button" class="btn btnClaro btnPeq" data-sel-tema="${esc(t)}">${icone('check', 18)} Marcar tema</button>` : ''}<button type="button" class="btnIcone" data-ver-tema="${esc(t)}" aria-label="Ver ${esc(t)} em tela cheia" title="Ver em tela cheia">${icone('expandir', 20)}</button><button type="button" class="btnIcone" data-renomear-tema="${esc(t)}" aria-label="Renomear tema">${icone('editar', 20)}</button>
             <button type="button" class="btnIcone" data-apagar-tema="${esc(t)}" aria-label="Apagar tema">${icone('lixo', 20)}</button></span></summary>
           <div class="gradeAdmin">${doTema.map(a => `
             <button type="button" class="miniAdmin ${a.oculto ? 'oculta' : ''} ${selecao?.has(a.id) ? 'marcada' : ''}" data-arte="${esc(a.id)}" ${selecao ? `aria-pressed="${selecao.has(a.id)}"` : ''}>
@@ -179,6 +180,13 @@ ABAS.artes = async el => {
     aviso(`${lista.length} artes apagadas.`, 'ok');
     ABAS.artes(el);
   });
+  // Ver as artes em tela cheia, como o cliente vê (setas, deslizar o dedo, editar e ocultar ali mesmo)
+  const emOrdem = temas.flatMap(t => lista.filter(a => a.tema === t).sort(ordemArtes));
+  $('#verTodas', el) && ($('#verTodas', el).onclick = () => verArtesAdmin(emOrdem, 0, temas, () => ABAS.artes(el)));
+  $$('[data-ver-tema]', el).forEach(b => (b.onclick = e => {
+    e.preventDefault(); e.stopPropagation();
+    verArtesAdmin(emOrdem, Math.max(0, emOrdem.findIndex(a => a.tema === b.dataset.verTema)), temas, () => ABAS.artes(el));
+  }));
   $('#ordemTemas', el) && ($('#ordemTemas', el).onclick = () => ordemDasCategorias(lista, () => ABAS.artes(el)));
   $('#exportar', el).onclick = async () => {
     const p = progressoJanela('Gerando a cópia do catálogo');
@@ -440,6 +448,80 @@ async function ordemDasCategorias(lista, depois) {
   await salvar({ ordemTemas: nova, ordemGrupos });
   aviso('Ordem das categorias salva.', 'ok');
   depois();
+}
+
+/**
+ * Passar pelas artes do catálogo em tela cheia, na camiseta, como o cliente vê:
+ * setas, deslizar o dedo ou ← →. Dá para trocar a cor, editar e ocultar sem sair.
+ */
+async function verArtesAdmin(lista, i, temas, depois) {
+  if (!lista.length) return;
+  let atual = i, cor = null, mexeu = false, vez = 0;
+  const j = janela({ classe: 'janelaArte telaCheia janelaVerAdmin', titulo: '', html: `
+    <div class="verArte">
+      <div class="verPalcoBox"><div class="verPalco verPalcoAdmin" id="vaPalco"></div>
+        ${lista.length > 1 ? `<button type="button" class="setaCheia esq" data-passo="-1" aria-label="Arte anterior">${icone('voltar', 30)}</button>
+          <button type="button" class="setaCheia dir" data-passo="1" aria-label="Próxima arte">${icone('avancar', 30)}</button>
+          <p class="dicaSwipe">${icone('mao', 16)} Deslize para o lado para passar</p>` : ''}</div>
+      <div class="verInfo">
+        <p class="verTema" id="vaTema"></p>
+        <h2 id="vaNome"></h2>
+        <p class="seloOcultaGrande" id="vaOculta" hidden>${icone('olho', 16)} Oculta para os clientes</p>
+        <div class="rotuloLinha"><b>Cor da camiseta</b><span class="medidas" id="vaCorNome"></span></div>
+        <div class="coresProntas" id="vaCores"></div>
+        <p class="textoAjuda" id="vaArquivo"></p>
+        <div class="linhaBotoes">
+          <button type="button" class="btn btnEscuro" id="vaEditar">${icone('editar', 20)} Editar</button>
+          <button type="button" class="btn btnClaro" id="vaOcultar"></button>
+        </div>
+        <div class="verNav">
+          <button type="button" class="btn btnClaro" data-passo="-1" aria-label="Anterior">${icone('voltar')}</button>
+          <span id="vaPos"></span>
+          <button type="button" class="btn btnClaro" data-passo="1" aria-label="Próxima">${icone('avancar')}</button>
+        </div>
+      </div>
+    </div>` });
+  const mostrar = async (d = 0) => {
+    const minha = ++vez, r = lista[atual];
+    const cores = App.coresDaPronta(r, 'Masculina');
+    if (!cor || !cores.includes(cor)) cor = cores[0];
+    $('#vaTema', j.el).textContent = [r.tema, r.grupo, r.codigo && `Cód. ${r.codigo}`].filter(Boolean).join(' · ');
+    $('#vaNome', j.el).textContent = r.nome;
+    $('#vaOculta', j.el).hidden = !r.oculto;
+    $('#vaOcultar', j.el).innerHTML = r.oculto ? `${icone('olho', 20)} Mostrar para os clientes` : `${icone('olho', 20)} Ocultar dos clientes`;
+    $('#vaPos', j.el).textContent = `${atual + 1} de ${lista.length}`;
+    $('#vaArquivo', j.el).textContent = `Arquivo: ${r.arquivo || '—'}`;
+    $('#vaCorNome', j.el).textContent = CORES[cor]?.nome || cor;
+    $('#vaCores', j.el).innerHTML = cores.map(c => `<button type="button" class="corMini corGrande ${CORES[c].mescla ? 'mescla' : ''}" data-cor="${esc(c)}" style="--c:${CORES[c].hex}" aria-pressed="${c === cor}" aria-label="${esc(CORES[c].nome || c)}"></button>`).join('');
+    $$('#vaCores [data-cor]', j.el).forEach(b => (b.onclick = () => { cor = b.dataset.cor; mostrar(); }));
+    const html = await App.previaPronta(r, 'Masculina', cor);
+    if (minha !== vez) return; // já passou para outra
+    const pal = $('#vaPalco', j.el);
+    pal.innerHTML = html;
+    if (d) { pal.style.setProperty('--de', d > 0 ? '3rem' : '-3rem'); pal.classList.remove('entra'); void pal.offsetWidth; pal.classList.add('entra'); }
+  };
+  const passar = d => { atual = (atual + d + lista.length) % lista.length; mostrar(d); };
+  $$('[data-passo]', j.el).forEach(b => (b.onclick = () => passar(+b.dataset.passo)));
+  if (lista.length > 1) { aoDeslizar($('.verPalcoBox', j.el), passar); setasDoTeclado(j.el, passar); }
+  $('#vaOcultar', j.el).onclick = async () => {
+    const r = lista[atual], a = await DB.pegar('artes', r.id);
+    if (!a) return;
+    a.oculto = r.oculto = !r.oculto;
+    await DB.salvar('artes', a); mexeu = true;
+    aviso(r.oculto ? 'Arte escondida dos clientes.' : 'Arte à mostra para os clientes.');
+    mostrar();
+  };
+  $('#vaEditar', j.el).onclick = () => {
+    const id = lista[atual].id;
+    editarArte(id, temas, async () => {
+      mexeu = true;
+      const novo = (await DB.artesResumo()).find(x => x.id === id);
+      if (novo) lista[atual] = novo; else { lista.splice(atual, 1); if (!lista.length) return j.fechar(); atual %= lista.length; }
+      mostrar();
+    });
+  };
+  j.aoFechar.then(async () => { if (mexeu) { await App.recarregarCatalogo(); depois(); } });
+  await mostrar();
 }
 
 /** Padrão da camiseta pronta (igual ao do app). */

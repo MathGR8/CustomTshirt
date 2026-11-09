@@ -20,7 +20,7 @@
 import { PADRAO, CORES, MALHAS, MODELOS, POSICOES, ordenarTemas, ordenarGrupos, compararArtes } from './config.js';
 import { DB } from './db.js';
 import { icone } from './icons.js';
-import { $, $$, esc, num, aviso, janela, confirmar, ajuda, coach, ajudarTeclado } from './ui.js';
+import { $, $$, esc, num, aviso, janela, confirmar, ajuda, coach, ajudarTeclado, aoDeslizar, setasDoTeclado } from './ui.js';
 import { camisetaSVG, areaImpressao, modelo, VB, limiteCamiseta, dentroDaCamiseta } from './shirt.js';
 import { urlDa, processarArquivoCliente, removerFundoDaArte, lib } from './catalog.js';
 import { qualidade, ICONE_QUALIDADE, buscarImagens, baixarImagem, credito } from './fontes.js';
@@ -60,7 +60,7 @@ const S = {
 const item = () => S.itens[S.atual];
 let uidSeq = 0;
 
-export const App = { S, irPara, recarregarCatalogo, aplicarConfig, recomecar, previaPronta };
+export const App = { S, irPara, recarregarCatalogo, aplicarConfig, recomecar, previaPronta, coresDaPronta: (r, m) => coresDaPronta(r, m) };
 
 /** Prévia (SVG de cada lado) de uma camiseta pronta — usada no administrador. */
 async function previaPronta(resumo, modeloId, cor) {
@@ -661,13 +661,13 @@ function galeriaProntas() {
 /** Janela da camiseta pronta: ver na camiseta, escolher a cor. */
 async function verPronta(lista, i, opc = {}) {
   const it = item();
-  let atual = i, cor = it.cor, lado = 'Frente', artes = [], inicioX = null;
+  let atual = i, cor = it.cor, lado = 'Frente', artes = [];
   const j = janela({ classe: `janelaArte${opc.cheia ? ' telaCheia' : ''}`, titulo: '', html: `
     <div class="verArte">
       <div class="verPalcoBox"><div class="verPalco" id="verPalco"></div>
         ${opc.cheia && lista.length > 1 ? `<button type="button" class="setaCheia esq" data-passo="-1" aria-label="Estampa anterior">${icone('voltar', 30)}</button>
           <button type="button" class="setaCheia dir" data-passo="1" aria-label="Próxima estampa">${icone('avancar', 30)}</button>
-          <p class="dicaSwipe">${icone('mao', 16)} Deslize para o lado para ver outras estampas</p>` : ''}</div>
+          <p class="dicaSwipe">${icone('mao', 16)} Deslize para o lado para ver outras estampas</p>` : lista.length > 1 ? `<p class="dicaSwipe dicaSwipeNormal">${icone('mao', 16)} Deslize para o lado</p>` : ''}</div>
       <div class="verInfo">
         <p class="verTema" id="verTema"></p>
         <h2 id="verNome"></h2>
@@ -721,13 +721,8 @@ async function verPronta(lista, i, opc = {}) {
   $('#ant', j.el).onclick = () => passar(-1);
   $('#prox', j.el).onclick = () => passar(1);
   $$('#verLados [data-lado]', j.el).forEach(b => (b.onclick = () => { lado = b.dataset.lado; pintar(); }));
-  const pal = $('#verPalco', j.el);
-  pal.addEventListener('pointerdown', e => { inicioX = e.clientX; });
-  pal.addEventListener('pointerup', e => {
-    if (inicioX == null) return;
-    const d = e.clientX - inicioX; inicioX = null;
-    if (Math.abs(d) > 50) passar(d < 0 ? 1 : -1);
-  });
+  // Deslizar o dedo na camiseta (ou nas setas do teclado) passa para a outra estampa
+  if (lista.length > 1) { aoDeslizar($('.verPalcoBox', j.el), passar); setasDoTeclado(j.el, passar); }
   const escolher = comTexto => {
     const r = lista[atual];
     const textos = it.artes.filter(a => a.tipo === 'texto'); // textos já colocados continuam
