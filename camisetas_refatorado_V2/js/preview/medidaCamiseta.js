@@ -79,6 +79,11 @@ export function medirUrl(src) {
 }
 
 /** Medida já calculada (ou undefined, se ainda não terminou). */
+/** Medida já conhecida de uma imagem (ex.: foto com modelo, medida à mão). */
+export function registrarMedida(src, medida) {
+  if (src && medida) cache.set(src, medida);
+}
+
 export function medidaPronta(src) {
   const m = cache.get(src);
   return m instanceof Promise ? undefined : m;

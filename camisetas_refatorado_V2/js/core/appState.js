@@ -19,6 +19,9 @@ export const AppState = {
   /** Lado atualmente exibido no preview: 'Frente' ou 'Costas'. */
   currentView: "Frente",
 
+  /** Visualização do preview: 'camiseta' (sozinha) ou 'modelo' (foto com modelo vestindo). */
+  vista: 'camiseta',
+
   /** Cor da camiseta selecionada pelo usuário. */
   selectedColor: "Preto",
 

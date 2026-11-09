@@ -66,6 +66,12 @@
   <main id="middlePanel" class="palco">
     <div id="previewContainer" class="previewContainer">
       <div id="currentSideBadge">Frente</div>
+      <!-- Visualização: camiseta sozinha ou foto com modelo vestindo -->
+      <div class="vistaToggle" role="group" aria-label="Visualização">
+        <button type="button" data-vista="camiseta" aria-pressed="true" onclick="UIModule.setVista('camiseta')">👕 Camiseta</button>
+        <button type="button" data-vista="modelo" aria-pressed="false" onclick="UIModule.setVista('modelo')">🧍 <span class="soPc">No modelo</span><span class="soCel">Modelo</span></button>
+      </div>
+      <p class="vistaAviso" id="vistaAviso" hidden></p>
       <!-- Desfazer / refazer (também Ctrl+Z / Ctrl+Y) -->
       <div class="palcoAcoes">
         <button type="button" id="btnUndo" class="palcoBtn" onclick="HistoryModule.undo()" title="Desfazer (Ctrl+Z)" aria-label="Desfazer" disabled>↶</button>

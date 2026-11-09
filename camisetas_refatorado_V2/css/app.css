@@ -264,7 +264,7 @@ button, label, select { touch-action: manipulation; }
   .app .colorOption { min-width: 0; flex: 1 1 0; }
   .app .colorCircle { width: 34px; height: 34px; }
   #btnTabelaMedidas { padding: 0; }
-  .app .infoExemplo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app .infoExemplo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; min-width: 0; box-sizing: border-box; }
   .app #btnToggleView { height: 34px; padding: 0 12px; font-size: 12px; }
   .app #currentSideBadge { font-size: 10px; }
   /* Ajuste fino menor */
@@ -335,3 +335,32 @@ body #uiNotice { top: calc(env(safe-area-inset-top) + 58px); bottom: auto; borde
   .app .stampRowBtns button { min-height: 30px; }
 }
 @media (max-width: 640px) { .app .infoExemplo { text-align: left; padding: 0 6px; } }
+
+/* A camiseta é enquadrada pelo app (UIModule.enquadrarCamiseta); sem o zoom fixo antigo da feminina */
+.app img#baseShirtImg, .app img#baseShirtImg.feminine-shirt { transform: none; transition: none; }
+
+/* ---------- Visualização: camiseta sozinha / no modelo ---------- */
+.vistaToggle {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 12;
+  display: flex; padding: 3px; gap: 2px; border-radius: 99px; background: rgba(18, 18, 18, .78); box-shadow: var(--sombra);
+}
+.vistaToggle button {
+  border: 0; background: none; color: #fff; font: 700 12px var(--font-base); padding: 0 12px; height: 32px; border-radius: 99px; cursor: pointer; white-space: nowrap;
+}
+.vistaToggle button[aria-pressed="true"] { background: #fff; color: var(--preto); }
+.vistaToggle .soCel { display: none; }
+.vistaAviso {
+  position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 12; margin: 0;
+  background: rgba(255, 255, 255, .95); color: var(--texto); font: 600 11px var(--font-base); padding: 4px 10px; border-radius: 99px; box-shadow: var(--sombra); white-space: nowrap;
+}
+.vistaAviso[hidden] { display: none; }
+/* Foto com modelo: fundo branco como o da foto; estampa "assenta" no tecido branco */
+.app .previewContainer.modoModelo { background: #fff; }
+.app .previewContainer.modoModelo img#baseShirtImg { padding: 0; }
+.previewContainer.modoModelo.tecidoClaro .artOverlay { mix-blend-mode: multiply; }
+@media (max-width: 640px) {
+  .vistaToggle { top: 6px; }
+  .vistaToggle .soCel { display: inline; }
+  .vistaAviso { top: 44px; }
+  .vistaToggle button { padding: 0 9px; height: 28px; font-size: 11px; }
+}
