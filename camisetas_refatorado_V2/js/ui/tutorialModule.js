@@ -15,16 +15,11 @@ const LOGO = 'https://cdn.awsli.com.br/400x300/1274/1274265/logo/logo-art-rock-2
 
 /** Passos: elemento destacado, título e texto. */
 const PASSOS = [
-  { alvo: '#setor1', titulo: 'Escolha o modelo', texto: 'Masculina, Feminina ou Infantil/Juvenil, e o tipo de malha.' },
-  { alvo: '#seletorCor', titulo: 'Escolha a cor', texto: 'Toque na cor da camiseta. O preview muda na hora.' },
-  { alvo: '#enviaEstampa', titulo: 'Coloque sua arte ou um texto', texto: 'Envie sua arte (PNG, JPG, SVG ou PDF) ou toque em <b>Adicionar texto</b> para escrever um nome, frase ou número.' },
-  { alvo: '#previewContainer', titulo: 'Posicione na camiseta', texto: 'Arraste a estampa para mudar o lugar. O tracejado é a área máxima de impressão: fica <b>vermelho</b> quando a estampa encosta no limite. Use <b>Frente / Costas</b> para virar a camiseta.' },
-  { alvo: '#rightPanel', titulo: 'Suas estampas', texto: 'Mude o lado, a largura em cm, edite, duplique ou remova cada estampa ou texto.' },
-  { alvo: '#btnTabelaMedidas', titulo: 'Tabela de medidas', texto: 'Confira as medidas de cada tamanho antes de escolher.' },
-  { alvo: '#btnDefineQuantities', titulo: 'Quantidades', texto: 'Diga quantas camisetas de cada tamanho você quer.' },
-  { alvo: '#btnSaveItem', titulo: 'Salve no pedido', texto: 'Salve este modelo. Dá para montar vários modelos no mesmo pedido.' },
-  { alvo: '#btnGerarPdf', titulo: 'Gere o PDF', texto: 'Gere o PDF do pedido e envie para o atendimento da ArtRock pelo WhatsApp.' },
-  { alvo: '#btnAjuda', titulo: 'Precisa de ajuda?', texto: 'Toque aqui para ver este tutorial de novo quando quiser.' }
+  { alvo: '#etapas', titulo: 'São 4 etapas', texto: '<b>Produto</b>, <b>Arte</b>, <b>Tamanhos</b> e <b>Pedido</b>. A camiseta fica sempre à vista e você avança pelo botão embaixo.' },
+  { alvo: '#setor1', titulo: 'Escolha o modelo', texto: 'Masculina, Feminina ou Infantil, e o tipo de malha.' },
+  { alvo: '#seletorCor', titulo: 'Escolha a cor', texto: 'Toque na cor da camiseta. Ela muda na hora.' },
+  { alvo: '#btnAvancar', titulo: 'Depois, envie a sua arte', texto: 'Na etapa <b>Arte</b> você manda a imagem do celular (foto, PNG, JPG, SVG ou PDF) ou escreve um texto, e arrasta para posicionar.' },
+  { alvo: '#btnAjuda', titulo: 'Precisa de ajuda?', texto: 'Toque aqui para ver estas dicas de novo quando quiser.' }
 ];
 
 let raiz = null, passo = 0, aoTerminar = null;
@@ -129,17 +124,16 @@ function boasVindas() {
   raiz.innerHTML = `
     <div class="bvCaixa" role="dialog" aria-modal="true" aria-labelledby="bvTitulo">
       <div class="bvTopo"><img src="${LOGO}" alt="ArtRock"></div>
-      <h2 id="bvTitulo">Bem-vindo ao personalizador de camisetas da ArtRock!</h2>
-      <p class="bvSub">Aqui você monta a sua camiseta do seu jeito:</p>
-      <ul class="bvLista">
-        <li><span>👕</span><div><b>Escolha o modelo, a malha e a cor</b><small>Masculina, feminina ou infantil/juvenil.</small></div></li>
-        <li><span>🎨</span><div><b>Envie sua arte ou escreva um texto</b><small>PNG, JPG, SVG ou PDF, e textos com várias fontes.</small></div></li>
-        <li><span>✋</span><div><b>Posicione na frente e nas costas</b><small>Arraste, mude o tamanho e veja tudo em escala real.</small></div></li>
-        <li><span>📏</span><div><b>Confira as medidas e escolha os tamanhos</b><small>Tabela de medidas de cada modelo.</small></div></li>
-        <li><span>📄</span><div><b>Gere o PDF e fale com a gente</b><small>Envie o pedido para o atendimento pelo WhatsApp.</small></div></li>
-      </ul>
-      <button type="button" class="btn-dark bvProsseguir" data-bv="ir">Prosseguir ›</button>
-      <button type="button" class="bvPular" data-bv="pular">Já conheço, pular tutorial</button>
+      <h2 id="bvTitulo">Monte a sua camiseta ArtRock</h2>
+      <p class="bvSub">Em 4 etapas, aqui mesmo no celular:</p>
+      <ol class="bvLista bvEtapas">
+        <li><span>1</span><div><b>Produto</b><small>Modelo, malha e cor</small></div></li>
+        <li><span>2</span><div><b>Arte</b><small>Envie a sua imagem ou escreva um texto</small></div></li>
+        <li><span>3</span><div><b>Tamanhos</b><small>Quantas peças de cada tamanho</small></div></li>
+        <li><span>4</span><div><b>Pedido</b><small>Envie para o atendimento pelo WhatsApp</small></div></li>
+      </ol>
+      <button type="button" class="btn-dark bvProsseguir" data-bv="ir">Começar ›</button>
+      <button type="button" class="bvPular" data-bv="pular">Já conheço, pular as dicas</button>
     </div>`;
   document.body.appendChild(raiz);
   raiz.querySelector('[data-bv="ir"]').onclick = iniciarPassos;

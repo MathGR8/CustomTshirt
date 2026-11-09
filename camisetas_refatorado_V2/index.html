@@ -2,275 +2,219 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Configure e personalize sua camiseta ArtRock: escolha cor, envie a estampa e gere o pedido em PDF." />
-  <title>Configurar Camiseta - ArtRock (Demo)</title>
+  <!-- interactive-widget: o teclado do celular passa por cima (não encolhe a tela) -->
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-visual" />
+  <meta name="theme-color" content="#ED3051" />
+  <meta name="description" content="Personalize sua camiseta ArtRock: escolha o modelo e a cor, envie a sua arte e monte o pedido para o atendimento." />
+  <title>Personalize sua camiseta · ArtRock</title>
 
-  <!-- Fonte Montserrat (usada em todo o app via --font-base) -->
+  <!-- Fonte Montserrat (identidade ArtRock) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <!-- Fontes dos textos na camiseta (TextoModule) -->
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bangers&family=Bebas+Neue&family=Black+Ops+One&family=Creepster&family=Dancing+Script:wght@700&family=Lobster&family=Metal+Mania&family=Oswald:wght@700&family=Pacifico&family=Permanent+Marker&family=Righteous&family=Rye&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
 
-  <!-- Folha de estilos externa (extraída do HTML original) -->
+  <!-- Estilos: janelas e componentes (styles.css) + a tela única por etapas (app.css) -->
   <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/app.css" />
 
-  <!-- jsPDF + AutoTable (dependências externas, carregadas antes do módulo principal) -->
+  <!-- jsPDF + AutoTable (PDF do pedido) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-
   <!-- JSZip (junta as artes num .zip para enviar ao atendimento) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
-  <!-- PDF.js (para rasterização de PDFs como estampa) -->
+  <!-- PDF.js (PDF enviado como estampa) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
+    if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc =
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   </script>
 </head>
 <body>
 
-<!-- Barra de avisos (UX) -->
+<!-- Avisos (sucesso, erro, dica) -->
 <div id="uiNotice" role="status" aria-live="polite"></div>
 
-<div id="overallContainer">
+<div id="overallContainer" class="app" data-etapa="produto">
 
-  <!-- Cabeçalho -->
+  <!-- ==================== TOPO ==================== -->
   <header class="appHeader">
-    <img src="https://cdn.awsli.com.br/400x300/1274/1274265/logo/logo-art-rock-200-5fh0snhoio.png" alt="ArtRock">
-    <h1>Personalize sua camiseta</h1>
-    <div>
-      <!-- Desfazer / refazer (também Ctrl+Z / Ctrl+Y) e lista de atalhos -->
-      <button type="button" id="btnUndo" class="hdrIcon" onclick="HistoryModule.undo()" title="Desfazer (Ctrl+Z)" aria-label="Desfazer" disabled>↶</button>
-      <button type="button" id="btnRedo" class="hdrIcon" onclick="HistoryModule.redo()" title="Refazer (Ctrl+Y)" aria-label="Refazer" disabled>↷</button>
-      <button type="button" id="btnShortcuts" class="hdrIcon" onclick="KeyboardModule.showHelp()" title="Atalhos de teclado (?)" aria-label="Atalhos de teclado">⌨</button>
-      <!-- Tutorial (aparece sozinho só na primeira visita) -->
-      <button type="button" id="btnAjuda" class="hdrAjuda" onclick="TutorialModule.abrir()" title="Ver o tutorial" aria-label="Ajuda: ver o tutorial">❔ Ajuda</button>
-      <!-- Atalho: leva até a lista "Seu pedido" (útil no celular, onde ela fica embaixo) -->
-      <button type="button" id="orderSummaryBadge" title="Ver itens do pedido"
-              onclick="document.getElementById('orderPanel').scrollIntoView({ behavior: 'smooth', block: 'start' })">
-        📦 Itens: <span id="orderCount">0</span>
-      </button>
-      <button type="button" class="btn-outline" onclick="OrderModule.clearOrder()">
-        Limpar
+    <a class="marca" href="https://www.artrock.com.br" target="_top" aria-label="ArtRock">
+      <img src="https://cdn.awsli.com.br/400x300/1274/1274265/logo/logo-art-rock-200-5fh0snhoio.png" alt="ArtRock">
+    </a>
+    <!-- Etapas: tocar volta para uma etapa já feita -->
+    <nav class="etapas" id="etapas" aria-label="Etapas">
+      <button type="button" data-ir="produto"><b>1</b><span>Produto</span></button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-ir="arte"><b>2</b><span>Arte</span></button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-ir="tamanhos"><b>3</b><span>Tamanhos</span></button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-ir="pedido"><b>4</b><span>Pedido</span></button>
+    </nav>
+    <div class="hdrAcoes">
+      <button type="button" id="btnShortcuts" class="hdrIcon soPc" onclick="KeyboardModule.showHelp()" title="Atalhos de teclado (?)" aria-label="Atalhos de teclado">⌨</button>
+      <button type="button" id="btnAjuda" class="hdrIcon" onclick="TutorialModule.abrir()" title="Como funciona" aria-label="Ajuda: como funciona">?</button>
+      <button type="button" id="orderSummaryBadge" class="hdrPedido" onclick="EtapasModule.ir('pedido')" title="Ver o pedido" aria-label="Ver o pedido">
+        <span aria-hidden="true">🛒</span><span id="orderCount">0</span>
       </button>
     </div>
   </header>
 
-  <div class="mainContainer">
+  <!-- ==================== CAMISETA (sempre à vista) ==================== -->
+  <main id="middlePanel" class="palco">
+    <div id="previewContainer" class="previewContainer">
+      <div id="currentSideBadge">Frente</div>
+      <!-- Desfazer / refazer (também Ctrl+Z / Ctrl+Y) -->
+      <div class="palcoAcoes">
+        <button type="button" id="btnUndo" class="palcoBtn" onclick="HistoryModule.undo()" title="Desfazer (Ctrl+Z)" aria-label="Desfazer" disabled>↶</button>
+        <button type="button" id="btnRedo" class="palcoBtn" onclick="HistoryModule.redo()" title="Refazer (Ctrl+Y)" aria-label="Refazer" disabled>↷</button>
+      </div>
+      <div class="shirtPreview" id="preview"></div>
 
-    <!-- ==================== ITENS DO PEDIDO (lateral) ==================== -->
-    <!-- Itens já salvos: reabrir para edição, renomear, duplicar e remover -->
-    <aside id="orderPanel" aria-label="Itens do pedido">
-      <p class="sectionTitle">Seu pedido</p>
-      <div id="orderList"></div>
-    </aside>
-
-    <!-- ==================== PAINEL ESQUERDO ==================== -->
-    <aside id="leftPanel" aria-label="Configurações do produto">
-
-      <!-- Configurações -->
-      <div id="configSection">
-        <p class="sectionTitle">Produto</p>
-
-        <div id="setor1">
-          <div class="seletor" id="seletorCtg">
-            <label for="category">Categoria</label>
-            <select id="category" onchange="UIModule.updateColorOptions(); SizeModule.updateSizeTable(); StampModule.limitarEstampas();">
-              <option value="Masculina" selected>Masculina</option>
-              <option value="Feminina">Feminina</option>
-              <option value="Infantil/Juvenil">Infantil/Juvenil</option>
-            </select>
-          </div>
-          <div class="seletor" id="seletorMalha">
-            <label for="fabricType">Tipo de Malha</label>
-            <select id="fabricType" onchange="UIModule.updateColorOptions()">
-              <option value="100% algodão" selected>100% algodão</option>
-              <option value="Premium mesclado">Premium mesclado</option>
-            </select>
-          </div>
+      <!-- Ajuste fino da estampa selecionada -->
+      <div id="alignHud" role="toolbar" aria-label="Ajustar a posição da estampa">
+        <div class="centerCol">
+          <button type="button" class="align-button" onclick="StampModule.alignStamp('centerX')" title="Centralizar" aria-label="Centralizar na horizontal">↔ Centro</button>
+          <button type="button" class="align-button" onclick="StampModule.alignStamp('top')" title="Alinhar ao topo" aria-label="Alinhar ao topo">⤒ Topo</button>
         </div>
-
-        <div class="seletor" id="seletorCor">
-          <span class="fieldLabel" id="colorLabel">Cor</span>
-          <div id="colorOptionsContainer" role="radiogroup" aria-labelledby="colorLabel"></div>
+        <div class="dpad" role="group" aria-label="Mover estampa">
+          <button id="btnNudgeUp" class="cell"
+            onmousedown="StampModule.startNudge('moveUp')" onmouseup="StampModule.stopNudge()" onmouseleave="StampModule.stopNudge()"
+            ontouchstart="StampModule.startNudge('moveUp');return false;" ontouchend="StampModule.stopNudge()" ontouchcancel="StampModule.stopNudge()"
+            aria-label="Mover para cima">▲</button>
+          <button id="btnNudgeLeft" class="cell"
+            onmousedown="StampModule.startNudge('moveLeft')" onmouseup="StampModule.stopNudge()" onmouseleave="StampModule.stopNudge()"
+            ontouchstart="StampModule.startNudge('moveLeft');return false;" ontouchend="StampModule.stopNudge()" ontouchcancel="StampModule.stopNudge()"
+            aria-label="Mover para esquerda">◀</button>
+          <button id="btnNudgeRight" class="cell"
+            onmousedown="StampModule.startNudge('moveRight')" onmouseup="StampModule.stopNudge()" onmouseleave="StampModule.stopNudge()"
+            ontouchstart="StampModule.startNudge('moveRight');return false;" ontouchend="StampModule.stopNudge()" ontouchcancel="StampModule.stopNudge()"
+            aria-label="Mover para direita">▶</button>
+          <button id="btnNudgeDown" class="cell"
+            onmousedown="StampModule.startNudge('moveDown')" onmouseup="StampModule.stopNudge()" onmouseleave="StampModule.stopNudge()"
+            ontouchstart="StampModule.startNudge('moveDown');return false;" ontouchend="StampModule.stopNudge()" ontouchcancel="StampModule.stopNudge()"
+            aria-label="Mover para baixo">▼</button>
         </div>
+      </div>
 
-        <p class="sectionTitle">Estampa</p>
+      <button type="button" id="btnToggleView" onclick="UIModule.toggleView()" aria-label="Virar a camiseta (frente / costas)">⟲ <span>Frente / Costas</span></button>
+    </div>
+    <!-- Tamanho da camiseta do exemplo (preview em escala real) -->
+    <p id="infoExemplo" class="infoExemplo"></p>
+  </main>
 
-        <div class="seletor" id="enviaEstampa">
-          <span class="fieldLabel">Envie sua arte ou escreva um texto</span>
-          <!-- Ao escolher o arquivo a estampa já é adicionada (sem 2º clique) -->
-          <label class="uploadBtn" for="stampFile">
-            <span>＋ Adicionar estampa</span>
-            <small>PNG, JPG, SVG ou PDF</small>
-          </label>
-          <input type="file" id="stampFile" class="visuallyHidden" accept=".svg,.png,.jpg,.jpeg,.pdf"
-                 aria-label="Selecionar arquivo de estampa" onchange="StampModule.updateStampPreview()" />
-          <!-- Texto (nome, frase, número) com várias fontes -->
-          <button type="button" id="btnAddTexto" class="textoBtn" onclick="TextoModule.adicionar()">
-            <span>Aa Adicionar texto</span>
-            <small>Nome, frase ou número</small>
-          </button>
+  <!-- ==================== ETAPA ATUAL ==================== -->
+  <section class="painel" id="painel" aria-live="polite">
+
+    <!-- 1. PRODUTO -->
+    <div class="etapa" data-etapa="produto" id="configSection">
+      <h2 class="etapaTitulo">Escolha a camiseta</h2>
+      <div id="setor1">
+        <div class="campo">
+          <span class="rotulo" id="rotModelo">Modelo</span>
+          <div class="chips" data-chips="category" role="radiogroup" aria-labelledby="rotModelo"></div>
+          <select id="category" class="visuallyHidden" tabindex="-1" aria-hidden="true"
+                  onchange="UIModule.updateColorOptions(); SizeModule.updateSizeTable(); StampModule.limitarEstampas();">
+            <option value="Masculina" selected>Masculina</option>
+            <option value="Feminina">Feminina</option>
+            <option value="Infantil/Juvenil">Infantil / Juvenil</option>
+          </select>
         </div>
-
-        <div id="locationSection" class="seletor">
-          <div style="display:flex; gap:10px; width:100%;">
-            <div id="locationContainer" style="flex:1;">
-              <label for="stampLocation">Local</label>
-              <select id="stampLocation" onchange="UIModule.stampLocationChanged()">
-                <option value="Frente" selected>Frente</option>
-                <option value="Costas">Costas</option>
-              </select>
-            </div>
-            <div id="subLocationContainer" style="flex:1;">
-              <label for="subLocation">Tamanho rápido</label>
-              <select id="subLocation" onchange="UIModule.updateStampSizeDefault()"></select>
-            </div>
-          </div>
+        <div class="campo">
+          <span class="rotulo" id="rotMalha">Malha</span>
+          <div class="chips" data-chips="fabricType" role="radiogroup" aria-labelledby="rotMalha"></div>
+          <select id="fabricType" class="visuallyHidden" tabindex="-1" aria-hidden="true" onchange="UIModule.updateColorOptions()">
+            <option value="100% algodão" selected>100% algodão</option>
+            <option value="Premium mesclado">Premium mesclado</option>
+          </select>
         </div>
+      </div>
+      <div class="campo" id="seletorCor">
+        <span class="rotulo" id="colorLabel">Cor</span>
+        <div id="colorOptionsContainer" role="radiogroup" aria-labelledby="colorLabel"></div>
+      </div>
+      <button type="button" id="btnTabelaMedidas" class="linkBtn" onclick="TabelaMedidasModule.abrir()">📏 Tabela de medidas</button>
+    </div>
 
-        <div id="stampSizeContainer" class="seletor" style="display:none;">
-          <label for="stampSize">
-            Largura da estampa ativa
-            <span id="stampSizeValue">0 cm</span>
-          </label>
-          <input type="range" id="stampSize" min="5" max="38" value="22" aria-label="Largura da estampa em centímetros" />
-        </div>
-
-        <button type="button" id="btnTabelaMedidas" class="btn-outline medidasBtn" onclick="TabelaMedidasModule.abrir()">
-          📏 Tabela de medidas
+    <!-- 2. ARTE -->
+    <div class="etapa" data-etapa="arte">
+      <div id="enviaEstampa" class="enviar">
+        <!-- Ao escolher o arquivo a estampa já entra na camiseta -->
+        <label class="enviarBtn" for="stampFile">
+          <span class="enviarIcone" aria-hidden="true">⬆</span>
+          <b>Enviar minha arte</b>
+          <small>Foto, PNG, JPG, SVG ou PDF</small>
+        </label>
+        <input type="file" id="stampFile" class="visuallyHidden" accept=".svg,.png,.jpg,.jpeg,.pdf,image/png,image/jpeg,image/svg+xml,application/pdf"
+               aria-label="Escolher o arquivo da arte" onchange="StampModule.updateStampPreview()" />
+        <button type="button" id="btnAddTexto" class="textoBtn" onclick="TextoModule.adicionar()">
+          <span class="enviarIcone" aria-hidden="true">Aa</span>
+          <b>Texto</b>
+          <small>Nome, frase, número</small>
         </button>
-
-        <button type="button" id="btnDefineQuantities" onclick="SizeModule.showSizeSection(); SizeModule.updateSizeTable()">
-          📋 Definir Quantidades
-        </button>
       </div>
 
-      <!-- Seção de tamanhos -->
-      <div id="sizeSection" style="display:none;">
-        <div class="sizeSectionHeader">
-          <h2>Tamanhos e Quantidades</h2>
-          <button type="button" class="btn-outline" onclick="TabelaMedidasModule.abrir()">📏 Medidas</button>
-          <button type="button" class="btn-outline" onclick="SizeModule.backToConfig()">← Voltar</button>
-        </div>
-        <table id="sizeTable" class="tableSizes"></table>
-        <p id="totalPiecesLabel" style="margin-top:8px; font-size:13px; color:var(--color-text-muted); text-align:right;"></p>
-      </div>
-
-    </aside><!-- /leftPanel -->
-
-    <!-- ==================== PAINEL CENTRAL ==================== -->
-    <main id="middlePanel">
-
-      <div class="previewWrapper">
-        <div id="previewContainer" class="previewContainer">
-          <!-- Badge de lado -->
-          <div id="currentSideBadge">Frente</div>
-
-          <div class="shirtPreview" id="preview"></div>
-
-          <!-- HUD de alinhamento -->
-          <div id="alignHud" role="toolbar" aria-label="Ferramentas de alinhamento">
-            <div class="centerCol">
-              <button type="button" class="align-button"
-                      onclick="StampModule.alignStamp('centerX')"
-                      title="Centralizar horizontalmente"
-                      aria-label="Centralizar horizontalmente">Centro ⟷</button>
-              <button type="button" class="align-button"
-                      onclick="StampModule.alignStamp('top')"
-                      title="Alinhar ao topo"
-                      aria-label="Alinhar ao topo">Topo ⤒</button>
-              <button type="button" class="align-button"
-                      onclick="StampModule.alignStamp('bottom')"
-                      title="Alinhar à base"
-                      aria-label="Alinhar à base">Baixo ⤓</button>
-            </div>
-            <div class="dpad" role="group" aria-label="Mover estampa">
-              <button id="btnNudgeUp" class="cell"
-                onmousedown="StampModule.startNudge('moveUp')"    onmouseup="StampModule.stopNudge()" onmouseleave="StampModule.stopNudge()"
-                ontouchstart="StampModule.startNudge('moveUp');return false;" ontouchend="StampModule.stopNudge()" ontouchcancel="StampModule.stopNudge()"
-                aria-label="Mover para cima">▲</button>
-              <button id="btnNudgeLeft" class="cell"
-                onmousedown="StampModule.startNudge('moveLeft')"  onmouseup="StampModule.stopNudge()" onmouseleave="StampModule.stopNudge()"
-                ontouchstart="StampModule.startNudge('moveLeft');return false;" ontouchend="StampModule.stopNudge()" ontouchcancel="StampModule.stopNudge()"
-                aria-label="Mover para esquerda">◀</button>
-              <button id="btnNudgeRight" class="cell"
-                onmousedown="StampModule.startNudge('moveRight')" onmouseup="StampModule.stopNudge()" onmouseleave="StampModule.stopNudge()"
-                ontouchstart="StampModule.startNudge('moveRight');return false;" ontouchend="StampModule.stopNudge()" ontouchcancel="StampModule.stopNudge()"
-                aria-label="Mover para direita">▶</button>
-              <button id="btnNudgeDown" class="cell"
-                onmousedown="StampModule.startNudge('moveDown')"  onmouseup="StampModule.stopNudge()" onmouseleave="StampModule.stopNudge()"
-                ontouchstart="StampModule.startNudge('moveDown');return false;" ontouchend="StampModule.stopNudge()" ontouchcancel="StampModule.stopNudge()"
-                aria-label="Mover para baixo">▼</button>
-            </div>
-          </div>
-
-          <!-- Botão trocar vista -->
-          <button type="button" id="btnToggleView" onclick="UIModule.toggleView()" aria-label="Alternar entre frente e costas">
-            🔄 Frente / Costas
-          </button>
-        </div>
-
-        <!-- Opções abaixo do preview -->
-        <!-- Tamanho da camiseta do exemplo (o preview é em escala real) -->
-        <p id="infoExemplo" class="infoExemplo"></p>
-        <div class="previewOptions">
-          <label>
-            <input type="checkbox" id="chkShowShirtBox" checked onchange="UIModule.toggleShirtBox(this.checked)">
-            Mostrar área de impressão
-          </label>
-          <label>
-            <input type="checkbox" id="chkContornoArte" onchange="UIModule.toggleContornoArte(this.checked)">
-            Contorno na estampa selecionada
-          </label>
-          <label>
-            <input type="checkbox" id="chkPdfShirtBox" />
-            Área de impressão no PDF (debug)
-          </label>
-        </div>
-      </div>
-
-    </main><!-- /middlePanel -->
-
-    <!-- ==================== PAINEL DIREITO ==================== -->
-    <aside id="rightPanel" aria-label="Lista de estampas">
-      <div class="stampsPanelHeader">
-        <p class="sectionTitle" style="margin:0; border:none;">Estampas</p>
-        <span class="badge" id="stampsCountBadge">0</span>
+      <div class="listaTopo" id="stampsHeader">
+        <span class="rotulo">Suas artes <span class="badge" id="stampsCountBadge">0</span></span>
+        <button type="button" class="linkBtn perigo" id="btnClearAll" onclick="StampModule.clearAllStamps()" style="display:none;">Limpar</button>
       </div>
       <div id="stampsList"></div>
-      <button type="button" class="btn-danger" id="btnClearAll" onclick="StampModule.clearAllStamps()" style="margin-top:auto; display:none;">
-        🗑 Limpar tudo
-      </button>
-    </aside><!-- /rightPanel -->
 
-  </div><!-- /mainContainer -->
+      <!-- Para a próxima arte: lado e tamanho pronto -->
+      <div id="locationSection" class="campoLinha">
+        <label class="campoMini" id="locationContainer"><span>Lado</span>
+          <select id="stampLocation" onchange="UIModule.stampLocationChanged()">
+            <option value="Frente" selected>Frente</option>
+            <option value="Costas">Costas</option>
+          </select></label>
+        <label class="campoMini" id="subLocationContainer"><span>Tamanho pronto</span>
+          <select id="subLocation" onchange="UIModule.updateStampSizeDefault()"></select></label>
+      </div>
+      <div id="stampSizeContainer" class="campo" style="display:none;">
+        <label for="stampSize" class="rotulo">Largura da arte selecionada <span id="stampSizeValue">0 cm</span></label>
+        <input type="range" id="stampSize" min="5" max="38" value="22" aria-label="Largura da arte em centímetros" />
+      </div>
+      <div class="opcoesPreview">
+        <label><input type="checkbox" id="chkShowShirtBox" checked onchange="UIModule.toggleShirtBox(this.checked)"> Área de impressão</label>
+        <label><input type="checkbox" id="chkContornoArte" onchange="UIModule.toggleContornoArte(this.checked)"> Contorno na arte</label>
+        <input type="checkbox" id="chkPdfShirtBox" hidden />
+      </div>
+    </div>
 
-  <!-- Rodapé de ações -->
-  <footer class="appFooter">
-    <button type="button" id="btnCancelEdit" class="btn-outline" onclick="OrderModule.cancelEdit()" style="display:none;">
-      ✕ Cancelar edição
-    </button>
-    <button type="button" id="btnSaveItem" class="btn-dark" onclick="OrderModule.saveItem()">
-      ➕ Salvar no Pedido
-    </button>
-    <button type="button" id="btnGerarPdf" class="btn-dark" onclick="PDFModule.gerarPDF()" disabled
-            title="Adicione itens ao pedido para gerar o PDF">
-      📄 Gerar PDF do Pedido
-    </button>
+    <!-- 3. TAMANHOS -->
+    <div class="etapa" data-etapa="tamanhos" id="sizeSection">
+      <div class="etapaTopo">
+        <h2 class="etapaTitulo">Quantas de cada tamanho?</h2>
+        <button type="button" class="linkBtn" onclick="TabelaMedidasModule.abrir()">📏 Medidas</button>
+      </div>
+      <table id="sizeTable" class="tableSizes"></table>
+      <p id="totalPiecesLabel" class="totalPecas"></p>
+    </div>
+
+    <!-- 4. PEDIDO -->
+    <div class="etapa" data-etapa="pedido" id="orderPanel">
+      <div class="etapaTopo">
+        <h2 class="etapaTitulo">Seu pedido</h2>
+        <button type="button" class="linkBtn perigo" onclick="OrderModule.clearOrder()">Limpar pedido</button>
+      </div>
+      <div id="orderList"></div>
+      <button type="button" class="outroModelo" onclick="EtapasModule.novoModelo()">＋ Montar outro modelo</button>
+    </div>
+  </section>
+
+  <!-- ==================== RODAPÉ: voltar / avançar ==================== -->
+  <footer class="appFooter rodape">
+    <button type="button" id="btnVoltar" class="btnVoltar" onclick="EtapasModule.voltar()" aria-label="Voltar">‹ <span>Voltar</span></button>
+    <p class="resumo" id="resumo"></p>
+    <button type="button" id="btnCancelEdit" class="btnVoltar" onclick="OrderModule.cancelEdit()" style="display:none;">✕ <span>Cancelar edição</span></button>
+    <button type="button" id="btnSaveItem" class="btnAvancar" onclick="EtapasModule.salvar()">Salvar no pedido ›</button>
+    <button type="button" id="btnGerarPdf" class="btnAvancar" onclick="PDFModule.gerarPDF()" disabled title="Salve um modelo no pedido para enviar">Enviar pedido ›</button>
+    <button type="button" id="btnAvancar" class="btnAvancar" onclick="EtapasModule.avancar()">Avançar ›</button>
   </footer>
+</div>
 
-</div><!-- /overallContainer -->
-
-<!--
-  Ponto de entrada da aplicação.
-  type="module" habilita ES Modules e garante que o script seja executado
-  após o DOM estar carregado (comportamento equivalente a defer).
--->
 <script type="module" src="js/main.js"></script>
-
 </body>
 </html>

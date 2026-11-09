@@ -83,6 +83,7 @@ export const OrderModule = {
     this._resetEditor(category);
     this._refresh();
     window._modules?.HistoryModule?.commit('salvar');
+    return true;
   },
 
   /**
@@ -313,7 +314,7 @@ export const OrderModule = {
     const btnSave   = document.getElementById('btnSaveItem');
     const btnCancel = document.getElementById('btnCancelEdit');
     if (btnSave) {
-      btnSave.textContent = idx != null ? '💾 Salvar alterações' : '➕ Salvar no Pedido';
+      btnSave.textContent = idx != null ? 'Salvar alterações ›' : 'Salvar no pedido ›';
       btnSave.title = idx != null ? `Salvar alterações em "${nomeItem(AppState.orderItems[idx], idx)}"` : '';
     }
     if (btnCancel) btnCancel.style.display = idx != null ? '' : 'none';
