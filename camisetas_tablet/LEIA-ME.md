@@ -153,6 +153,19 @@ No Mac/Linux, o comando equivalente é
 - **↔ Centralizar**: centraliza a estampa só na horizontal (mantém a altura).
 - **Imagens protegidas**: segurar o dedo numa imagem não abre mais o menu de copiar/baixar/compartilhar.
 
+## Categorias, subcategorias e ordem
+
+- **Ordem das categorias** (Administrador → Artes → **Ordem das categorias**): use as setas ou
+  **Primeira** para escolher qual aparece primeiro para o cliente (ex.: Rock primeiro). Em
+  **Subcategorias** dá para ordenar também as bandas/jogos/filmes de cada categoria. As que
+  não estão na lista (novas) entram depois, em ordem alfabética.
+- **Importar por pastas** (.zip ou pasta, com **PDF e PNG misturados**):
+  `Categoria/Subcategoria/arquivo` → por exemplo `Rock/Metallica/arte.png` vira categoria
+  **Rock** e subcategoria **Metallica**. A pasta de fora que só embrulha tudo (ex.: "Artes")
+  é ignorada.
+- **Código pelo nome do arquivo**: `ROCK-151 - Metallica – Logo.png` vira o código
+  **ROCK-151** e o nome **Metallica – Logo**.
+
 ## Aviso de pedido no computador do gestor
 
 A cada pedido novo (e a cada cliente que deixar o contato) aparece um **alerta com som** no
