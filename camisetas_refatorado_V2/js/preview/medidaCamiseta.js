@@ -48,18 +48,39 @@ export function medirSilhueta(img) {
     if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
   }
   if (x1 < 0 || (x1 - x0) < w * 0.2 || (y1 - y0) < h * 0.2) return null;
-  // Largura do corpo: linha a 62% da altura (abaixo das mangas), a partir do centro
-  const yc = Math.round(y0 + (y1 - y0) * 0.62), xc = Math.round((x0 + x1) / 2);
-  const ate = (dir) => {
-    let x = xc, buraco = 0;
-    while (x + dir >= 0 && x + dir < w) {
-      x += dir;
-      if (eCamiseta(x, yc)) buraco = 0; else if (++buraco > 3) return x - dir * buraco;
-    }
-    return x;
+  // Largura do corpo no peito, logo abaixo das axilas (é a "largura" da tabela
+  // de medidas). Antes media a 62% da altura: na feminina (baby look) isso cai
+  // na cintura, mais estreita, e o quadrado da área ficava grande demais.
+  const xc = Math.round((x0 + x1) / 2);
+  const corrida = (yc) => {
+    if (!eCamiseta(xc, yc)) return null;
+    const ate = (dir) => {
+      let x = xc, buraco = 0;
+      while (x + dir >= 0 && x + dir < w) {
+        x += dir;
+        if (eCamiseta(x, yc)) buraco = 0; else if (++buraco > 3) return x - dir * buraco;
+      }
+      return x;
+    };
+    return [ate(-1), ate(1)];
   };
-  if (!eCamiseta(xc, yc)) return null;
-  const ce = ate(-1), cd = ate(1);
+  const H = y1 - y0, linhas = [];
+  for (let f = 0.2; f <= 0.8001; f += 0.01) {
+    const c = corrida(Math.round(y0 + H * f));
+    if (c) linhas.push({ f, e: c[0], d: c[1], l: c[1] - c[0] });
+  }
+  if (!linhas.length) return null;
+  // Fim das mangas: a primeira queda forte de largura (> 12%) de uma linha para outra
+  let peito = null;
+  for (let i = 1; i < linhas.length; i++) {
+    if (linhas[i].l < linhas[i - 1].l * 0.88) { peito = linhas[Math.min(linhas.length - 1, i + 2)]; break; }
+  }
+  // Sem queda (mangas soltas do corpo): a linha mais larga entre 30% e 50%
+  if (!peito) {
+    const faixa = linhas.filter(l => l.f >= 0.3 && l.f <= 0.5);
+    peito = (faixa.length ? faixa : linhas).reduce((a, b) => (b.l > a.l ? b : a));
+  }
+  const ce = peito.e, cd = peito.d;
   return { topo: y0 / h, base: (y1 + 1) / h, esq: x0 / w, dir: (x1 + 1) / w, corpoEsq: ce / w, corpoDir: (cd + 1) / w };
 }
 
@@ -100,8 +121,12 @@ export function areaNaImagem(categoria, lado, medida, aspecto) {
   const a = AREA_IMPRESSAO[categoria] || AREA_IMPRESSAO.Masculina;
   const ex = CAMISETA_EXEMPLO[categoria] || CAMISETA_EXEMPLO.Masculina;
   if (!medida || !aspecto) {
+    // Sem medida (imagem sem CORS): caixa fixa, proporcional à área da categoria
+    // em relação à masculina (área ÷ largura do peito: feminina 30/49 × masculina 38/55)
     const b = SHIRT_PRINT_BOX[lado] || SHIRT_PRINT_BOX.Frente;
-    return { x: b.x, y: b.y, w: b.w, h: b.w * aspecto * a.h / a.w, fixo: true };
+    const exM = CAMISETA_EXEMPLO.Masculina, aM = AREA_IMPRESSAO.Masculina;
+    const w = b.w * Math.min(1, (a.w / ex.largura) / (aM.w / exM.largura));
+    return { x: b.x + (b.w - w) / 2, y: b.y, w, h: w * aspecto * a.h / a.w, fixo: true };
   }
   // cm → fração da largura e da altura da imagem
   const porCmX = (medida.corpoDir - medida.corpoEsq) / ex.largura;

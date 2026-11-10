@@ -124,7 +124,8 @@ export function initConfigurator() {
   }
 
   // Última visualização escolhida (camiseta sozinha ou no modelo)
-  try { if (localStorage.getItem('artrock_vista') === 'modelo') AppState.vista = 'modelo'; } catch { /* ok */ }
+  // Visualização "No modelo" em espera: sempre a camiseta aberta
+  try { localStorage.removeItem('artrock_vista'); } catch { /* ok */ }
   UIModule.updateColorOptions();
   UIModule.populateSubLocations();
   UIModule.updateStampSizeDefault();
