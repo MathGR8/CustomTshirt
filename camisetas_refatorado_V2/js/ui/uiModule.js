@@ -19,7 +19,7 @@
  */
 
 import { AppState } from '../core/appState.js';
-import { BASE_IMAGES, CHEST_PRESET, MODELO_FOTOS } from '../core/constants.js';
+import { BASE_IMAGES, CHEST_PRESET, MODELO_FOTOS, SILHUETA_LOJA } from '../core/constants.js';
 import { Logger } from '../core/logger.js';
 import { Utils } from '../utils/helpers.js';
 import { PreviewGeom } from '../preview/previewGeometry.js';
@@ -337,6 +337,9 @@ export const UIModule = {
     const comModelo = AppState.vista === 'modelo' && !!foto;
     const imgData  = comModelo ? foto.url : BASE_IMAGES?.[category]?.[AppState.selectedColor]?.[mainLoc];
     if (comModelo) registrarMedida(foto.url, foto.medida);
+    // Imagens da loja que o navegador não consegue medir: silhueta medida à mão
+    const silhueta = !comModelo && SILHUETA_LOJA[category]?.[mainLoc];
+    if (silhueta && imgData) registrarMedida(imgData, silhueta);
     const caixa = document.getElementById('previewContainer');
     caixa?.classList.toggle('modoModelo', comModelo);
     caixa?.classList.toggle('tecidoClaro', comModelo && /Branc/.test(AppState.selectedColor));

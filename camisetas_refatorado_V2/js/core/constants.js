@@ -84,6 +84,21 @@ export const AREA_IMPRESSAO = {
 //  largura e altura em cm (da tabela de medidas). O app mede a camiseta na
 //  imagem e desenha a área de impressão na mesma proporção.
 // ============================================================
+// ============================================================
+//  SILHUETA DAS IMAGENS DA LOJA, MEDIDA À MÃO
+//  O CDN da loja não libera a leitura das imagens (CORS), então o navegador
+//  não consegue medir a camiseta sozinho. Frações (0–1) da imagem:
+//  topo/base = ombro/barra; esq/dir = mangas; corpoEsq/corpoDir = peito logo
+//  abaixo das axilas (= largura da tabela de medidas).
+//  Feminina: medida nos prints da loja (todas as cores usam a mesma foto-base).
+// ============================================================
+export const SILHUETA_LOJA = {
+  'Feminina': {
+    Frente: { topo: 0.11, base: 0.878, esq: 0.112, dir: 0.884, corpoEsq: 0.226, corpoDir: 0.774 },
+    Costas: { topo: 0.11, base: 0.878, esq: 0.114, dir: 0.884, corpoEsq: 0.226, corpoDir: 0.774 }
+  }
+};
+
 export const CAMISETA_EXEMPLO = {
   'Masculina':        { tamanho: 'G',  largura: 55, altura: 74 },
   'Feminina':         { tamanho: 'G',  largura: 49, altura: 63 },
