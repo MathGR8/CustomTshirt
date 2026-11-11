@@ -1,7 +1,11 @@
 /**
  * @module devModule
  * @description Modo desenvolvedor: ajustar a área de impressão de cada modelo
- * (Masculina, Feminina, Infantil) e lado, direto sobre a camiseta.
+ * (Masculina, Feminina, Infantil), cor e lado, direto sobre a camiseta.
+ *
+ * "Aplicar a": "Só <cor>" (cada cor tem a sua foto) ou "Todas as cores" do
+ * modelo (vale para as cores sem ajuste próprio). A janela do painel se
+ * arrasta pela barra de cima; duplo clique na barra volta ao canto.
  *
  * Como abrir: endereço do site + "?dev" (ex.: …/index.html?dev).
  * Fica ligado nesta aba até fechar; "?dev=0" desliga.
@@ -25,6 +29,7 @@ import { NoticeModule } from './noticeModule.js';
 const M = () => window._modules || {};
 const CHAVE = 'artrock_dev';
 const pct = v => (v * 100).toFixed(1).replace('.', ',');
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
 /** O modo dev foi pedido no endereço (ou já está ligado nesta aba)? */
 function pedido() {
@@ -47,9 +52,27 @@ export const DevModule = {
     this.reaplicar();
   },
 
-  /** Modelo e lado na tela agora. */
+  /**
+   * Onde o ajuste é gravado: 'cor' (só a cor na tela: cada cor tem a sua foto)
+   * ou 'modelo' (todas as cores do modelo que não têm ajuste próprio).
+   */
+  escopo: (() => { try { return localStorage.getItem('artrock_dev_escopo') || 'cor'; } catch { return 'cor'; } })(),
+
+  /** Modelo, cor e lado na tela agora (cor = null quando o ajuste vale para todas). */
   _atual() {
-    return { cat: document.getElementById('category')?.value || 'Masculina', lado: AppState.currentView || 'Frente' };
+    const corTela = AppState.selectedColor || 'Preto';
+    return {
+      cat: document.getElementById('category')?.value || 'Masculina',
+      lado: AppState.currentView || 'Frente',
+      corTela,
+      cor: this.escopo === 'cor' ? corTela : null
+    };
+  },
+
+  setEscopo(v) {
+    this.escopo = v === 'modelo' ? 'modelo' : 'cor';
+    try { localStorage.setItem('artrock_dev_escopo', this.escopo); } catch { /* ok */ }
+    this._atualizarPainel();
   },
 
   /** Área atual em frações da imagem (ajustada ou a automática). */
@@ -79,8 +102,8 @@ export const DevModule = {
     n.w = Math.max(0.05, Math.min(1, n.w));
     n.x = Math.max(-0.2, Math.min(1, n.x));
     n.y = Math.max(-0.2, Math.min(1, n.y));
-    const { cat, lado } = this._atual();
-    Calibragem.definir(cat, lado, n);
+    const { cat, lado, cor } = this._atual();
+    Calibragem.definir(cat, lado, n, cor);
     this.reaplicar();
   },
 
@@ -89,9 +112,10 @@ export const DevModule = {
   largura(dw) { this.mudar(a => ({ ...a, x: a.x - dw / 2, w: a.w + dw })); },
   centralizar() { this.mudar(a => ({ ...a, x: 0.5 - a.w / 2 })); },
 
+  /** Tira o ajuste do escopo atual (desta cor, ou do modelo) deste lado. */
   automatico() {
-    const { cat, lado } = this._atual();
-    Calibragem.definir(cat, lado, null);
+    const { cat, lado, cor } = this._atual();
+    Calibragem.definir(cat, lado, null, cor);
     this.reaplicar();
   },
 
@@ -132,9 +156,15 @@ export const DevModule = {
     const p = document.createElement('aside');
     p.id = 'devPainel';
     p.innerHTML = `
-      <header data-dev="recolher"><b>🛠 Modo dev</b><button type="button" data-dev="recolher" title="Abrir / recolher">▾</button></header>
+      <header title="Arraste para mover a janela"><b>⠿ 🛠 Modo dev</b><button type="button" data-dev="recolher" title="Abrir / recolher">▾</button></header>
       <div class="devCorpo">
         <p class="devQual" id="devQual"></p>
+        <div class="devEscopo" role="group" aria-label="Aplicar o ajuste a">
+          <span>Aplicar a</span>
+          <button type="button" data-dev="escopoCor" id="devEscopoCor"></button>
+          <button type="button" data-dev="escopoModelo">Todas as cores</button>
+        </div>
+        <p class="devAviso" id="devAviso" hidden></p>
         <div class="devGrade">
           <button type="button" data-dev="cima" title="Subir">▲</button>
           <button type="button" data-dev="esq" title="Esquerda">◀</button>
@@ -151,7 +181,7 @@ export const DevModule = {
           <button type="button" data-dev="salvar" class="devPrim">Salvar neste navegador</button>
           <button type="button" data-dev="baixar">Baixar calibragem.json</button>
           <button type="button" data-dev="copiar">Copiar</button>
-          <button type="button" data-dev="auto">Automático (este lado)</button>
+          <button type="button" data-dev="auto" id="devAuto">Tirar ajuste</button>
           <button type="button" data-dev="descartar">Descartar ajustes</button>
           <button type="button" data-dev="sair">Sair</button>
         </div>
@@ -168,9 +198,11 @@ export const DevModule = {
       centro: () => this.centralizar(), menor: e => this.largura(-passo(e)), maior: e => this.largura(passo(e)),
       salvar: () => this.salvar(), baixar: () => this.baixar(), copiar: () => this.copiar(),
       auto: () => this.automatico(), descartar: () => this.descartar(), sair: () => this.sair(),
-      recolher: () => p.classList.toggle('recolhido')
+      escopoCor: () => this.setEscopo('cor'), escopoModelo: () => this.setEscopo('modelo'),
+      recolher: () => { p.classList.toggle('recolhido'); this._encaixarJanela(p); }
     };
     p.addEventListener('click', e => { const b = e.target.closest('[data-dev]'); if (b) acoes[b.dataset.dev]?.(e); });
+    this._janelaMovel(p);
 
     this._arrastar();
     // Troca de modelo, cor ou lado: atualiza o painel
@@ -179,12 +211,21 @@ export const DevModule = {
   },
 
   _atualizarPainel() {
-    const { cat, lado } = this._atual();
+    const { cat, lado, corTela } = this._atual();
     const a = this._areaAtual();
     const el = id => document.getElementById(id);
     if (!el('devQual')) return;
-    const ajustada = !!Calibragem.area(cat, lado);
-    el('devQual').innerHTML = `${cat.replace('Infantil/Juvenil', 'Infantil')} · ${lado} · <i>${ajustada ? 'ajustada' : 'automática'}</i>`;
+    const origem = Calibragem.origem(cat, lado, corTela);
+    const deOnde = { cor: `ajuste só do ${corTela}`, modelo: 'ajuste de todas as cores' }[origem] || 'automática';
+    el('devQual').innerHTML = `${cat.replace('Infantil/Juvenil', 'Infantil')} · ${esc(corTela)} · ${lado}<br><i>Em uso: ${esc(deOnde)}</i>`;
+    el('devEscopoCor').textContent = `Só ${corTela}`;
+    el('devEscopoCor').setAttribute('aria-pressed', String(this.escopo === 'cor'));
+    document.querySelector('[data-dev="escopoModelo"]')?.setAttribute('aria-pressed', String(this.escopo === 'modelo'));
+    el('devAuto').textContent = this.escopo === 'cor' ? `Tirar ajuste do ${corTela}` : 'Tirar ajuste de todas';
+    // Ajustando "todas as cores" com esta cor tendo ajuste próprio: a mudança não aparece aqui
+    const aviso = el('devAviso');
+    aviso.hidden = !(this.escopo === 'modelo' && origem === 'cor');
+    aviso.textContent = `O ${corTela} tem ajuste próprio, que vale por cima deste. Escolha "Só ${corTela}" ou tire o ajuste dele.`;
     if (a) {
       el('devW').textContent = pct(a.w) + '%';
       const px = PreviewGeom.getPxPerCmPreview(), ar = PreviewGeom.area(cat);
@@ -196,6 +237,59 @@ export const DevModule = {
     this._naoSalvo = salvo !== atual && Calibragem.temRascunho();
     el('devStatus').textContent = !Calibragem.temRascunho() ? 'Igual ao publicado no site.'
       : this._naoSalvo ? '● Alterações não salvas.' : '✓ Salvo neste navegador · ainda não publicado.';
+  },
+
+  /** Janela do modo dev: arrasta pela barra de cima; a posição fica guardada. */
+  _janelaMovel(p) {
+    const CH = 'artrock_dev_janela';
+    try {
+      const pos = JSON.parse(localStorage.getItem(CH) || 'null');
+      if (pos) { p.style.left = pos.x + 'px'; p.style.top = pos.y + 'px'; p.style.bottom = 'auto'; p.style.right = 'auto'; p.classList.add('movida'); }
+    } catch { /* ok */ }
+    const topo = p.querySelector('header');
+    let ini = null;
+    topo.addEventListener('pointerdown', e => {
+      if (e.target.closest('button')) return;
+      const r = p.getBoundingClientRect();
+      ini = { dx: e.clientX - r.left, dy: e.clientY - r.top, x: e.clientX, y: e.clientY, moveu: false };
+      topo.setPointerCapture?.(e.pointerId);
+      e.preventDefault();
+    });
+    topo.addEventListener('pointermove', e => {
+      if (!ini) return;
+      if (!ini.moveu && Math.hypot(e.clientX - ini.x, e.clientY - ini.y) < 6) return; // ainda é um toque
+      ini.moveu = true;
+      p.style.left = (e.clientX - ini.dx) + 'px'; p.style.top = (e.clientY - ini.dy) + 'px';
+      p.style.bottom = 'auto'; p.style.right = 'auto'; p.classList.add('movida');
+      this._encaixarJanela(p, false);
+    });
+    const soltar = () => {
+      if (!ini) return;
+      const toque = !ini.moveu;
+      ini = null;
+      if (toque) p.classList.toggle('recolhido'); // toque sem arrastar: abre / recolhe
+      this._encaixarJanela(p);
+    };
+    topo.addEventListener('pointerup', soltar);
+    topo.addEventListener('pointercancel', soltar);
+    // Duplo clique na barra: volta ao canto de baixo
+    topo.addEventListener('dblclick', e => {
+      if (e.target.closest('button')) return;
+      ['left', 'top', 'bottom', 'right'].forEach(k => (p.style[k] = ''));
+      p.classList.remove('movida');
+      try { localStorage.removeItem(CH); } catch { /* ok */ }
+    });
+    addEventListener('resize', () => this._encaixarJanela(p, false));
+  },
+
+  /** Mantém a janela dentro da tela (e guarda a posição). */
+  _encaixarJanela(p, guardar = true) {
+    if (!p.classList.contains('movida')) return;
+    const r = p.getBoundingClientRect();
+    const x = Math.max(4, Math.min(innerWidth - Math.min(r.width, innerWidth) - 4, r.left));
+    const y = Math.max(4, Math.min(innerHeight - 44, r.top));
+    p.style.left = x + 'px'; p.style.top = y + 'px';
+    if (guardar) try { localStorage.setItem('artrock_dev_janela', JSON.stringify({ x: Math.round(x), y: Math.round(y) })); } catch { /* ok */ }
   },
 
   /** Arrastar o quadrado (mover) e o canto (tamanho). */
@@ -215,11 +309,11 @@ export const DevModule = {
       if (!ini) return;
       e.preventDefault();
       const dx = (e.clientX - ini.x) / ini.base.width, dy = (e.clientY - ini.y) / ini.base.height;
-      const { cat, lado } = this._atual();
+      const { cat, lado, cor } = this._atual();
       const n = ini.canto
         ? { x: ini.a.x, y: ini.a.y, w: Math.max(0.05, ini.a.w + dx) }
         : { x: ini.a.x + dx, y: ini.a.y + dy, w: ini.a.w };
-      Calibragem.definir(cat, lado, n);
+      Calibragem.definir(cat, lado, n, cor);
       M().UIModule?.updateShirtBoxOverlay();
       this._atualizarPainel();
     }, true);
