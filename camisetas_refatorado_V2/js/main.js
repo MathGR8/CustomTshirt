@@ -42,6 +42,7 @@ import { TextoModule }     from './image/textoModule.js';
 import { TabelaMedidasModule } from './ui/tabelaMedidasModule.js';
 import { TutorialModule }  from './ui/tutorialModule.js';
 import { EtapasModule }   from './ui/etapasModule.js';
+import { DevModule }      from './ui/devModule.js';
 import { registerGlobalEvents, initConfigurator } from './events/globalEvents.js';
 
 // ============================================================
@@ -93,6 +94,7 @@ window.TextoModule      = TextoModule;
 window.TabelaMedidasModule = TabelaMedidasModule;
 window.TutorialModule   = TutorialModule;
 window.EtapasModule     = EtapasModule;
+window.DevModule       = DevModule;
 
 // ValidationModule exposto para compatibilidade (lógica inline no HTML original)
 window.ValidationModule = {
@@ -133,5 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
   HistoryModule.init();
   // Boas-vindas + tutorial só na primeira visita (depois, pelo botão Ajuda)
   UIModule.toggleContornoArte();
-  TutorialModule.iniciarSeNovo();
+  // Área de impressão ajustada (calibragem.json) e modo desenvolvedor (?dev)
+  DevModule.init();
+  if (!DevModule.ativo) TutorialModule.iniciarSeNovo();
 });
