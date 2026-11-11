@@ -9,6 +9,9 @@
  *       Baixa a imagem escolhida e devolve com CORS liberado, para o app
  *       poder usá-la no canvas (só imagens, até 25 MB).
  *
+ *   POST /api/externo/pedido
+ *       Pedido do site da Art Rock (sem senha, só cria). Ver worker/pedidos.js.
+ *
  *   /api/pedidos...
  *       Pedidos enviados pelo tablet para a confecção ver no computador
  *       (pedidos.html). Ver worker/pedidos.js.
@@ -34,6 +37,8 @@ export default {
       if (url.pathname === '/api/busca') return await busca(url, env, ctx);
       if (url.pathname === '/api/imagem') return await imagem(url);
       if (url.pathname === '/api/pedidos' || url.pathname.startsWith('/api/pedidos/')) return await rotaPedidos(req, env);
+      // Pedido enviado pelo site da Art Rock (público, só cria; ver worker/pedidos.js)
+      if (url.pathname === '/api/externo/pedido') return await rotaPedidos(req, env);
     } catch (e) {
       return json({ erro: 'falha', detalhe: String(e && e.message || e) }, 502);
     }

@@ -280,6 +280,19 @@ export const WHATSAPP = {
 };
 
 // ============================================================
+//  ENVIO DO PEDIDO PARA A CONFECÇÃO (app do tablet)
+//  url = endereço do app do tablet (o mesmo que abre a confecção), ex.:
+//        'https://camisetas-tablet.SEU-USUARIO.workers.dev'
+//  Com o endereço, a janela final oferece "Enviar pedido para a Art Rock":
+//  o pedido (dados, PDF e artes) chega no painel da confecção com a
+//  etiqueta "Art Rock", número AR-0001… e aviso no celular/computador.
+//  Vazio = só o WhatsApp, como antes.
+// ============================================================
+export const CONFECCAO = {
+  url: ''
+};
+
+// ============================================================
 //  FOTOS COM MODELO (visualização "No modelo")
 //  MODELO_FOTOS[categoria][cor][lado] = foto + medidas da camiseta na foto
 //  (frações da foto): topo = alto do ombro junto à gola, base = barra,

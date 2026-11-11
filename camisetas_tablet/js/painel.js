@@ -26,7 +26,15 @@ const SITUACOES = [
 ];
 const nomeSituacao = s => (SITUACOES.find(x => x[0] === s) || SITUACOES[0])[1];
 
-const E = { chave: '', pedidos: [], filtro: 'abertos', busca: '', vistos: new Set(), primeira: true, novos: new Set() };
+const E = { chave: '', pedidos: [], filtro: 'abertos', origem: 'todas', busca: '', vistos: new Set(), primeira: true, novos: new Set() };
+
+/** Pedido do site da Art Rock tem numeração própria: AR-0001. */
+const codigo = p => (p.origem === 'artrock' ? `AR-${numeroPedido(p.numero)}` : numeroPedido(p.numero));
+const ORIGENS = [['todas', 'Todas'], ['loja', 'Loja'], ['artrock', 'Art Rock']];
+/** Etiqueta "Loja" (tablet) ou "Art Rock" (site). */
+const etiqueta = p => (p.origem === 'artrock'
+  ? '<span class="etiquetaOrigem origemArtrock">Art Rock</span>'
+  : '<span class="etiquetaOrigem origemLoja">Loja</span>');
 
 // ---------- Acesso ----------
 
@@ -154,6 +162,9 @@ function iniciarPainel() {
         <div class="segmento" id="filtros" role="tablist">
           ${[['abertos', 'Em aberto'], ...SITUACOES, ['todos', 'Todos']].map(([v, n]) => `<button type="button" data-filtro="${v}" aria-pressed="${E.filtro === v}">${n} <small data-conta="${v}"></small></button>`).join('')}
         </div>
+        <div class="segmento segOrigem" id="filtroOrigem" role="group" aria-label="De onde veio o pedido">
+          ${ORIGENS.map(([v, n]) => `<button type="button" data-origem="${v}" aria-pressed="${E.origem === v}">${n}</button>`).join('')}
+        </div>
         <label class="busca">${icone('busca')}<input type="search" id="busca" placeholder="Nome, telefone ou nº…" value="${esc(E.busca)}"></label>
         <div class="linhaBotoes">
           <button type="button" class="btn btnClaro" id="btnAvisos">${icone('sino', 20)} Avisos <i class="pontoAviso" id="pontoAviso"></i></button>
@@ -171,6 +182,7 @@ function iniciarPainel() {
       <main class="painelLista" id="lista"><div class="vazio"><span class="girando"></span></div></main>
     </div>`;
   $$('[data-filtro]').forEach(b => (b.onclick = () => { E.filtro = b.dataset.filtro; $$('[data-filtro]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); pintarLista(); }));
+  $$('[data-origem]').forEach(b => (b.onclick = () => { E.origem = b.dataset.origem; $$('[data-origem]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); pintarLista(); }));
   let t;
   $('#busca').oninput = e => { clearTimeout(t); t = setTimeout(() => { E.busca = e.target.value; pintarLista(); }, 200); };
   $('#atualizar').onclick = () => carregar(true);
@@ -237,11 +249,13 @@ function filtrados() {
   const b = E.busca.trim().toLowerCase();
   return E.pedidos.filter(p =>
     (E.filtro === 'todos' || (E.filtro === 'abertos' ? p.status !== 'entregue' : p.status === E.filtro)) &&
-    (!b || `${p.nome} ${p.telefone} ${numeroPedido(p.numero)} ${p.numero}`.toLowerCase().includes(b)));
+    (E.origem === 'todas' || (p.origem === 'artrock' ? 'artrock' : 'loja') === E.origem) &&
+    (!b || `${p.nome} ${p.telefone} ${codigo(p)} ${p.numero} ${p.origem === 'artrock' ? 'art rock artrock' : 'loja'}`.toLowerCase().includes(b)));
 }
 
 function pintarLista() {
-  const conta = f => E.pedidos.filter(p => f === 'todos' || (f === 'abertos' ? p.status !== 'entregue' : p.status === f)).length;
+  const daOrigem = E.pedidos.filter(p => E.origem === 'todas' || (p.origem === 'artrock' ? 'artrock' : 'loja') === E.origem);
+  const conta = f => daOrigem.filter(p => f === 'todos' || (f === 'abertos' ? p.status !== 'entregue' : p.status === f)).length;
   $$('[data-conta]').forEach(s => (s.textContent = conta(s.dataset.conta) || ''));
   const lista = filtrados();
   $('#lista').innerHTML = lista.length ? `<div class="gradePedidos">${lista.map(p => {
@@ -250,25 +264,25 @@ function pintarLista() {
     if (p.tipo === 'contato') return `<button type="button" class="cartaoPedido contatoCartao st-${esc(p.status)}${novo}" data-id="${esc(p.id)}">
       <span class="cpImg">${icone('whatsapp', 48)}</span>
       <span class="cpInfo">
-        <span class="cpTopo"><strong>Contato</strong>${novo ? '<span class="seloNovo">CHEGOU AGORA</span>' : ''}<span class="chipSituacao st-${esc(p.status)}">${p.status === 'entregue' ? 'Atendido' : 'Chamar'}</span></span>
+        <span class="cpTopo"><strong>Contato</strong>${etiqueta(p)}${novo ? '<span class="seloNovo">CHEGOU AGORA</span>' : ''}<span class="chipSituacao st-${esc(p.status)}">${p.status === 'entregue' ? 'Atendido' : 'Chamar'}</span></span>
         <span class="cpNome">${esc(p.nome || 'Sem nome')}</span>
         <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${p.telefone ? ' · ' + esc(p.telefone) : ''}</small>
         <small>Quer fazer camiseta com a própria arte</small>
       </span>
     </button>`;
-    return `<button type="button" class="cartaoPedido st-${esc(p.status)}${novo}" data-id="${esc(p.id)}">
+    return `<button type="button" class="cartaoPedido st-${esc(p.status)}${novo}${p.origem === 'artrock' ? ' cartaoArtrock' : ''}" data-id="${esc(p.id)}">
       <span class="cpImg">${p.miniatura ? `<img src="${esc(p.miniatura)}" alt="">` : icone('camisa', 48)}</span>
       <span class="cpInfo">
-        <span class="cpTopo"><strong>Nº ${numeroPedido(p.numero)}</strong>${novo ? '<span class="seloNovo">CHEGOU AGORA</span>' : ''}<span class="chipSituacao st-${esc(p.status)}">${nomeSituacao(p.status)}</span></span>
+        <span class="cpTopo"><strong>Nº ${codigo(p)}</strong>${etiqueta(p)}${novo ? '<span class="seloNovo">CHEGOU AGORA</span>' : ''}<span class="chipSituacao st-${esc(p.status)}">${nomeSituacao(p.status)}</span></span>
         <span class="cpNome">${esc(p.nome || 'Sem nome')}</span>
         <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${p.telefone ? ' · ' + esc(p.telefone) : ''}</small>
         ${p.limpo ? '<small class="seloLimpo">arquivos apagados</small>' : ''}
-        <small>${p.camisetas} camiseta${p.camisetas === 1 ? '' : 's'} · ${p.pecas} peça${p.pecas === 1 ? '' : 's'}${p.total ? ` · <b>${dinheiro(p.total)}</b>` : ''}</small>
+        <small>${p.camisetas} ${p.origem === 'artrock' ? `modelo${p.camisetas === 1 ? '' : 's'}` : `camiseta${p.camisetas === 1 ? '' : 's'}`} · ${p.pecas} peça${p.pecas === 1 ? '' : 's'}${p.total ? ` · <b>${dinheiro(p.total)}</b>` : ''}</small>
         ${p.alerta ? `<small class="alertaPedido">${icone('fechar', 14)} Arte com qualidade baixa</small>` : ''}
       </span>
     </button>`;
   }).join('')}</div>`
-    : `<div class="vazio">${icone('lista', 48)}<p>${E.pedidos.length ? 'Nenhum pedido neste filtro.' : 'Nenhum pedido ainda. Assim que o tablet enviar, aparece aqui (a lista atualiza sozinha).'}</p></div>`;
+    : `<div class="vazio">${icone('lista', 48)}<p>${E.pedidos.length ? 'Nenhum pedido neste filtro.' : 'Nenhum pedido ainda. Assim que o tablet da loja ou o site da Art Rock enviar, aparece aqui (a lista atualiza sozinha).'}</p></div>`;
   $$('#lista [data-id]').forEach(b => (b.onclick = () => { if (E.novos.delete(b.dataset.id)) pintarLista(); parar(); abrir(b.dataset.id); }));
 }
 
@@ -315,6 +329,7 @@ async function abrir(id) {
   let p;
   try { p = await (await api(encodeURIComponent(id))).json(); } catch (e) { return aviso(e.message, 'erro'); }
   if (p.tipo === 'contato') return verContato(p);
+  if (p.origem === 'artrock') return verPedidoArtrock(p);
   const nomeArq = `pedido-${numeroPedido(p.numero)}`;
   const j = await verPedidoPainel(p, nomeArq);
   return j;
@@ -374,6 +389,84 @@ function verPedidoPainel(p, nomeArq) {
       };
     }
   });
+}
+
+// ---------- Pedido do site da Art Rock ----------
+
+/** Situação + apagar (mesma barra dos pedidos da loja). */
+function barraSituacao(p, j) {
+  const id = String(p.id);
+  $$('[data-st]', j.el).forEach(b => (b.onclick = async () => {
+    try {
+      await api(encodeURIComponent(id), { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: b.dataset.st }) });
+      $$('[data-st]', j.el).forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      const item = E.pedidos.find(x => String(x.id) === id); if (item) item.status = b.dataset.st;
+      pintarLista();
+      aviso(`Pedido nº ${codigo(p)}: ${nomeSituacao(b.dataset.st)}.`, 'ok');
+    } catch (e) { aviso(e.message, 'erro'); }
+  }));
+  $('#dApagar', j.el).onclick = async () => {
+    if (!(await confirmar(`Apagar o pedido nº ${codigo(p)} (Art Rock) da nuvem? Os arquivos também são apagados.`, { sim: 'Apagar', perigo: true }))) return;
+    try { await api(encodeURIComponent(id), { method: 'DELETE' }); j.fechar(); await carregar(); aviso('Pedido apagado.'); } catch (e) { aviso(e.message, 'erro'); }
+  };
+}
+
+/**
+ * Pedido feito no site da Art Rock: cliente, modelos com tamanhos, artes de
+ * cada modelo e os arquivos enviados (PDF do pedido com as camisetas montadas
+ * + artes em alta). A montagem completa está no PDF.
+ */
+function verPedidoArtrock(p) {
+  const id = String(p.id), c = p.cliente || {}, d = new Date(p.data);
+  const dig = String(c.telefone || '').replace(/\D/g, '');
+  const zap = `https://wa.me/${dig.length <= 11 ? '55' + dig : dig}?text=${encodeURIComponent(`Olá, ${c.nome || ''}! Aqui é da Art Rock, sobre o seu pedido AR-${numeroPedido(p.numero)} feito no site.`)}`;
+  const arquivos = p.arquivos || [];
+  const pdf = arquivos.find(f => /pedido.*\.pdf$/i.test(f.nome)) || arquivos.find(f => f.tipo === 'application/pdf');
+  const pecas = it => Object.values(it.quantidades || {}).reduce((a, n) => a + (+n || 0), 0);
+  const kb = b => (b >= 1048576 ? `${(b / 1048576).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+  const j = janela({ titulo: `${icone('lista')} Pedido nº ${codigo(p)} <span class="etiquetaOrigem origemArtrock">Art Rock</span>`, classe: 'janelaGrande janelaArtrock', html: `
+    ${p.limpo ? `<p class="avisoLimpo">${icone('pasta', 18)} Os arquivos deste pedido foram apagados em ${new Date(p.limpo).toLocaleDateString('pt-BR')} para liberar espaço. Os dados continuam.</p>` : ''}
+    <div class="situacaoPedido">
+      <span>Situação:</span>
+      <div class="segmento" id="dSituacao">${SITUACOES.map(([v, n]) => `<button type="button" data-st="${v}" aria-pressed="${p.status === v}">${n}</button>`).join('')}</div>
+      <button type="button" class="btn btnClaro btnPerigoTexto" id="dApagar">${icone('lixo', 20)} Apagar</button>
+    </div>
+    <div class="arCliente">
+      <div><b>${esc(c.nome || 'Sem nome')}</b><small>${esc(c.telefone || '—')} · ${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · pelo site da Art Rock</small></div>
+      <a class="btn btnEscuro" href="${zap}" target="_blank" rel="noopener">${icone('whatsapp', 20)} Chamar no WhatsApp</a>
+    </div>
+    ${c.obs ? `<div class="obsContato"><b>Observação:</b> ${esc(c.obs)}</div>` : ''}
+    <div class="arAcoes">
+      ${pdf && !p.limpo ? `<button type="button" class="btn btnEscuro" data-arq="${esc(pdf.nome)}">${icone('baixar', 20)} PDF do pedido (camisetas montadas)</button>` : ''}
+      ${arquivos.length && !p.limpo ? `<button type="button" class="btn btnClaro" id="arTudo">${icone('pasta', 20)} Baixar tudo (.zip)</button>` : ''}
+    </div>
+    <div class="arItens">${(p.itens || []).map((it, i) => `
+      <section class="arItem">
+        <h3>${i + 1}. ${esc(it.nome || `${it.modelo} ${it.cor}`)} <small>${esc([it.modelo, it.malha, it.cor].filter(Boolean).join(' · '))}</small></h3>
+        <p class="arTamanhos">${Object.entries(it.quantidades || {}).map(([t, q]) => `<span><b>${esc(t)}</b> × ${q}</span>`).join('')}<em>${pecas(it)} peça${pecas(it) === 1 ? '' : 's'}</em></p>
+        ${(it.artes || []).length ? `<ul class="arArtes">${it.artes.map(a => `<li>
+          <span class="arLado">${a.lado === 'Costas' ? 'Costas' : 'Frente'}</span>
+          <span>${a.tipo === 'texto' ? `Texto “${esc(a.texto || a.nome)}”` : esc(a.nome || 'Arte')}</span>
+          <small>${esc(a.medidas || '')}</small></li>`).join('')}</ul>` : '<p class="textoAjuda">Sem estampa (camiseta lisa).</p>'}
+      </section>`).join('')}</div>
+    ${arquivos.length && !p.limpo ? `<h3 class="arTitulo">Arquivos enviados</h3>
+      <ul class="arArquivos">${arquivos.map(f => `<li><span>${esc(f.nome)}</span><small>${kb(f.tamanho)}</small>
+        <button type="button" class="btnTexto btnArquivo" data-arq="${esc(f.nome)}">${icone('baixar', 16)} Baixar</button></li>`).join('')}</ul>` : ''}` });
+  $$('[data-arq]', j.el).forEach(b => (b.onclick = async () => {
+    try { baixar(await blobArquivo(id, b.dataset.arq), b.dataset.arq); } catch (e) { aviso(e.message, 'erro'); }
+  }));
+  $('#arTudo', j.el) && ($('#arTudo', j.el).onclick = async () => {
+    try {
+      const JSZip = await lib('jszip');
+      const zip = new JSZip();
+      for (const f of arquivos) zip.file(f.nome, await blobArquivo(id, f.nome));
+      zip.file('pedido.txt', [`Pedido AR-${numeroPedido(p.numero)} (site Art Rock)`, `${c.nome || ''} · ${c.telefone || ''}`, c.obs ? `Obs.: ${c.obs}` : '',
+        ...(p.itens || []).map((it, i) => `${i + 1}. ${[it.modelo, it.malha, it.cor].join(' · ')} — ${Object.entries(it.quantidades || {}).map(([t, q]) => `${t}×${q}`).join(' ')}`)].filter(Boolean).join('\n') + '\n');
+      baixar(await zip.generateAsync({ type: 'blob' }), `pedido-AR-${numeroPedido(p.numero)}.zip`);
+    } catch (e) { aviso('Não foi possível baixar: ' + e.message, 'erro'); }
+  });
+  barraSituacao(p, j);
+  return j;
 }
 
 // ---------- Início ----------

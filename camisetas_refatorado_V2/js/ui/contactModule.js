@@ -26,7 +26,8 @@
  */
 
 import { AppState } from '../core/appState.js';
-import { WHATSAPP } from '../core/constants.js';
+import { WHATSAPP, CONFECCAO } from '../core/constants.js';
+import { PreviewGeom } from '../preview/previewGeometry.js';
 import { Logger } from '../core/logger.js';
 import { NoticeModule } from './noticeModule.js';
 import { arquivosTexto } from '../image/textoVetor.js';
@@ -53,6 +54,17 @@ const HTML = `
     <div><b id="ctArtes">–</b><span>arte(s)</span></div>
   </div>
   <div class="ctFiles" id="waFiles"></div>
+  <form class="ctEnvio" id="ctEnvio" hidden novalidate>
+    <p class="ctEnvioTit">🚀 Enviar o pedido direto para a Art Rock</p>
+    <p class="ctEnvioSub">Chega na hora para a nossa equipe, com o PDF e as artes. A gente te chama no WhatsApp com a cotação.</p>
+    <input id="ctNome" type="text" placeholder="Seu nome" autocomplete="name" maxlength="80" required>
+    <input id="ctFone" type="tel" placeholder="Seu WhatsApp com DDD" autocomplete="tel" inputmode="tel" maxlength="30" required>
+    <textarea id="ctObs" rows="2" placeholder="Observação (opcional): prazo, dúvidas…" maxlength="1000"></textarea>
+    <p class="ctErro" id="ctErro" hidden></p>
+    <button type="submit" class="ctEnviar" id="ctEnviar" disabled>Enviar pedido</button>
+    <p class="ctOu"><span>ou, se preferir, pelo WhatsApp</span></p>
+  </form>
+  <div class="ctOk" id="ctOk" hidden></div>
   <label for="waMsg" class="ctLabel">💬 Sua mensagem para o atendimento <span>pode editar</span></label>
   <div class="ctBubble"><textarea id="waMsg" rows="3"></textarea></div>
   <ol class="ctSteps" id="waSteps" hidden></ol>
@@ -174,8 +186,44 @@ function montar() {
     else if (act === 'share')  ContactModule._compartilhar();
     else if (act === 'baixar') ContactModule._baixarTudo();
   });
+  dlg.querySelector('#ctEnvio').addEventListener('submit', e => { e.preventDefault(); ContactModule._enviarParaLoja(); });
   return dlg;
 }
+
+/** Pedido em dados (o que a confecção vê no painel). */
+function dadosDoPedido(cliente) {
+  const num = v => String(v).replace('.', ',');
+  return {
+    cliente,
+    itens: AppState.orderItems.map((it, i) => ({
+      nome: it.name || `Modelo ${i + 1}`,
+      modelo: it.category, malha: it.fabric, cor: it.color,
+      quantidades: Object.fromEntries(Object.entries(it.quantities || {}).filter(([, q]) => (parseInt(q, 10) || 0) > 0)),
+      artes: (it.stamps || []).filter(s => !s.hidden).map(s => {
+        const m = PreviewGeom.medidas(s, it.category);
+        return { nome: s.name || (s.tipo === 'texto' ? 'Texto' : 'Arte'), tipo: s.tipo === 'texto' ? 'texto' : 'imagem',
+          texto: s.tipo === 'texto' ? s.texto : '', lado: s.side, medidas: `${num(m.w)} × ${num(m.h)} cm` };
+      })
+    }))
+  };
+}
+
+/** Miniatura (JPEG pequeno) da 1ª página do PDF, para a lista da confecção. */
+async function miniaturaDoPdf(pdf) {
+  try {
+    const PDFModule = window._modules?.PDFModule;
+    const { canvas } = await PDFModule.convertPdfToImageDataURL(pdf, { scale: 0.6, asCanvas: true });
+    const k = Math.min(1, 360 / Math.max(canvas.width, canvas.height));
+    const c = Object.assign(document.createElement('canvas'), { width: Math.round(canvas.width * k), height: Math.round(canvas.height * k) });
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(canvas, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.7);
+  } catch { return ''; }
+}
+
+const lembrar = (k, v) => { try { localStorage.setItem(k, v); } catch { /* ok */ } };
+const lembrado = k => { try { return localStorage.getItem(k) || ''; } catch { return ''; } };
 
 /** Link do WhatsApp com o número do atendimento e a mensagem. */
 function linkWhatsApp(msg) {
@@ -193,6 +241,18 @@ export const ContactModule = {
 
     $('waMsg').value = WHATSAPP.message;
     $('waSteps').hidden = true;
+    // Envio direto para a confecção (só com o endereço configurado em CONFECCAO.url)
+    const envio = $('ctEnvio');
+    envio.hidden = !CONFECCAO.url;
+    dlg.classList.toggle('ctComEnvio', !!CONFECCAO.url);
+    dlg.classList.remove('ctEnviadoLoja');
+    $('ctOk').hidden = true;
+    $('ctErro').hidden = true;
+    $('ctNome').value = lembrado('artrock_cliente_nome');
+    $('ctFone').value = lembrado('artrock_cliente_fone');
+    $('ctObs').value = '';
+    $('ctEnviar').disabled = true;
+    $('ctEnviar').textContent = 'Preparando os arquivos…';
     // Volta ao estado inicial (mensagem + botão do WhatsApp visíveis)
     dlg.classList.remove('ctEnviado');
     $('ctTitulo').textContent = 'Seu projeto está pronto!';
@@ -228,6 +288,8 @@ export const ContactModule = {
       `<span class="ctChip"><i>PDF</i>${PDF_NAME}</span>` +
       (n ? `<span class="ctChip"><i>${st.zip ? 'ZIP' : 'IMG'}</i>${st.zip ? ZIP_NAME : n + ' arte(s)'}</span>` : '');
     btnWa.disabled = false;
+    $('ctEnviar').disabled = false;
+    $('ctEnviar').textContent = 'Enviar pedido';
 
     // "Enviar arquivos direto" só no celular: no computador o menu de
     // compartilhar do sistema quase nunca oferece o WhatsApp
@@ -238,9 +300,58 @@ export const ContactModule = {
     } catch { btnShare.hidden = true; }
   },
 
+  /**
+   * Envia o pedido (dados, PDF e artes) para o painel da confecção (app do
+   * tablet), que avisa a equipe. Mostra o número do pedido (AR-0001…). @private
+   */
+  async _enviarParaLoja() {
+    const nome = $('ctNome').value.trim(), fone = $('ctFone').value.trim(), obs = $('ctObs').value.trim();
+    const erro = msg => { $('ctErro').textContent = msg; $('ctErro').hidden = false; };
+    $('ctErro').hidden = true;
+    if (!nome) { erro('Escreva o seu nome.'); $('ctNome').focus(); return; }
+    if (fone.replace(/\D/g, '').length < 10) { erro('Escreva o seu WhatsApp com DDD (ex.: 12 99999-9999).'); $('ctFone').focus(); return; }
+    lembrar('artrock_cliente_nome', nome); lembrar('artrock_cliente_fone', fone);
+
+    const btn = $('ctEnviar');
+    btn.disabled = true; btn.textContent = 'Enviando…';
+    try {
+      const fd = new FormData();
+      fd.append('pedido', JSON.stringify(dadosDoPedido({ nome, telefone: fone, obs })));
+      const mini = await miniaturaDoPdf(st.pdf);
+      if (mini) fd.append('miniatura', mini);
+      [st.pdf, ...st.artes].forEach(f => fd.append('arquivo', f, f.name));
+      const r = await fetch(CONFECCAO.url.replace(/\/$/, '') + '/api/externo/pedido', { method: 'POST', body: fd });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) throw new Error(d.erro || `servidor respondeu ${r.status}`);
+      st.codigo = d.codigo;
+      this._mostrarEnviado(d.codigo);
+      Logger.info('UI', `Pedido ${d.codigo} enviado para a confecção.`);
+    } catch (e) {
+      Logger.warn('UI', 'Envio para a confecção falhou: ' + e.message);
+      erro(`Não foi possível enviar agora (${e.message}). Tente de novo ou use o WhatsApp abaixo.`);
+      btn.disabled = false; btn.textContent = 'Tentar de novo';
+    }
+  },
+
+  /** Depois de enviar: número do pedido e WhatsApp opcional (já com o número). @private */
+  _mostrarEnviado(codigo) {
+    st.dlg.classList.add('ctEnviadoLoja');
+    $('ctEnvio').hidden = true;
+    $('ctTitulo').textContent = 'Pedido enviado! 🎉';
+    $('ctSubtitulo').textContent = 'Recebemos o seu pedido com o PDF e as artes. Em breve a Art Rock chama você no WhatsApp com a cotação.';
+    const ok = $('ctOk');
+    ok.innerHTML = `<span>Número do pedido</span><b>${codigo}</b><small>Guarde este número: é só falar ele para a gente.</small>`;
+    ok.hidden = false;
+    $('waMsg').value = `Olá! Acabei de enviar o pedido ${codigo} pelo site da Art Rock.`;
+    st.dlg.querySelector('[data-act="wa"] span').textContent = 'Avisar no WhatsApp (opcional)';
+    st.dlg.scrollTop = 0;
+  },
+
   /** Baixa as artes (se ainda não baixou) e abre a conversa do atendimento. @private */
   _enviarWhatsApp() {
     st.msg = $('waMsg').value.trim() || WHATSAPP.message;
+    // Pedido já enviado para a confecção: o WhatsApp é só um aviso (sem anexar arquivos)
+    if (st.codigo) { this._abrirConversa(); return; }
     if (!st.artesBaixadas) this._baixarArtes();
     this._abrirConversa();
 
