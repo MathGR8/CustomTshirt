@@ -289,7 +289,7 @@ export const WHATSAPP = {
 //  Vazio = só o WhatsApp, como antes.
 // ============================================================
 export const CONFECCAO = {
-  url: ''
+  url: 'https://camisetas-tablet.matheusmdn.workers.dev'
 };
 
 // ============================================================
