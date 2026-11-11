@@ -1,1 +1,144 @@
-{ "versao": 1, "areas": {} }
+{
+  "versao": 2,
+  "atualizado": "2026-11-11",
+  "areas": {
+    "Masculina": {
+      "cores": {
+        "Preto": {
+          "Frente": {
+            "x": 0.1938,
+            "y": 0.158,
+            "w": 0.6124
+          }
+        },
+        "Branco": {
+          "Frente": {
+            "x": 0.2082,
+            "y": 0.1668,
+            "w": 0.5835
+          }
+        },
+        "Marinho": {
+          "Frente": {
+            "x": 0.2053,
+            "y": 0.1518,
+            "w": 0.5894
+          }
+        },
+        "Preta Jaguar": {
+          "Frente": {
+            "x": 0.22,
+            "y": 0.165,
+            "w": 0.55
+          }
+        },
+        "Marinho Índigo": {
+          "Frente": {
+            "x": 0.225,
+            "y": 0.155,
+            "w": 0.55
+          }
+        },
+        "Cinza Mescla": {
+          "Frente": {
+            "x": 0.191,
+            "y": 0.17,
+            "w": 0.618
+          }
+        },
+        "Cinza Grafite": {
+          "Frente": {
+            "x": 0.2,
+            "y": 0.165,
+            "w": 0.6001
+          }
+        }
+      }
+    },
+    "Feminina": {
+      "cores": {
+        "Preto": {
+          "Frente": {
+            "x": 0.2919,
+            "y": 0.2832,
+            "w": 0.4162
+          }
+        },
+        "Branco": {
+          "Frente": {
+            "x": 0.2898,
+            "y": 0.2865,
+            "w": 0.4205
+          }
+        },
+        "Marinho": {
+          "Frente": {
+            "x": 0.2997,
+            "y": 0.2857,
+            "w": 0.4005
+          }
+        },
+        "Preta Jaguar": {
+          "Frente": {
+            "x": 0.2997,
+            "y": 0.2807,
+            "w": 0.4005
+          }
+        }
+      }
+    },
+    "Infantil/Juvenil": {
+      "cores": {
+        "Preta Jaguar": {
+          "Frente": {
+            "x": 0.225,
+            "y": 0.16,
+            "w": 0.55
+          }
+        },
+        "Marinho Índigo": {
+          "Frente": {
+            "x": 0.225,
+            "y": 0.155,
+            "w": 0.55
+          }
+        },
+        "Cinza Mescla": {
+          "Frente": {
+            "x": 0.1978,
+            "y": 0.17,
+            "w": 0.6044
+          }
+        },
+        "Cinza Grafite": {
+          "Frente": {
+            "x": 0.1964,
+            "y": 0.165,
+            "w": 0.6073
+          }
+        },
+        "Preto": {
+          "Frente": {
+            "x": 0.1865,
+            "y": 0.16,
+            "w": 0.6269
+          }
+        },
+        "Branco": {
+          "Frente": {
+            "x": 0.215,
+            "y": 0.155,
+            "w": 0.57
+          }
+        },
+        "Marinho": {
+          "Frente": {
+            "x": 0.215,
+            "y": 0.155,
+            "w": 0.57
+          }
+        }
+      }
+    }
+  }
+}
