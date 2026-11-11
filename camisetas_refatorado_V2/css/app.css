@@ -319,7 +319,7 @@ button, label, select { touch-action: manipulation; }
 .app .rodape .btnVoltar { padding: 0 14px; font-size: 15px; }
 /* Aviso: logo abaixo do topo (não cobre a etapa nem o rodapé) */
 body #uiNotice { top: calc(env(safe-area-inset-top) + 58px); bottom: auto; border-radius: 12px; font-family: var(--font-base); }
-.app .marca img { max-width: 84px; object-fit: contain; }
+.app .marca img { object-fit: contain; }
 .etapas { overflow: hidden; }
 @media (max-width: 640px) {
   .app .rodape .btnVoltar { width: 48px; padding: 0; }
