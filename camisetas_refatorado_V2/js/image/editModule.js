@@ -371,6 +371,7 @@ const HTML = `
   <button type="button" data-op="cancel" class="editClose" aria-label="Fechar sem salvar" title="Fechar sem salvar">✕</button></div>
 <div class="editBody">
   <div class="editStageBox">
+    <div class="editVarinhaFaixa" id="editVarinhaFaixa" hidden aria-live="polite">🪄 <b>Varinha ligada:</b> toque na cor que quer apagar</div>
     <div class="editStage" id="editStage"><div class="editWrap" id="editWrap"><canvas id="editCanvas"></canvas><div id="editSel"><i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i><i data-h="e"></i><i data-h="se"></i><i data-h="s"></i><i data-h="sw"></i><i data-h="w"></i></div></div></div>
     <div class="editZoom" role="group" aria-label="Zoom">
       <button type="button" data-op="zoom-" title="Diminuir zoom (−)" aria-label="Diminuir zoom">−</button>
@@ -379,14 +380,18 @@ const HTML = `
     </div>
   </div>
   <div class="editTools">
-    <fieldset><legend>Fundo</legend>
+    <fieldset class="editFundo"><legend>Fundo</legend>
       <div class="editRow"><button type="button" data-op="fundo" class="editMain">✨ Remover fundo</button>
         <button type="button" data-op="varinha" id="editVarinha" aria-pressed="false" title="Ligue e clique numa cor da imagem para apagá-la (W)">🪄 Varinha</button></div>
-      <p class="editHint" id="editVarinhaDica" hidden>Varinha ligada: clique na cor que quer apagar. Clique de novo no botão para desligar.</p>
+      <div class="editVarinhaDica" id="editVarinhaDica" hidden>
+        <b>🪄 Varinha ligada</b>
+        <span>Toque (ou clique) na imagem, na <b>cor que você quer apagar</b>: essa cor some da arte.</span>
+        <span>Apagou demais? Use <b>↶ Desfazer</b>. Para apagar mais ou menos tons parecidos, mude a tolerância.</span>
+      </div>
       <label class="editSlide">Tolerância <input type="range" id="editTol" min="0" max="100" step="1" value="25"><output id="editTolV">25</output></label>
       <label class="editCheck"><input type="checkbox" id="editLigados" checked> Só a parte ligada (não apaga o branco de dentro da arte)</label>
-      <label class="editCheck"><input type="checkbox" id="editAparar" checked> Aparar as sobras depois de remover o fundo</label>
-      <p class="editHint">"Remover fundo" apaga a cor das bordas (ex.: o branco de um PDF). Sobrou algo? Aumente a tolerância ou use a varinha.</p>
+      <label class="editCheck editSoFundo"><input type="checkbox" id="editAparar" checked> Aparar as sobras depois de remover o fundo</label>
+      <p class="editHint editSoFundo">"Remover fundo" apaga a cor das bordas (ex.: o branco de um PDF). Sobrou algo? Aumente a tolerância ou use a varinha.</p>
     </fieldset>
     <fieldset><legend>Girar e espelhar</legend>
       <div class="editRow">
@@ -675,10 +680,24 @@ const tolerancia = () => +$('editTol').value * 2.2;
 
 /** Liga/desliga a varinha. */
 function alternarVarinha(liga = !ed.varinha) {
+  const antes = !!ed.varinha;
   ed.varinha = liga;
-  $('editVarinha').setAttribute('aria-pressed', String(liga));
+  const btn = $('editVarinha');
+  btn.setAttribute('aria-pressed', String(liga));
+  btn.textContent = liga ? '✓ Fechar a varinha' : '🪄 Varinha';
+  btn.title = liga ? 'Desliga a varinha e volta para as outras ferramentas (W)' : 'Ligue e clique numa cor da imagem para apagá-la (W)';
   $('editVarinhaDica').hidden = !liga;
+  $('editVarinhaFaixa').hidden = !liga;
   $('editWrap').style.cursor = liga ? 'cell' : 'crosshair';
+  // Varinha ligada: só ela no menu (as outras ferramentas voltam ao fechar)
+  btn.closest('.editDlg')?.classList.toggle('modoVarinha', liga);
+  if (liga && !antes) {
+    // Aviso dentro do editor (a janela fica por cima dos avisos da página)
+    const faixa = $('editVarinhaFaixa');
+    faixa.classList.remove('chamar'); void faixa.offsetWidth; faixa.classList.add('chamar');
+    // No celular as ferramentas ficam embaixo: mostra a imagem para o toque
+    $('editStage')?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }
 }
 
 /** Apaga a cor do ponto clicado (respeitando a seleção, se houver). */

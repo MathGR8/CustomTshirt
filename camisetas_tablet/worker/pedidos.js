@@ -24,6 +24,16 @@
  *   POST   /api/pedidos/espaco/limpar          {meses} apaga os ARQUIVOS dos pedidos entregues
  *                                              há mais de N meses (os dados do pedido ficam)
  *
+ * Pedidos do site da Art Rock (personalizador da loja virtual):
+ *   POST   /api/externo/pedido                 multipart: "pedido" (JSON), "miniatura"
+ *                                              (data URL) e "arquivo" (vários: PDF e artes)
+ *       SEM senha (o site é público), com limites: tamanho, quantidade de
+ *       arquivos, tipos permitidos e 6 pedidos por hora por endereço de rede.
+ *       Só cria pedidos novos (não lê, não altera, não apaga nada). Numeração
+ *       própria (AR-0001…), etiqueta "Art Rock" no painel e o mesmo aviso.
+ *       ARTROCK_ORIGENS (variável do Worker, opcional): endereços do site
+ *       permitidos, separados por vírgula (ex.: https://artrock-personalize.x.workers.dev).
+ *
  * Aviso de pedido: a cada pedido (ou contato) novo o servidor manda uma
  * notificação do navegador (Web Push) para cada computador/celular que ativou
  * "Receber avisos" no painel da confecção. Grátis e sem serviço de terceiros
@@ -48,6 +58,14 @@ const reais = v => (+v || 0).toLocaleString('pt-BR', { style: 'currency', curren
 export function avisoDoPedido(p, origem = '') {
   const c = p.cliente || {};
   const url = `${origem}/?pedido=${encodeURIComponent(p.id)}#confeccao`;
+  if (p.origem === 'artrock') {
+    const itens = p.itens || [];
+    const pecas = itens.reduce((s, it) => s + Object.values(it.quantidades || {}).reduce((a, n) => a + (+n || 0), 0), 0);
+    return { titulo: `🎸 Novo pedido Art Rock nº AR-${String(p.numero || 0).padStart(4, '0')}`, tag: `p-${p.id}`, url,
+      texto: [`${c.nome || 'Sem nome'}${c.telefone ? ' · ' + c.telefone : ''} · ${pecas} peça${pecas === 1 ? '' : 's'}`,
+        ...itens.slice(0, 3).map(it => `${it.modelo || ''} ${it.cor || ''} — ${Object.entries(it.quantidades || {}).filter(([, q]) => q > 0).map(([t, q]) => `${t}×${q}`).join(' ')}`.replace(/\s+/g, ' ').trim()),
+        itens.length > 3 ? `… e mais ${itens.length - 3} modelo(s)` : '', c.obs ? `Obs.: ${c.obs}` : ''].filter(Boolean).join('\n') };
+  }
   if (p.tipo === 'contato') {
     return { titulo: '📞 Novo contato — arte própria', tag: `p-${p.id}`, url,
       texto: [`${c.nome || 'Sem nome'}${c.telefone ? ' · ' + c.telefone : ''}`, 'Quer fazer camiseta com a própria arte: chame no WhatsApp.', c.obs ? `Obs.: ${c.obs}` : ''].filter(Boolean).join('\n') };
@@ -100,6 +118,10 @@ export class Pedidos extends DurableObject {
     try { this.sql.exec("ALTER TABLE pedidos ADD COLUMN tipo TEXT DEFAULT 'pedido'"); } catch { /* já existe */ }
     // Quando os arquivos do pedido foram apagados para liberar espaço
     try { this.sql.exec('ALTER TABLE pedidos ADD COLUMN limpo INTEGER'); } catch { /* já existe */ }
+    // De onde veio o pedido: 'loja' (tablet) ou 'artrock' (site da Art Rock)
+    try { this.sql.exec("ALTER TABLE pedidos ADD COLUMN origem TEXT DEFAULT 'loja'"); } catch { /* já existe */ }
+    // Limite de pedidos do site por endereço de rede (contra abuso)
+    this.sql.exec('CREATE TABLE IF NOT EXISTS externos (ip TEXT PRIMARY KEY, n INTEGER, ate INTEGER)');
     // Uma vez só: apaga a senha gravada pelas versões antigas (a 1ª senha usada
     // ficava valendo) e volta para a senha inicial 000000. Os pedidos ficam.
     if (!this.um("SELECT v FROM cfg WHERE k = 'senha_inicial_v2'")) {
@@ -136,6 +158,8 @@ export class Pedidos extends DurableObject {
     const url = new URL(req.url);
     const ip = req.headers.get('cf-connecting-ip') || 'local';
     const partes = url.pathname.replace(/^\/api\/pedidos\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
+    // Pedido do site da Art Rock: sem senha, só cria (ver receberExterno)
+    if (url.pathname === '/api/externo/pedido') return this.externo(req, ip, url.origin);
     try {
       if (this.bloqueado(ip)) return json({ erro: 'Muitas tentativas com a senha errada. Espere 15 minutos.' }, 429);
 
@@ -192,12 +216,117 @@ export class Pedidos extends DurableObject {
     }
   }
 
+  // ---------- Pedidos do site da Art Rock ----------
+
+  /** Cabeçalhos CORS para o site da Art Rock (todas as origens, ou só as de ARTROCK_ORIGENS). */
+  cors(req) {
+    const origem = req.headers.get('origin') || '';
+    const lista = String(this.env.ARTROCK_ORIGENS || '').split(',').map(s => s.trim().replace(/\/$/, '')).filter(Boolean);
+    const permitida = !lista.length || lista.includes(origem);
+    return {
+      permitida,
+      h: {
+        'access-control-allow-origin': lista.length ? (permitida ? origem : 'null') : '*',
+        'access-control-allow-methods': 'POST, OPTIONS',
+        'access-control-allow-headers': 'content-type',
+        'access-control-max-age': '86400',
+        vary: 'origin'
+      }
+    };
+  }
+
+  async externo(req, ip, origemServidor) {
+    const { permitida, h } = this.cors(req);
+    const resp = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...h } });
+    if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: h });
+    if (req.method !== 'POST') return resp({ erro: 'use POST' }, 405);
+    if (!permitida) return resp({ erro: 'site não autorizado' }, 403);
+    try {
+      return resp(...await this.receberExterno(req, ip, origemServidor));
+    } catch (e) {
+      return resp({ erro: 'falha no servidor', detalhe: String(e && e.message || e) }, 500);
+    }
+  }
+
+  /**
+   * Cria um pedido vindo do site da Art Rock.
+   * Só aceita os campos conhecidos (o resto é descartado) e arquivos de imagem/PDF.
+   * @returns {Promise<[Object, number]>} corpo e status da resposta
+   */
+  async receberExterno(req, ip, origemServidor) {
+    // 6 pedidos por hora por endereço de rede
+    const t = this.um('SELECT n, ate FROM externos WHERE ip = ?', ip);
+    const vale = t && t.ate > Date.now();
+    if (vale && t.n >= 6) return [{ erro: 'Muitos pedidos seguidos. Tente de novo daqui a pouco ou fale com a gente pelo WhatsApp.' }, 429];
+    if (+req.headers.get('content-length') > 80 * 1024 * 1024) return [{ erro: 'arquivos grandes demais (máx. 80 MB no total)' }, 413];
+    const form = await req.formData().catch(() => null);
+    if (!form) return [{ erro: 'envio inválido' }, 400];
+
+    const txt = (v, max) => String(v ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').trim().slice(0, max);
+    let bruto;
+    try { bruto = JSON.parse(String(form.get('pedido') || '')); } catch { return [{ erro: 'pedido inválido' }, 400]; }
+    const c = bruto.cliente || {};
+    const cliente = { nome: txt(c.nome, 80), telefone: txt(c.telefone, 30), obs: txt(c.obs, 1000) };
+    if (!cliente.nome || cliente.telefone.replace(/\D/g, '').length < 8) return [{ erro: 'Informe nome e WhatsApp.' }, 400];
+    const itens = (Array.isArray(bruto.itens) ? bruto.itens : []).slice(0, 30).map(it => ({
+      nome: txt(it.nome, 80), modelo: txt(it.modelo, 40), malha: txt(it.malha, 40), cor: txt(it.cor, 40),
+      quantidades: Object.fromEntries(Object.entries(it.quantidades || {}).slice(0, 40)
+        .map(([k, v]) => [txt(k, 12), Math.max(0, Math.min(100000, parseInt(v, 10) || 0))]).filter(([k, v]) => k && v > 0)),
+      artes: (Array.isArray(it.artes) ? it.artes : []).slice(0, 30).map(a => ({
+        nome: txt(a.nome, 120), tipo: a.tipo === 'texto' ? 'texto' : 'imagem', texto: txt(a.texto, 300),
+        lado: a.lado === 'Costas' ? 'Costas' : 'Frente', medidas: txt(a.medidas, 60), arquivo: txt(a.arquivo, 120)
+      }))
+    }));
+    if (!itens.length || !itens.some(it => Object.keys(it.quantidades).length)) return [{ erro: 'O pedido está vazio.' }, 400];
+
+    // Arquivos: PDF do pedido e artes (imagens, PDF, SVG, ZIP)
+    const TIPOS = /^(application\/pdf|image\/(png|jpeg|webp|gif|svg\+xml)|application\/zip|application\/x-zip-compressed)$/;
+    const arquivos = [];
+    let total = 0;
+    for (const f of form.getAll('arquivo')) {
+      if (typeof f === 'string') continue;
+      if (arquivos.length >= 40) return [{ erro: 'arquivos demais' }, 413];
+      const nome = txt(f.name, 120).replace(/[\\/:*?"<>|]+/g, '_') || `arquivo-${arquivos.length + 1}`;
+      const tipo = (f.type || '').toLowerCase();
+      if (!TIPOS.test(tipo)) continue; // ignora o que não é imagem/PDF
+      if (f.size > MAX_ARQUIVO) return [{ erro: `arquivo grande demais: ${nome}` }, 413];
+      total += f.size;
+      if (total > 80 * 1024 * 1024) return [{ erro: 'arquivos grandes demais (máx. 80 MB no total)' }, 413];
+      arquivos.push({ nome, tipo, buf: new Uint8Array(await f.arrayBuffer()) });
+    }
+    const mini = String(form.get('miniatura') || '');
+    const miniatura = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(mini) && mini.length <= 200000 ? mini : '';
+
+    // Número próprio (AR-0001…) e gravação
+    const numero = (+(this.um("SELECT v FROM cfg WHERE k = 'numero_artrock'")?.v) || 0) + 1;
+    const id = 'ar-' + crypto.randomUUID();
+    const p = { id, numero, origem: 'artrock', tipo: 'pedido', data: new Date().toISOString(), cliente, itens, total: 0, loja: 'Art Rock' };
+    const dados = JSON.stringify(p);
+    const n = Math.ceil(dados.length / PEDACO) || 1;
+    const pecas = itens.reduce((s, it) => s + Object.values(it.quantidades).reduce((a, q) => a + q, 0), 0);
+    this.ctx.storage.transactionSync(() => {
+      this.sql.exec("INSERT OR REPLACE INTO cfg (k, v) VALUES ('numero_artrock', ?)", String(numero));
+      for (let i = 0; i < n; i++) this.sql.exec('INSERT INTO pedido_partes (id, idx, dados) VALUES (?, ?, ?)', id, i, dados.slice(i * PEDACO, (i + 1) * PEDACO));
+      this.sql.exec(`INSERT INTO pedidos (id, numero, data, nome, telefone, total, pecas, camisetas, status, miniatura, recebido, partes, alerta, tipo, origem)
+                     VALUES (?, ?, ?, ?, ?, 0, ?, ?, 'novo', ?, ?, ?, 0, 'pedido', 'artrock')`,
+        id, numero, p.data, cliente.nome, cliente.telefone, pecas, itens.length, miniatura, Date.now(), n);
+      for (const a of arquivos) {
+        const partes = Math.ceil(a.buf.length / PEDACO) || 1;
+        for (let i = 0; i < partes; i++) this.sql.exec('INSERT OR REPLACE INTO arquivo_partes (pedido, nome, idx, dados) VALUES (?, ?, ?, ?)', id, a.nome, i, a.buf.subarray(i * PEDACO, (i + 1) * PEDACO));
+        this.sql.exec('INSERT OR REPLACE INTO arquivos (pedido, nome, tipo, tamanho, partes) VALUES (?, ?, ?, ?, ?)', id, a.nome, a.tipo, a.buf.length, partes);
+      }
+      this.sql.exec('INSERT OR REPLACE INTO externos (ip, n, ate) VALUES (?, ?, ?)', ip, vale ? t.n + 1 : 1, vale ? t.ate : Date.now() + 3600 * 1000);
+    });
+    this.ctx.waitUntil(this.avisarTodos(avisoDoPedido(p, origemServidor), origemServidor).catch(() => {}));
+    return [{ ok: true, numero, codigo: `AR-${String(numero).padStart(4, '0')}` }, 200];
+  }
+
   // ---------- Pedidos ----------
 
   lista(url) {
     const status = url.searchParams.get('status');
     const rows = this.sql.exec(
-      `SELECT p.id, p.numero, p.data, p.nome, p.telefone, p.total, p.pecas, p.camisetas, p.status, p.miniatura, p.recebido, p.alerta, p.tipo, p.limpo,
+      `SELECT p.id, p.numero, p.data, p.nome, p.telefone, p.total, p.pecas, p.camisetas, p.status, p.miniatura, p.recebido, p.alerta, p.tipo, p.limpo, p.origem,
               (SELECT COUNT(*) FROM arquivos a WHERE a.pedido = p.id) AS arquivos
          FROM pedidos p ${status && STATUS.includes(status) ? 'WHERE p.status = ?' : ''}
         ORDER BY p.recebido DESC LIMIT 500`, ...(status && STATUS.includes(status) ? [status] : [])).toArray();
