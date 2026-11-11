@@ -51,12 +51,16 @@
   @keyframes arp-gola {
     0%, 30% { stroke: #3a3a40; } 33.3%, 63.3% { stroke: #d4d4d8; } 66.6%, 96.6% { stroke: #2f4f9a; } 100% { stroke: #3a3a40; }
   }
-  .arp-estampa { transform-box: fill-box; transform-origin: center; animation: arp-pop 2.5s infinite cubic-bezier(.3, 1.6, .5, 1); }
+  /* Uma estampa para cada cor da camiseta (7,5 s no total, 2,5 s cada):
+     guitarra na preta, moto na branca, caveira mexicana na azul */
+  .arp-est { transform-box: fill-box; transform-origin: center; opacity: 0; animation: arp-pop 7.5s infinite cubic-bezier(.3, 1.6, .5, 1); }
+  .arp-est2 { animation-delay: -5s; }   /* aparece com a camiseta branca */
+  .arp-est3 { animation-delay: -2.5s; } /* aparece com a camiseta azul */
   @keyframes arp-pop {
-    0%, 6% { transform: scale(0) rotate(-25deg); opacity: 0; }
-    16% { transform: scale(1.18) rotate(4deg); opacity: 1; }
-    22%, 84% { transform: scale(1) rotate(0); opacity: 1; }
-    94%, 100% { transform: scale(0) rotate(20deg); opacity: 0; }
+    0%, 2% { transform: scale(0) rotate(-25deg); opacity: 0; }
+    5.3% { transform: scale(1.18) rotate(4deg); opacity: 1; }
+    7.3%, 28% { transform: scale(1) rotate(0); opacity: 1; }
+    31.3%, 100% { transform: scale(0) rotate(20deg); opacity: 0; }
   }
   .arp-pincel { transform-box: fill-box; transform-origin: 20% 80%; animation: arp-pincel 2.5s infinite ease-in-out; }
   @keyframes arp-pincel {
@@ -153,8 +157,8 @@
   @media (prefers-reduced-motion: reduce) {
     .arp-flutua .arp-link, .arp-icone::after { animation: none !important; }
     .arp-pincel, .arp-brilho { animation: none !important; opacity: 0 !important; }
-    .arp-estampa { animation-name: arp-surge !important; animation-timing-function: ease-in-out !important; }
-    @keyframes arp-surge { 0%, 6% { opacity: 0; } 20%, 84% { opacity: 1; } 96%, 100% { opacity: 0; } }
+    .arp-est { animation-name: arp-surge !important; animation-timing-function: ease-in-out !important; }
+    @keyframes arp-surge { 0%, 2% { opacity: 0; } 6.6%, 28% { opacity: 1; } 32%, 100% { opacity: 0; } }
   }
   /* ---------- Celular e tablet (até 1024 px): continua à esquerda, 80 px acima do rodapé ----------
      Para mudar a altura, troque só o número abaixo (o id #arp-personalize é o do botão). */
@@ -165,22 +169,53 @@
     (document.head || document.documentElement).appendChild(st);
   }
 
-  // Animação: camiseta (troca de cor) + estampa "ROCK" que aparece com o pincel
+  // Animação: camiseta (troca de cor) + uma estampa por cor (guitarra, moto, caveira mexicana) com o pincel
   var ANIM =
     '<svg class="arp-anim" viewBox="8 10 104 102" aria-hidden="true" focusable="false">' +
       '<path class="arp-camisa" stroke-width="2" stroke="#3a3a40" stroke-linejoin="round" d="M44 22 L30 27 L12 41 L21 58 L32 52 L32 102 Q60 107 88 102 L88 52 L99 58 L108 41 L90 27 L76 22 Q60 34 44 22 Z"/>' +
       '<path class="arp-gola" fill="none" stroke-width="3" stroke-linecap="round" stroke="#3a3a40" d="M46 23 Q60 33 74 23"/>' +
       '<g class="arp-estampa">' +
-        // Caveira (vermelha; olhos, nariz e dentes vazados em escuro)
-        '<g class="arp-caveira">' +
-          '<path fill="#ed3051" d="M60 43 C51.5 43 46 49 46 56.5 C46 61.5 48.6 64.6 51.5 66.2 L51.5 71.5 Q51.5 75.5 55.5 75.5 L64.5 75.5 Q68.5 75.5 68.5 71.5 L68.5 66.2 C71.4 64.6 74 61.5 74 56.5 C74 49 68.5 43 60 43 Z"/>' +
-          '<ellipse cx="54.6" cy="57.5" rx="3.9" ry="4.4" fill="#121214"/>' +
-          '<ellipse cx="65.4" cy="57.5" rx="3.9" ry="4.4" fill="#121214"/>' +
-          '<path fill="#121214" d="M60 62.4 L57.9 66.6 L62.1 66.6 Z"/>' +
-          '<path stroke="#121214" stroke-width="1.6" stroke-linecap="round" d="M56.2 70 V75 M60 70 V75.2 M63.8 70 V75"/>' +
+        // 1) Guitarra (camiseta preta): corpo vermelho, braço amarelo, cordas brancas
+        '<g class="arp-est arp-est1"><g transform="translate(5 6) rotate(-35 60 66)">' +
+          '<rect x="57.4" y="33" width="5.2" height="8" rx="1.6" fill="#ffd23f"/>' +
+          '<circle cx="56.6" cy="35" r="1" fill="#fff"/><circle cx="56.6" cy="38.6" r="1" fill="#fff"/>' +
+          '<circle cx="63.4" cy="35" r="1" fill="#fff"/><circle cx="63.4" cy="38.6" r="1" fill="#fff"/>' +
+          '<rect x="58.5" y="40" width="3" height="32" fill="#e8b44a"/>' +
+          '<path stroke="#7a4b14" stroke-width=".7" d="M58.5 46 H61.5 M58.5 51 H61.5 M58.5 56 H61.5 M58.5 61 H61.5"/>' +
+          '<ellipse cx="60" cy="71" rx="9" ry="7.5" fill="#ed3051"/>' +
+          '<ellipse cx="60" cy="82" rx="12" ry="9.5" fill="#ed3051"/>' +
+          '<path fill="#fff" d="M53.5 74 Q52 82 56 86 L60 86 L60 72 Q56 71 53.5 74 Z"/>' +
+          '<rect x="55.5" y="73.5" width="9" height="2.2" rx=".6" fill="#121214"/>' +
+          '<rect x="55.5" y="78.5" width="9" height="2.2" rx=".6" fill="#121214"/>' +
+          '<rect x="56" y="84.5" width="8" height="2" rx=".6" fill="#ffd23f"/>' +
+          '<path stroke="#fff" stroke-width=".45" opacity=".85" d="M59.2 37 V85 M60.8 37 V85"/>' +
+        '</g></g>' +
+        // 2) Moto (camiseta branca): silhueta escura, tanque vermelho, farol amarelo
+        '<g class="arp-est arp-est2">' +
+          '<circle cx="44" cy="78" r="8.3" fill="none" stroke="#121214" stroke-width="3.2"/>' +
+          '<circle cx="76" cy="78" r="8.3" fill="none" stroke="#121214" stroke-width="3.2"/>' +
+          '<circle cx="44" cy="78" r="2" fill="#121214"/><circle cx="76" cy="78" r="2" fill="#121214"/>' +
+          '<path stroke="#121214" stroke-width="2.6" stroke-linecap="round" fill="none" d="M44 78 L55 70 M76 78 L71.5 58 L68.5 54.5 M66.5 55.5 L71 53.5"/>' +
+          '<path fill="#121214" d="M41 66 Q45 63 52 64.5 L56 65 L57 70.5 L50 71.5 Q44 71 41 66 Z"/>' +
+          '<rect x="55" y="67" width="10" height="8" rx="2" fill="#3a3a40"/>' +
+          '<path stroke="#9aa0a6" stroke-width="2" stroke-linecap="round" d="M50 76 L63 76.5"/>' +
+          '<path fill="#ed3051" d="M55 64.5 Q61 57.5 70 60 L68.5 65 Q62 66.5 55.5 67 Z"/>' +
+          '<path fill="#fff" opacity=".55" d="M58 62.5 Q62 60 66 60.6 L65.6 61.8 Q62 61.6 58.8 63.4 Z"/>' +
+          '<circle cx="74.5" cy="59.5" r="2.2" fill="#ffd23f" stroke="#121214" stroke-width=".8"/>' +
         '</g>' +
-        '<rect x="41" y="80" width="38" height="12" rx="3" fill="#ffd23f"/>' +
-        '<text x="60" y="89.5" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="9.5" fill="#121214" letter-spacing="1">ROCK</text>' +
+        // 3) Caveira mexicana (camiseta azul): branca, olhos com flores coloridas
+        '<g class="arp-est arp-est3">' +
+          '<path fill="#f4f4f5" d="M60 42 C50 42 44 49 44 57.5 C44 63 47 66.6 50.5 68.4 L50.5 74.5 Q50.5 79 55 79 L65 79 Q69.5 79 69.5 74.5 L69.5 68.4 C73 66.6 76 63 76 57.5 C76 49 70 42 60 42 Z"/>' +
+          '<circle cx="53.8" cy="59" r="5.6" fill="#ed3051"/><circle cx="66.2" cy="59" r="5.6" fill="#ffd23f"/>' +
+          '<circle cx="53.8" cy="59" r="3.3" fill="#121214"/><circle cx="66.2" cy="59" r="3.3" fill="#121214"/>' +
+          '<circle cx="54.8" cy="58" r=".9" fill="#fff"/><circle cx="67.2" cy="58" r=".9" fill="#fff"/>' +
+          '<g fill="#ed3051"><circle cx="60" cy="46.6" r="1.9"/><circle cx="62.5" cy="48.4" r="1.9"/><circle cx="61.5" cy="51.3" r="1.9"/><circle cx="58.5" cy="51.3" r="1.9"/><circle cx="57.5" cy="48.4" r="1.9"/></g>' +
+          '<circle cx="60" cy="49.2" r="1.5" fill="#ffd23f"/>' +
+          '<path fill="#121214" d="M60 63.6 C58.6 62.3 57 64.2 58.4 65.6 L60 67.2 L61.6 65.6 C63 64.2 61.4 62.3 60 63.6 Z"/>' +
+          '<circle cx="48.6" cy="66" r="1.3" fill="#2ec4b6"/><circle cx="71.4" cy="66" r="1.3" fill="#2ec4b6"/>' +
+          '<path stroke="#121214" stroke-width="1.2" stroke-linecap="round" d="M53 73 H67 M55 70.6 V75.4 M58.3 70.6 V75.4 M61.7 70.6 V75.4 M65 70.6 V75.4"/>' +
+          '<g fill="#2ec4b6"><circle cx="55" cy="77.3" r=".8"/><circle cx="60" cy="77.6" r=".8"/><circle cx="65" cy="77.3" r=".8"/></g>' +
+        '</g>' +
       '</g>' +
       '<g class="arp-pincel"><rect x="78" y="66" width="7" height="26" rx="3" fill="#ffd23f" transform="rotate(35 81 79)"/>' +
         '<path d="M70 86 q4 -6 10 -2 l-3 7 q-5 2 -7 -5z" fill="#ed3051" transform="rotate(35 75 86)"/></g>' +
