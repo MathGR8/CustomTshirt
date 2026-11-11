@@ -71,56 +71,52 @@
   @keyframes arp-brilho { 0%, 14% { transform: scale(0); opacity: 0; } 24% { transform: scale(1.2); opacity: 1; } 40%, 100% { transform: scale(0); opacity: 0; } }
 
   /* ---------- Flutuante (canto inferior esquerdo) ---------- */
-  .arp-flutua { position: fixed; left: 16px; bottom: 16px; z-index: 2147483000; display: flex; align-items: center; gap: 0; }
-  .arp-flutua .arp-link { display: flex; align-items: center; gap: 9px; padding: 4px 14px 4px 4px; border-radius: 999px;
+  .arp-flutua { position: fixed; left: 18px; bottom: 18px; z-index: 2147483000; display: flex; align-items: center; gap: 0; }
+  .arp-flutua .arp-link { display: flex; align-items: center; gap: 12px; padding: 7px 18px 7px 7px; border-radius: 999px;
     background: linear-gradient(135deg, #ff3d60 0%, var(--arp-vermelho) 45%, #9d1030 100%); color: #fff !important;
-    box-shadow: 0 8px 22px rgba(237, 48, 81, .42), 0 2px 5px rgba(0, 0, 0, .22); transition: transform .2s, box-shadow .2s, padding .25s;
+    box-shadow: 0 10px 28px rgba(237, 48, 81, .45), 0 2px 6px rgba(0, 0, 0, .25); transition: transform .2s, box-shadow .2s, padding .25s;
     animation: arp-entra .7s cubic-bezier(.2, 1.4, .4, 1) both, arp-pulo 6s 3s infinite; }
-  .arp-flutua .arp-link:hover { transform: translateY(-2px) scale(1.03); box-shadow: 0 12px 28px rgba(237, 48, 81, .52), 0 3px 8px rgba(0, 0, 0, .22); }
+  .arp-flutua .arp-link:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 16px 34px rgba(237, 48, 81, .55), 0 3px 8px rgba(0, 0, 0, .25); }
   .arp-flutua .arp-cta { display: none; }
   .arp-flutua .arp-link:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
   .arp-icone { position: relative; flex: none; width: 66px; height: 66px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #2b2b31, var(--arp-escuro) 70%);
     box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .9); overflow: hidden; }
-  .arp-flutua .arp-icone { width: 48px; height: 48px; box-shadow: inset 0 0 0 2.5px rgba(255, 255, 255, .9); }
   .arp-icone::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .55); animation: arp-onda 2.5s infinite; }
   .arp-textos { display: flex; flex-direction: column; gap: 2px; white-space: nowrap; }
   .arp-textos small { font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; opacity: .9; }
   .arp-textos b { font-size: 17px; font-weight: 800; }
   .arp-textos em { font-style: normal; font-size: 12.5px; font-weight: 600; opacity: .95; }
-  .arp-flutua .arp-textos { gap: 1px; }
-  .arp-flutua .arp-textos small { font-size: 9px; letter-spacing: .6px; }
-  .arp-flutua .arp-textos b { font-size: 13.5px; }
-  .arp-flutua .arp-textos em { font-size: 10.5px; }
   .arp-seta { display: inline-block; transition: transform .2s; }
   .arp-link:hover .arp-seta { transform: translateX(4px); }
-  .arp-novo { position: absolute; top: -8px; left: 32px; background: #ffd23f; color: #3a2a00; font-size: 9px; font-weight: 900; letter-spacing: .5px;
-    padding: 2px 6px; border-radius: 99px; box-shadow: 0 2px 6px rgba(0, 0, 0, .25); transform: rotate(-8deg); pointer-events: none; }
+  .arp-novo { position: absolute; top: -9px; left: 46px; background: #ffd23f; color: #3a2a00; font-size: 10px; font-weight: 900; letter-spacing: .5px;
+    padding: 3px 7px; border-radius: 99px; box-shadow: 0 2px 6px rgba(0, 0, 0, .25); transform: rotate(-8deg); pointer-events: none; }
   /* "−": minimiza (fica só o círculo animado) */
-  .arp-fechar { position: absolute; top: -7px; right: -7px; width: 22px; height: 22px; border-radius: 50%; border: 0; cursor: pointer;
-    background: #fff; color: #333; font: 700 15px/22px Arial, sans-serif; text-align: center; padding: 0; box-shadow: 0 2px 8px rgba(0, 0, 0, .3); opacity: 0; transition: opacity .2s; }
+  .arp-fechar { position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; border: 0; cursor: pointer;
+    background: #fff; color: #333; font: 700 15px/24px Arial, sans-serif; text-align: center; padding: 0; box-shadow: 0 2px 8px rgba(0, 0, 0, .3); opacity: 0; transition: opacity .2s; }
   .arp-flutua:hover .arp-fechar, .arp-fechar:focus-visible { opacity: 1; }
   @keyframes arp-entra { from { transform: translateY(40px) scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
   @keyframes arp-pulo { 0%, 88%, 100% { transform: none; } 91% { transform: translateY(-8px); } 94% { transform: none; } 97% { transform: translateY(-3px); } }
   @keyframes arp-onda { 0% { transform: scale(.9); opacity: .9; } 100% { transform: scale(1.35); opacity: 0; } }
 
   /* Balão "Crie a sua camiseta aqui!" (celular; e no computador ao passar o mouse no círculo minimizado) */
-  .arp-balao { display: none; position: absolute; left: 66px; bottom: 9px; background: #fff; color: var(--arp-escuro); border-radius: 12px; padding: 7px 11px;
-    font-size: 12.5px; font-weight: 700; white-space: nowrap; box-shadow: 0 8px 22px rgba(0, 0, 0, .22); pointer-events: none; }
-  .arp-balao::before { content: ""; position: absolute; left: -6px; bottom: 13px; border: 7px solid transparent; border-left: 0; border-right-color: #fff; }
+  .arp-balao { display: none; position: absolute; left: 82px; bottom: 14px; background: #fff; color: var(--arp-escuro); border-radius: 14px; padding: 9px 12px;
+    font-size: 13px; font-weight: 700; white-space: nowrap; box-shadow: 0 8px 22px rgba(0, 0, 0, .22); pointer-events: none; }
+  .arp-balao::before { content: ""; position: absolute; left: -6px; bottom: 15px; border: 7px solid transparent; border-left: 0; border-right-color: #fff; }
   .arp-balao b { color: var(--arp-vermelho); }
   @keyframes arp-balao { 0% { opacity: 0; transform: translateX(-8px); } 6%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateX(-8px); visibility: hidden; } }
 
   /* Minimizado (depois do "−") e celular: só o círculo com a animação */
-  .arp-flutua.arp-mini .arp-link { padding: 4px; gap: 0; }
+  .arp-flutua.arp-mini .arp-link { padding: 7px; gap: 0; }
   .arp-flutua.arp-mini .arp-textos, .arp-flutua.arp-mini .arp-novo, .arp-flutua.arp-mini .arp-fechar { display: none; }
-  .arp-flutua.arp-mini .arp-icone { width: 52px; height: 52px; }
   @media (hover: hover) { .arp-flutua.arp-mini:hover .arp-balao { display: block; } }
   @media (max-width: 640px) {
     .arp-flutua { left: 12px; bottom: 14px; }
-    .arp-flutua .arp-link { padding: 4px; gap: 0; }
+    .arp-flutua .arp-link, .arp-flutua.arp-mini .arp-link { padding: 5px; gap: 0; }
     .arp-flutua .arp-textos, .arp-novo { display: none; }
-    .arp-flutua .arp-icone, .arp-flutua.arp-mini .arp-icone { width: 52px; height: 52px; }
-    .arp-flutua .arp-fechar { opacity: 1; top: -6px; right: -6px; width: 20px; height: 20px; line-height: 20px; font-size: 13px; }
+    .arp-flutua .arp-icone { width: 62px; height: 62px; }
+    .arp-flutua .arp-fechar { opacity: 1; top: -6px; right: -6px; width: 22px; height: 22px; line-height: 22px; font-size: 13px; }
+    .arp-balao { left: 78px; bottom: 10px; }
+    .arp-balao::before { bottom: 18px; }
     .arp-flutua:not(.arp-mini) .arp-balao { display: block; animation: arp-balao 9s 1.8s both; }
   }
 
@@ -191,9 +187,9 @@
   var miolo =
     '<a class="arp-link" id="arp-personalize-link" href="' + EDITOR + '"' + aba + ' aria-label="Personalize sua camiseta no editor da Art Rock">' +
       '<span class="arp-icone">' + ANIM + '</span>' +
-      '<span class="arp-textos"><small>Novo · Editor Art Rock</small><b>Personalize sua camiseta</b>' +
-        '<em>Sua arte, seu estilo · Monte agora <span class="arp-seta">→</span></em></span>' +
-      '<span class="arp-cta">Criar a minha →</span>' +
+      '<span class="arp-textos"><small>Novo \u00b7 Editor Art Rock</small><b>Personalize sua camiseta</b>' +
+        '<em>Sua arte, seu estilo \u00b7 Monte agora <span class="arp-seta">\u2192</span></em></span>' +
+      '<span class="arp-cta">Criar a minha \u2192</span>' +
     '</a>';
 
   function montar() {
@@ -215,8 +211,8 @@
     caixa.className = 'arp arp-flutua';
     caixa.innerHTML = miolo +
       '<span class="arp-novo">NOVO!</span>' +
-      '<span class="arp-balao">✨ <b>Crie a sua camiseta</b> aqui!</span>' +
-      '<button type="button" class="arp-fechar" aria-label="Minimizar" title="Minimizar">−</button>';
+      '<span class="arp-balao">\u2728 <b>Crie a sua camiseta</b> aqui!</span>' +
+      '<button type="button" class="arp-fechar" aria-label="Minimizar" title="Minimizar">\u2212</button>';
     caixa.querySelector('.arp-fechar').onclick = function (e) {
       e.preventDefault(); e.stopPropagation();
       caixa.className += ' arp-mini';
