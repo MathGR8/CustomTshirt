@@ -844,9 +844,38 @@ function telaComoFunciona(el, j) {
   };
 }
 
-/** Coloca um texto novo (ou edita um existente). */
-async function adicionarTexto(existente = null) {
+/**
+ * Pergunta onde vai a arte nova: frente ou costas (com a camiseta de cada lado).
+ * @returns {Promise<'Frente'|'Costas'|null>}
+ */
+async function perguntarLado(titulo, it = item()) {
+  const qtd = l => it.artes.filter(a => a.lado === l).length;
+  const j = janela({ titulo: `${icone('virar')} ${titulo}`, classe: 'janelaPequena', html: `
+    <div class="escolhaLado">
+      ${['Frente', 'Costas'].map(l => `
+        <button type="button" class="cartaoLado" data-l="${l}" aria-pressed="${S.lado === l}">
+          <span class="cartaoLadoPalco">${palco(it, l)}</span>
+          <b>${l === 'Frente' ? 'Na FRENTE' : 'Nas COSTAS'}</b>
+          <small>${qtd(l) ? `já tem ${qtd(l)} arte${qtd(l) > 1 ? 's' : ''}` : 'vazia'}</small>
+        </button>`).join('')}
+    </div>
+    <p class="textoAjuda centro">Depois dá para trocar no botão <b>“Passar para as costas / frente”</b>.</p>` });
+  $$('[data-l]', j.el).forEach(b => (b.onclick = () => j.fechar(b.dataset.l)));
+  return j.aoFechar;
+}
+
+/**
+ * Coloca um texto novo (ou edita um existente).
+ * Texto novo: pergunta antes se vai na frente ou nas costas (a não ser que
+ * o lado já tenha sido escolhido, como em "O que vai na FRENTE?").
+ */
+async function adicionarTexto(existente = null, ladoJaEscolhido = null) {
   const it = item();
+  if (!existente) {
+    const lado = ladoJaEscolhido || await perguntarLado('Onde vai o texto?', it);
+    if (!lado) return;
+    if (S.lado !== lado) { S.lado = lado; S.sel = null; if (S.tela === 'personalizar') TELAS.personalizar(); }
+  }
   const r = await editorTexto(existente || {}, CORES[it.cor].hex);
   if (!r) return;
   const img = await desenharTexto(r);
@@ -1074,8 +1103,9 @@ TELAS.personalizar = () => {
   $('#tela').innerHTML = `
     <section class="duasColunas ajustar">
       <div class="palco">
-        <div class="segmento segmentoTopo" role="group" aria-label="Lado da camiseta">
-          ${['Frente', 'Costas'].map(l => `<button type="button" data-lado="${l}" aria-pressed="${S.lado === l}">${icone('virar', 18)} ${l}${conta(l) ? ` <small>${conta(l)}</small>` : ''}</button>`).join('')}
+        <div class="segmento segmentoTopo" role="group" aria-label="Ver a frente ou as costas da camiseta">
+          <span class="segRotulo">${icone('olho', 16)} Ver</span>
+          ${['Frente', 'Costas'].map(l => `<button type="button" data-lado="${l}" aria-pressed="${S.lado === l}">${l}${conta(l) ? ` <small>${conta(l)}</small>` : ''}</button>`).join('')}
         </div>
         <div class="palcoArea" id="palcoArea">${palco(it, S.lado, { mostrarArea: true, sel: S.sel })}</div>
         <div class="zoomPalco" role="group" aria-label="Zoom na camiseta">
@@ -1108,6 +1138,10 @@ TELAS.personalizar = () => {
               : `<button type="button" class="btnIcone" id="trocar" aria-label="Trocar imagem" title="Trocar imagem">${icone('arte', 22)}</button>`}
             <button type="button" class="btnIcone btnPerigoTexto" id="remover" aria-label="Tirar arte" title="Tirar arte">${icone('lixo', 22)}</button>
           </div>
+          <div class="ladoArte" id="ladoArte">
+            <span>${icone('camisa', 20)} ${a.tipo === 'texto' ? 'Este texto' : 'Esta imagem'} está ${a.lado === 'Costas' ? 'nas <b>COSTAS</b>' : 'na <b>FRENTE</b>'}</span>
+            <button type="button" class="btn btnClaro" data-lado-arte="${outroLado(a.lado)}">${icone('virar', 20)} Passar para ${a.lado === 'Costas' ? 'a FRENTE' : 'as COSTAS'}</button>
+          </div>
           <div class="rotuloLinha">${icone('regua', 18)} <b>Tamanho</b><span class="medidas" id="medidas"></span></div>
           <p class="avisoArea" id="avisoArea" hidden></p>
           <div class="tamanhoArte">
@@ -1116,8 +1150,6 @@ TELAS.personalizar = () => {
             <button type="button" class="btnRedondo" data-tam="1" aria-label="Aumentar">${icone('mais', 24)}</button>
           </div>
           <div id="qualidadeAjuste"></div>
-          <div class="rotuloLinha">${icone('virar', 18)} <b>Lado</b><span class="medidas">${a.tipo === 'texto' ? 'deste texto' : 'desta imagem'}</span></div>
-          <div class="segmento segPeq" id="ladoArte" role="group" aria-label="Lado da arte">${['Frente', 'Costas'].map(l => `<button type="button" data-lado-arte="${l}" aria-pressed="${a.lado === l}">${l}</button>`).join('')}</div>
           <div class="rotuloLinha">${icone('centro', 18)} <b>Posição</b></div>
           <div class="chipsPos">
             <button type="button" class="chipPos" data-centralizar title="Centraliza só na horizontal (não mexe na altura)">↔ Centralizar</button>
@@ -1275,7 +1307,9 @@ TELAS.personalizar = () => {
     if (!it.artes.some(x => x.uid === S.sel)) S.sel = null;
     TELAS.personalizar();
   };
-  $$('[data-add]').forEach(b => (b.onclick = () => (b.dataset.add === 'texto' ? adicionarTexto() : janelaImagem())));
+  // O palco vazio ("O que vai na FRENTE?") já diz o lado: lá não pergunta de novo
+  $$('[data-add]').forEach(b => (b.onclick = () => (b.dataset.add === 'texto'
+    ? adicionarTexto(null, b.closest('.adicionarNoPalco') ? S.lado : null) : janelaImagem())));
   $$('.corCompacta [data-malha]').forEach(b => (b.onclick = () => {
     it.malha = b.dataset.malha;
     const cores = (MALHAS.find(mm => mm.id === it.malha) || MALHAS[0]).cores.filter(c => coresDoModelo(it.modelo).includes(c));

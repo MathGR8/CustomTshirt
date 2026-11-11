@@ -123,7 +123,7 @@ export const PreviewGeom = {
     const base = document.getElementById("baseShirtImg");
     const cat  = document.getElementById('category')?.value || 'Masculina';
     // Área em escala real sobre a camiseta do exemplo (ex.: 38 × 42 cm numa G de 55 cm)
-    const box  = areaNaImagem(cat, view, medidaPronta(base?.currentSrc || base?.src), baseRect.width / baseRect.height);
+    const box  = areaNaImagem(cat, view, medidaPronta(base?.currentSrc || base?.src), baseRect.width / baseRect.height, AppState.selectedColor);
     return {
       left:   baseRect.left + box.x * baseRect.width,
       top:    baseRect.top  + box.y * baseRect.height,

@@ -1148,3 +1148,20 @@ html:has(body.paginaPainel) { font-size: 16px; }
 .previaLimpeza { padding: 0.75rem 1rem; border-radius: 0.75rem; background: var(--fundo); }
 .avisoLimpo { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 0.75rem; background: #fff7d6; margin-bottom: 0.5rem; }
 .seloLimpo { color: #7a4b00; font-weight: 700; }
+
+/* Texto novo: frente ou costas? */
+.escolhaLado { display: grid; grid-template-columns: 1fr 1fr; gap: 0.875rem; }
+.cartaoLado { display: flex; flex-direction: column; align-items: center; gap: 0.375rem; padding: 0.75rem; border-radius: var(--raio); background: var(--branco); border: 3px solid var(--cinza-claro); box-shadow: var(--sombra); }
+.cartaoLado:active { transform: scale(.98); }
+.cartaoLado[aria-pressed="true"] { border-color: var(--preto); }
+.cartaoLadoPalco { display: flex; justify-content: center; width: 100%; height: 11rem; background: var(--palco); border-radius: calc(var(--raio) - 4px); padding: 0.375rem; }
+.cartaoLadoPalco .palcoSvg { width: auto; height: 100%; }
+.cartaoLado b { font-size: 1.25rem; }
+.cartaoLado small { color: var(--cinza); font-weight: 600; }
+.textoAjuda.centro { text-align: center; margin-top: 0.875rem; }
+/* Lado da arte selecionada: frase clara + botão para passar para o outro lado */
+.ladoArte { display: flex; align-items: center; justify-content: space-between; gap: 0.625rem; flex-wrap: wrap; background: var(--fundo); border-radius: var(--raio); padding: 0.625rem 0.75rem; }
+.ladoArte > span { display: flex; align-items: center; gap: 0.375rem; font-weight: 600; }
+.ladoArte .btn { min-height: 2.75rem; padding: 0 0.875rem; gap: 0.375rem; font-weight: 800; }
+/* "Ver Frente | Costas" no topo da camiseta: só muda o que se vê */
+.segRotulo { display: flex; align-items: center; gap: 0.25rem; padding: 0 0.375rem 0 0.5rem; font-size: 0.8125rem; font-weight: 700; color: var(--cinza); }
