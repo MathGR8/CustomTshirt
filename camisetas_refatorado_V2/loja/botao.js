@@ -158,12 +158,8 @@
     .arp-estampa { animation-name: arp-surge !important; animation-timing-function: ease-in-out !important; }
     @keyframes arp-surge { 0%, 6% { opacity: 0; } 20%, 84% { opacity: 1; } 96%, 100% { opacity: 0; } }
   }
-  @media only screen and (max-width: 1024px) {
-    .suporte-botao {
-        position: fixed;
-        bottom: 80px;
-        right: 10px;
-    }
+  @media only screen and (max-width: 768px) {
+    .suporte-botao { position: fixed; bottom: 80px !important; right: 10px !important; }
   }
 `;
     (document.head || document.documentElement).appendChild(st);
