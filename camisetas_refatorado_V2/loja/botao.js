@@ -171,7 +171,14 @@
       '<path class="arp-camisa" stroke-width="2" stroke="#3a3a40" stroke-linejoin="round" d="M44 22 L30 27 L12 41 L21 58 L32 52 L32 102 Q60 107 88 102 L88 52 L99 58 L108 41 L90 27 L76 22 Q60 34 44 22 Z"/>' +
       '<path class="arp-gola" fill="none" stroke-width="3" stroke-linecap="round" stroke="#3a3a40" d="M46 23 Q60 33 74 23"/>' +
       '<g class="arp-estampa">' +
-        '<path fill="#ed3051" d="M60 44 l5.6 11.4 12.6 1.8 -9.1 8.9 2.1 12.5 -11.2-5.9 -11.2 5.9 2.1-12.5 -9.1-8.9 12.6-1.8z"/>' +
+        // Caveira (vermelha; olhos, nariz e dentes vazados em escuro)
+        '<g class="arp-caveira">' +
+          '<path fill="#ed3051" d="M60 43 C51.5 43 46 49 46 56.5 C46 61.5 48.6 64.6 51.5 66.2 L51.5 71.5 Q51.5 75.5 55.5 75.5 L64.5 75.5 Q68.5 75.5 68.5 71.5 L68.5 66.2 C71.4 64.6 74 61.5 74 56.5 C74 49 68.5 43 60 43 Z"/>' +
+          '<ellipse cx="54.6" cy="57.5" rx="3.9" ry="4.4" fill="#121214"/>' +
+          '<ellipse cx="65.4" cy="57.5" rx="3.9" ry="4.4" fill="#121214"/>' +
+          '<path fill="#121214" d="M60 62.4 L57.9 66.6 L62.1 66.6 Z"/>' +
+          '<path stroke="#121214" stroke-width="1.6" stroke-linecap="round" d="M56.2 70 V75 M60 70 V75.2 M63.8 70 V75"/>' +
+        '</g>' +
         '<rect x="41" y="80" width="38" height="12" rx="3" fill="#ffd23f"/>' +
         '<text x="60" y="89.5" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="9.5" fill="#121214" letter-spacing="1">ROCK</text>' +
       '</g>' +
