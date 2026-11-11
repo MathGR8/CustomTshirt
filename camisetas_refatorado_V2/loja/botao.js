@@ -14,7 +14,7 @@
  * Lugar do botão:
  *   - Sem nada: flutuante no canto inferior esquerdo (no celular/tablet, até
  *     1024 px, 80 px acima do rodapé). O "−" minimiza
- *     (fica só o círculo animado) até o fim da visita.
+ *     (fica só o círculo animado); ao recarregar a página, volta ao normal.
  *   - id do botão: #arp-personalize (e o link: #arp-personalize-link).
  *   - <div id="ar-personalize-aqui"></div> em qualquer lugar: vira banner ali.
  *   - <div id="ar-personalize-aqui" data-estilo="compacto"></div>: pílula
@@ -210,9 +210,9 @@
       el.appendChild(caixa);
       return;
     }
-    // Flutuante. O "−" minimiza: fica só o círculo animado (até o fim da visita).
+    // Flutuante. O "−" minimiza: fica só o círculo animado. Toda página nova
+    // (ou recarregada) abre com o botão normal.
     caixa.className = 'arp arp-flutua';
-    try { if (sessionStorage.getItem('arpMini') === '1') caixa.className += ' arp-mini'; } catch (e) {}
     caixa.innerHTML = miolo +
       '<span class="arp-novo">NOVO!</span>' +
       '<span class="arp-balao">✨ <b>Crie a sua camiseta</b> aqui!</span>' +
@@ -220,7 +220,6 @@
     caixa.querySelector('.arp-fechar').onclick = function (e) {
       e.preventDefault(); e.stopPropagation();
       caixa.className += ' arp-mini';
-      try { sessionStorage.setItem('arpMini', '1'); } catch (er) {}
     };
     document.body.appendChild(caixa);
   }
