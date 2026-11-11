@@ -12,8 +12,10 @@
  *   data-editor="https://…"       outro endereço do editor (padrão: este site)
  *
  * Lugar do botão:
- *   - Sem nada: flutuante no canto inferior esquerdo. O "−" minimiza
+ *   - Sem nada: flutuante no canto inferior esquerdo (no celular/tablet, até
+ *     1024 px, 80 px acima do rodapé). O "−" minimiza
  *     (fica só o círculo animado) até o fim da visita.
+ *   - id do botão: #arp-personalize (e o link: #arp-personalize-link).
  *   - <div id="ar-personalize-aqui"></div> em qualquer lugar: vira banner ali.
  *   - <div id="ar-personalize-aqui" data-estilo="compacto"></div>: pílula
  *     pequena para menu/header.
@@ -158,8 +160,10 @@
     .arp-estampa { animation-name: arp-surge !important; animation-timing-function: ease-in-out !important; }
     @keyframes arp-surge { 0%, 6% { opacity: 0; } 20%, 84% { opacity: 1; } 96%, 100% { opacity: 0; } }
   }
-  @media only screen and (max-width: 768px) {
-    .suporte-botao { position: fixed; bottom: 80px !important; right: 10px !important; }
+  /* ---------- Celular e tablet (até 1024 px): continua à esquerda, 80 px acima do rodapé ----------
+     Para mudar a altura, troque só o número abaixo (o id #arp-personalize é o do botão). */
+  @media only screen and (max-width: 1024px) {
+    #arp-personalize.arp-flutua { bottom: 80px !important; }
   }
 `;
     (document.head || document.documentElement).appendChild(st);
@@ -185,7 +189,7 @@
   function target() { return document.getElementById('ar-personalize-aqui'); }
   var aba = NOVA_ABA ? ' target="_blank" rel="noopener"' : '';
   var miolo =
-    '<a class="arp-link" href="' + EDITOR + '"' + aba + ' aria-label="Personalize sua camiseta no editor da Art Rock">' +
+    '<a class="arp-link" id="arp-personalize-link" href="' + EDITOR + '"' + aba + ' aria-label="Personalize sua camiseta no editor da Art Rock">' +
       '<span class="arp-icone">' + ANIM + '</span>' +
       '<span class="arp-textos"><small>Novo · Editor Art Rock</small><b>Personalize sua camiseta</b>' +
         '<em>Sua arte, seu estilo · Monte agora <span class="arp-seta">→</span></em></span>' +
@@ -195,6 +199,9 @@
   function montar() {
     var el = target();
     var caixa = document.createElement('div');
+    // id fixo do botão (para estilizar ou mover pelo CSS da loja): #arp-personalize
+    // e o link dentro dele: #arp-personalize-link
+    caixa.id = 'arp-personalize';
     if (el) {
       // Dentro do lugar escolhido (banner, ou pílula pequena com data-estilo="compacto")
       caixa.className = 'arp ' + (el.getAttribute('data-estilo') === 'compacto' ? 'arp-compacto' : 'arp-banner');
