@@ -126,9 +126,14 @@
   .arp-compacto .arp-fechar, .arp-compacto .arp-balao, .arp-compacto .arp-cta { display: none; }
   .arp-compacto .arp-textos b { font-size: 14px; }
 
+  /* Aparelho com "reduzir animações" ligado (Windows sem efeitos de animação,
+     celular em economia de bateria): continua animado, mas só com o suave:
+     a camiseta troca de cor e a estampa aparece/some. Sem pulos nem pincel. */
   @media (prefers-reduced-motion: reduce) {
-    .arp *, .arp .arp-link { animation-duration: .01s !important; animation-iteration-count: 1 !important; }
-    .arp-estampa { opacity: 1 !important; transform: none !important; }
+    .arp-flutua .arp-link, .arp-icone::after { animation: none !important; }
+    .arp-pincel, .arp-brilho { animation: none !important; opacity: 0 !important; }
+    .arp-estampa { animation-name: arp-surge !important; animation-timing-function: ease-in-out !important; }
+    @keyframes arp-surge { 0%, 6% { opacity: 0; } 20%, 84% { opacity: 1; } 96%, 100% { opacity: 0; } }
   }
 </style>
 
