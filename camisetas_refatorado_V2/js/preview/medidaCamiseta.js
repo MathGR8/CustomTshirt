@@ -14,6 +14,7 @@
  */
 
 import { AREA_IMPRESSAO, SHIRT_PRINT_BOX, CAMISETA_EXEMPLO, TOPO_AREA_CM } from '../core/constants.js';
+import { Calibragem } from './calibragem.js';
 
 const cache = new Map();   // src → medida | null (falhou) | Promise
 
@@ -120,6 +121,9 @@ export function medidaPronta(src) {
 export function areaNaImagem(categoria, lado, medida, aspecto) {
   const a = AREA_IMPRESSAO[categoria] || AREA_IMPRESSAO.Masculina;
   const ex = CAMISETA_EXEMPLO[categoria] || CAMISETA_EXEMPLO.Masculina;
+  // Ajustada à mão no modo desenvolvedor (calibragem.json): vale sobre a medição
+  const cal = aspecto && Calibragem.area(categoria, lado);
+  if (cal) return { x: cal.x, y: cal.y, w: cal.w, h: cal.w * aspecto * a.h / a.w, calibrada: true };
   if (!medida || !aspecto) {
     // Sem medida (imagem sem CORS): caixa fixa, proporcional à área da categoria
     // em relação à masculina (área ÷ largura do peito: feminina 30/49 × masculina 38/55)

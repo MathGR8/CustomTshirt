@@ -364,3 +364,47 @@ body #uiNotice { top: calc(env(safe-area-inset-top) + 58px); bottom: auto; borde
   .vistaAviso { top: 44px; }
   .vistaToggle button { padding: 0 9px; height: 28px; font-size: 11px; }
 }
+
+/* =============================================
+   MODO DESENVOLVEDOR (?dev): ajustar a área de impressão
+   ============================================= */
+body.modoDev #shirtBoxOverlay { pointer-events: auto !important; cursor: move; border-color: #d633ff !important; background: rgba(214, 51, 255, .06); touch-action: none; z-index: 6 !important; }
+body.modoDev #shirtBoxOverlay .devCanto {
+  position: absolute; right: -12px; bottom: -12px; width: 26px; height: 26px; display: grid; place-items: center;
+  font-style: normal; font-size: 15px; color: #fff; background: #d633ff; border-radius: 50%; cursor: nwse-resize; box-shadow: var(--sombra);
+}
+#devPainel {
+  position: fixed; left: 12px; bottom: 12px; z-index: 9000; width: 300px; max-height: calc(100vh - 24px); overflow-x: hidden; overflow-y: auto; box-sizing: border-box;
+  background: #1b1b1f; color: #f2f2f2; border-radius: 14px; box-shadow: 0 10px 40px rgba(0, 0, 0, .35); font: 13px/1.35 var(--font-base);
+}
+#devPainel header { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #d633ff; border-radius: 14px 14px 0 0; }
+#devPainel header button { background: none; border: 0; color: #fff; font-size: 16px; cursor: pointer; }
+#devPainel.recolhido .devCorpo { display: none; }
+#devPainel.recolhido header { border-radius: 14px; }
+#devPainel .devCorpo { padding: 10px 12px 12px; display: grid; gap: 8px; }
+#devPainel p { margin: 0; }
+#devPainel .devQual { font-weight: 700; font-size: 14px; }
+#devPainel .devQual i { font-weight: 500; color: #e3a6ff; }
+#devPainel button { font: inherit; border: 0; border-radius: 8px; background: #33333b; color: #fff; padding: 8px 10px; cursor: pointer; }
+#devPainel button:hover { background: #44444e; }
+#devPainel .devGrade { display: grid; grid-template-columns: repeat(3, 44px); grid-template-areas: ". c ." "e m d" ". b ."; gap: 4px; justify-content: center; }
+#devPainel .devGrade [data-dev="cima"] { grid-area: c; } #devPainel .devGrade [data-dev="esq"] { grid-area: e; }
+#devPainel .devGrade [data-dev="centro"] { grid-area: m; } #devPainel .devGrade [data-dev="dir"] { grid-area: d; }
+#devPainel .devGrade [data-dev="baixo"] { grid-area: b; }
+#devPainel .devLinha { display: flex; align-items: center; gap: 6px; }
+#devPainel .devLinha span { flex: 1; }
+#devPainel .devLinha output { min-width: 56px; text-align: center; font-weight: 700; }
+#devPainel .devNums, #devPainel .devDica, #devPainel .devStatus { font-size: 11.5px; color: #b9b9c3; }
+#devPainel .devStatus { color: #ffd166; font-weight: 600; }
+#devPainel .devAcoes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+#devPainel .devAcoes button { white-space: normal; min-width: 0; line-height: 1.2; }
+#devPainel .devAcoes .devPrim { grid-column: 1 / -1; background: #d633ff; font-weight: 700; }
+@media (max-width: 640px) {
+  #devPainel { left: 8px; right: 8px; width: auto; bottom: 8px; max-height: 46vh; }
+  #devPainel.recolhido { left: auto; right: 8px; bottom: auto; top: 62px; width: auto; }
+  #devPainel .devDica, #devPainel .devNums { display: none; }
+  #devPainel .devCorpo { gap: 6px; }
+  #devPainel button { padding: 7px 8px; }
+  #devPainel.recolhido header { padding: 6px 10px; gap: 6px; font-size: 12px; }
+}
+#devPainel header { cursor: pointer; }
