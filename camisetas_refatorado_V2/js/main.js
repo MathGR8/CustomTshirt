@@ -43,6 +43,7 @@ import { TabelaMedidasModule } from './ui/tabelaMedidasModule.js';
 import { TutorialModule }  from './ui/tutorialModule.js';
 import { EtapasModule }   from './ui/etapasModule.js';
 import { DevModule }      from './ui/devModule.js';
+import { DireitosModule } from './ui/direitosModule.js';
 import { registerGlobalEvents, initConfigurator } from './events/globalEvents.js';
 
 // ============================================================
@@ -69,7 +70,8 @@ window._modules = {
   TextoModule,
   TabelaMedidasModule,
   TutorialModule,
-  EtapasModule
+  EtapasModule,
+  DireitosModule
 };
 
 // ============================================================
@@ -95,6 +97,7 @@ window.TabelaMedidasModule = TabelaMedidasModule;
 window.TutorialModule   = TutorialModule;
 window.EtapasModule     = EtapasModule;
 window.DevModule       = DevModule;
+window.DireitosModule  = DireitosModule;
 
 // ValidationModule exposto para compatibilidade (lógica inline no HTML original)
 window.ValidationModule = {
@@ -128,6 +131,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initConfigurator();
   // Tela única por etapas (Produto → Arte → Tamanhos → Pedido)
   EtapasModule.init();
+  // Aviso de direitos autorais (só artes próprias ou autorizadas)
+  DireitosModule.init();
   // Carrega o pedido salvo no navegador e desenha "Itens do pedido"
   OrderModule.init();
   // Atalhos de teclado e histórico de desfazer (a partir do estado inicial)
