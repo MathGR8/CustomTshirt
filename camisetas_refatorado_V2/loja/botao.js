@@ -151,6 +151,71 @@
   .arp-compacto .arp-fechar, .arp-compacto .arp-balao, .arp-compacto .arp-cta { display: none; }
   .arp-compacto .arp-textos b { font-size: 14px; }
 
+  /* ---------- Seção para landing page (data-estilo="secao") ----------
+     No estilo da página de personalizados da Art Rock: fundo grafite, vermelho
+     #EC3236, Montserrat nos títulos e Nunito no texto, cartões escuros que
+     "enchem" de vermelho ao passar o mouse e botão vermelho com brilho. */
+  .arp-secao { --sx-vermelho: #EC3236; --sx-grafite: #1a1a1a; width: 100%; font-family: "Nunito", "Segoe UI", system-ui, Arial, sans-serif; color: #fff; }
+  .arp-secao .arp-sx { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); align-items: center; gap: 40px;
+    max-width: 1100px; margin: 0 auto; padding: 56px 48px; border-radius: 26px;
+    background: radial-gradient(circle at 82% 45%, rgba(236, 50, 54, .38), transparent 46%), radial-gradient(circle at 0% 100%, rgba(236, 50, 54, .16), transparent 40%), var(--sx-grafite);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .28); }
+  .arp-secao .arp-sx::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .07;
+    background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 18px 18px; }
+  .arp-secao .arp-sx > * { position: relative; }
+  .arp-secao .arp-sx-selo { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 6px 14px; border-radius: 999px;
+    background: rgba(236, 50, 54, .16); border: 1px solid rgba(236, 50, 54, .55); color: #ff8a8d; font: 800 12px/1 "Montserrat", Arial, sans-serif; letter-spacing: 1.4px; text-transform: uppercase; }
+  .arp-secao .arp-sx-selo::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--sx-vermelho); box-shadow: 0 0 0 4px rgba(236, 50, 54, .25); animation: arp-sx-ponto 1.6s infinite; }
+  @keyframes arp-sx-ponto { 50% { box-shadow: 0 0 0 7px rgba(236, 50, 54, 0); } }
+  .arp-secao h2.arp-sx-titulo { margin: 0 0 14px !important; padding: 0 !important; color: #fff !important; font: 900 clamp(28px, 3.4vw, 44px)/1.08 "Montserrat", Arial, sans-serif !important; letter-spacing: -.5px; text-transform: none; }
+  .arp-secao .arp-sx-titulo i { display: block; font-style: italic; font-weight: 300; color: #fff; }
+  .arp-secao .arp-sx-titulo em { font-style: normal; color: var(--sx-vermelho); }
+  .arp-secao p.arp-sx-sub { margin: 0 0 24px !important; color: #d4d4d8 !important; font: 400 17px/1.5 "Nunito", Arial, sans-serif !important; max-width: 520px; }
+  .arp-secao .arp-sx-passos { list-style: none; margin: 0 0 28px !important; padding: 0 !important; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .arp-secao .arp-sx-passos li { position: relative; overflow: hidden; margin: 0; padding: 16px 14px; border-radius: 14px; background: #232326; border: 1px solid #333; cursor: default; }
+  /* "Enche" de vermelho da esquerda para a direita, como os cartões da página */
+  .arp-secao .arp-sx-passos li::before { content: ""; position: absolute; inset: 0; background: var(--sx-vermelho); transform: scaleX(0); transform-origin: left center; transition: transform .45s ease; }
+  .arp-secao .arp-sx-passos li:hover::before { transform: scaleX(1); }
+  .arp-secao .arp-sx-passos li > * { position: relative; }
+  .arp-secao .arp-sx-passos b { display: inline-grid; place-items: center; width: 30px; height: 30px; margin-bottom: 10px; border-radius: 8px; background: var(--sx-vermelho); color: #fff;
+    font: 900 15px/1 "Montserrat", Arial, sans-serif; transition: background .45s, color .45s; }
+  .arp-secao .arp-sx-passos li:hover b { background: var(--sx-grafite); }
+  .arp-secao .arp-sx-passos span { display: block; color: #fff; font: 700 14px/1.3 "Montserrat", Arial, sans-serif; }
+  .arp-secao .arp-sx-acoes { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 20px; }
+  .arp-secao a.arp-sx-cta { display: inline-flex; align-items: center; gap: 10px; padding: 18px 34px; border-radius: 12px; color: #fff !important; text-decoration: none !important;
+    background: linear-gradient(90deg, #EC3236, #ff5a5e, #EC3236); background-size: 200% 100%; font: 900 17px/1 "Montserrat", Arial, sans-serif; letter-spacing: .6px; text-transform: uppercase;
+    box-shadow: 0 10px 30px rgba(236, 50, 54, .5); animation: arp-sx-grad 3s linear infinite, arp-sx-zoom 2.4s ease-in-out infinite; transition: box-shadow .2s; }
+  .arp-secao a.arp-sx-cta:hover { box-shadow: 0 14px 40px rgba(236, 50, 54, .7); }
+  .arp-secao a.arp-sx-cta:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+  @keyframes arp-sx-grad { to { background-position: -200% 0; } }
+  @keyframes arp-sx-zoom { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  .arp-secao .arp-sx-nota { color: #a1a1aa; font: 600 13px/1.4 "Nunito", Arial, sans-serif; }
+  /* Lado direito: a camiseta animada grande, com selos */
+  .arp-secao a.arp-sx-visual { position: relative; display: grid; place-items: center; aspect-ratio: 1; width: 100%; max-width: 380px; justify-self: center; text-decoration: none !important; }
+  .arp-secao .arp-sx-visual .arp-icone { width: 78%; height: auto; aspect-ratio: 1; box-shadow: inset 0 0 0 6px rgba(255, 255, 255, .92), 0 20px 50px rgba(0, 0, 0, .45); }
+  .arp-secao .arp-sx-visual .arp-icone::after { inset: -10px; border-width: 3px; }
+  .arp-secao .arp-sx-visual .arp-anim { width: 84%; height: 84%; margin: 8%; }
+  .arp-secao .arp-sx-tag { position: absolute; padding: 8px 12px; border-radius: 10px; background: #fff; color: var(--sx-grafite); font: 800 13px/1 "Montserrat", Arial, sans-serif; white-space: nowrap;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .3); animation: arp-sx-flutua 4s ease-in-out infinite; }
+  .arp-secao .arp-sx-tag::before { content: "\\2713  "; color: var(--sx-vermelho); }
+  .arp-secao .arp-sx-tag.t1 { top: 6%; left: -2%; }
+  .arp-secao .arp-sx-tag.t2 { top: 48%; right: -6%; animation-delay: -1.3s; }
+  .arp-secao .arp-sx-tag.t3 { bottom: 6%; left: 4%; animation-delay: -2.6s; }
+  @keyframes arp-sx-flutua { 50% { transform: translateY(-8px); } }
+  @media (max-width: 860px) {
+    .arp-secao .arp-sx { grid-template-columns: 1fr; gap: 8px; padding: 32px 20px 36px; border-radius: 20px; text-align: center; }
+    .arp-secao a.arp-sx-visual { order: -1; max-width: 270px; }
+    .arp-secao .arp-sx-selo { margin-bottom: 12px; }
+    .arp-secao p.arp-sx-sub { margin-left: auto !important; margin-right: auto !important; font-size: 15px !important; }
+    .arp-secao .arp-sx-passos { grid-template-columns: 1fr; gap: 8px; text-align: left; }
+    .arp-secao .arp-sx-passos li { display: flex; align-items: center; gap: 12px; padding: 12px; }
+    .arp-secao .arp-sx-passos b { margin: 0; flex: none; }
+    .arp-secao .arp-sx-acoes { flex-direction: column; }
+    .arp-secao a.arp-sx-cta { width: 100%; justify-content: center; padding: 17px 14px; font-size: 15px; letter-spacing: .3px; white-space: nowrap; }
+    .arp-secao .arp-sx-tag { font-size: 11.5px; padding: 7px 10px; }
+    .arp-secao .arp-sx-tag.t2 { right: -4%; }
+  }
+
   /* Aparelho com "reduzir animações" ligado (Windows sem efeitos de animação,
      celular em economia de bateria): continua animado, mas só com o suave:
      a camiseta troca de cor e a estampa aparece/some. Sem pulos nem pincel. */
@@ -158,6 +223,7 @@
     .arp-flutua .arp-link, .arp-icone::after { animation: none !important; }
     .arp-pincel, .arp-brilho { animation: none !important; opacity: 0 !important; }
     .arp-est { animation-name: arp-surge !important; animation-timing-function: ease-in-out !important; }
+    .arp-secao a.arp-sx-cta, .arp-secao .arp-sx-tag, .arp-secao .arp-sx-selo::before { animation: none !important; }
     @keyframes arp-surge { 0%, 2% { opacity: 0; } 6.6%, 28% { opacity: 1; } 32%, 100% { opacity: 0; } }
   }
   /* ---------- Celular e tablet (até 1024 px): continua à esquerda, 80 px acima do rodapé ----------
@@ -208,6 +274,33 @@
       '<span class="arp-cta">Criar a minha \u2192</span>' +
     '</a>';
 
+  // Seção para landing page: textos à esquerda, camiseta animada grande à direita.
+  // Os textos podem ser trocados aqui (acentos escritos como \\u00e1 etc. para nunca sair embaralhado).
+  function secao() {
+    return '<section class="arp-sx" aria-label="Editor de camisetas Art Rock">' +
+      '<div class="arp-sx-texto">' +
+        '<span class="arp-sx-selo">Novo \u00b7 Editor online</span>' +
+        '<h2 class="arp-sx-titulo"><i>Monte a sua camiseta</i> e veja como fica <em>antes de pedir</em></h2>' +
+        '<p class="arp-sx-sub">Envie a logo da sua empresa, evento ou projeto, escolha modelo, cor e tamanhos, e receba o or\u00e7amento da Art Rock.</p>' +
+        '<ol class="arp-sx-passos">' +
+          '<li><b>1</b><span>Escolha o modelo e a cor</span></li>' +
+          '<li><b>2</b><span>Envie sua arte ou escreva um texto</span></li>' +
+          '<li><b>3</b><span>Defina os tamanhos e pe\u00e7a o or\u00e7amento</span></li>' +
+        '</ol>' +
+        '<div class="arp-sx-acoes">' +
+          '<a class="arp-sx-cta" id="arp-personalize-link" href="' + EDITOR + '"' + aba + '>Personalizar agora! <span aria-hidden="true">\u2192</span></a>' +
+          '<span class="arp-sx-nota">Para marcas pr\u00f3prias, uniformes e eventos.<br>Sem cadastro e sem compromisso.</span>' +
+        '</div>' +
+      '</div>' +
+      '<a class="arp-sx-visual" href="' + EDITOR + '"' + aba + ' tabindex="-1" aria-hidden="true">' +
+        '<span class="arp-icone">' + ANIM + '</span>' +
+        '<span class="arp-sx-tag t1">Sua logo</span>' +
+        '<span class="arp-sx-tag t2">Tamanho real em cm</span>' +
+        '<span class="arp-sx-tag t3">Frente e costas</span>' +
+      '</a>' +
+    '</section>';
+  }
+
   function montar() {
     var el = target();
     var caixa = document.createElement('div');
@@ -215,6 +308,14 @@
     // e o link dentro dele: #arp-personalize-link
     caixa.id = 'arp-personalize';
     if (el) {
+      // Seção completa para landing page (data-estilo="secao")
+      if (el.getAttribute('data-estilo') === 'secao') {
+        caixa.className = 'arp arp-secao';
+        caixa.innerHTML = secao();
+        el.innerHTML = '';
+        el.appendChild(caixa);
+        return;
+      }
       // Dentro do lugar escolhido (banner, ou pílula pequena com data-estilo="compacto")
       caixa.className = 'arp ' + (el.getAttribute('data-estilo') === 'compacto' ? 'arp-compacto' : 'arp-banner');
       caixa.innerHTML = miolo;
