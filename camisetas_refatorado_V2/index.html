@@ -5,7 +5,7 @@
   <!-- interactive-widget: o teclado do celular passa por cima (não encolhe a tela) -->
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-visual" />
   <meta name="theme-color" content="#ED3051" />
-  <meta name="description" content="Personalize sua camiseta ArtRock: escolha o modelo e a cor, envie a sua arte e monte o pedido para o atendimento." />
+  <meta name="description" content="Personalize sua camiseta ArtRock: escolha o modelo e a cor, envie a sua arte e peça o seu orçamento. Preços e prazos são combinados depois com o atendente." />
   <title>Personalize sua camiseta · ArtRock</title>
 
   <!-- Fonte Montserrat (identidade ArtRock) -->
@@ -51,12 +51,12 @@
       <i aria-hidden="true"></i>
       <button type="button" data-ir="tamanhos"><b>3</b><span>Tamanhos</span></button>
       <i aria-hidden="true"></i>
-      <button type="button" data-ir="pedido"><b>4</b><span>Pedido</span></button>
+      <button type="button" data-ir="pedido"><b>4</b><span>Orçamento</span></button>
     </nav>
     <div class="hdrAcoes">
       <button type="button" id="btnShortcuts" class="hdrIcon soPc" onclick="KeyboardModule.showHelp()" title="Atalhos de teclado (?)" aria-label="Atalhos de teclado">⌨</button>
       <button type="button" id="btnAjuda" class="hdrIcon" onclick="TutorialModule.abrir()" title="Como funciona" aria-label="Ajuda: como funciona">?</button>
-      <button type="button" id="orderSummaryBadge" class="hdrPedido" onclick="EtapasModule.ir('pedido')" title="Ver o pedido" aria-label="Ver o pedido">
+      <button type="button" id="orderSummaryBadge" class="hdrPedido" onclick="EtapasModule.ir('pedido')" title="Ver o orçamento" aria-label="Ver o orçamento">
         <span aria-hidden="true">🛒</span><span id="orderCount">0</span>
       </button>
     </div>
@@ -200,9 +200,10 @@
     <!-- 4. PEDIDO -->
     <div class="etapa" data-etapa="pedido" id="orderPanel">
       <div class="etapaTopo">
-        <h2 class="etapaTitulo">Seu pedido</h2>
+        <h2 class="etapaTitulo">Seu orçamento</h2>
         <button type="button" class="linkBtn perigo" onclick="OrderModule.clearOrder()">Limpar pedido</button>
       </div>
+      <p class="orcAviso"><b>💬 Isto é um pedido de orçamento, não uma compra.</b> Nada é cobrado aqui: preços, prazo e pagamento são combinados depois, direto com o nosso atendente.</p>
       <div id="orderList"></div>
       <button type="button" class="outroModelo" onclick="EtapasModule.novoModelo()">＋ Montar outro modelo</button>
     </div>
@@ -214,7 +215,7 @@
     <p class="resumo" id="resumo"></p>
     <button type="button" id="btnCancelEdit" class="btnVoltar" onclick="OrderModule.cancelEdit()" style="display:none;">✕ <span>Cancelar edição</span></button>
     <button type="button" id="btnSaveItem" class="btnAvancar" onclick="EtapasModule.salvar()">Salvar no pedido ›</button>
-    <button type="button" id="btnGerarPdf" class="btnAvancar" onclick="PDFModule.gerarPDF()" disabled title="Salve um modelo no pedido para enviar">Enviar pedido ›</button>
+    <button type="button" id="btnGerarPdf" class="btnAvancar" onclick="PDFModule.gerarPDF()" disabled title="Salve um modelo no pedido para pedir o orçamento">Pedir orçamento ›</button>
     <button type="button" id="btnAvancar" class="btnAvancar" onclick="EtapasModule.avancar()">Avançar ›</button>
   </footer>
 </div>

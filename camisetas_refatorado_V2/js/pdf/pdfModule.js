@@ -815,7 +815,7 @@ export const PDFModule = {
       const json = await resp.json();
 
       if (json.ok) {
-        NoticeModule.show('success', 'Pedido enviado! O atendimento será notificado via WhatsApp.');
+        NoticeModule.show('success', 'Pedido de orçamento enviado! O atendente vai passar os preços pelo WhatsApp.');
         Logger.info('PDF', 'PDF enviado com sucesso via WhatsApp.');
       } else {
         NoticeModule.show('error', 'Erro no envio: ' + (json.error || JSON.stringify(json)));

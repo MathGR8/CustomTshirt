@@ -1,6 +1,6 @@
 /**
  * @module contactModule
- * @description Janela "Seu projeto está pronto!", aberta depois de gerar o PDF.
+ * @description Janela "Seu orçamento está pronto para enviar!", aberta depois de gerar o PDF.
  *
  * Responsabilidades:
  *  - Oferecer o contato com o atendimento pelo WhatsApp (número e mensagem
@@ -44,8 +44,8 @@ const HTML = `
   <div class="ctCheck" aria-hidden="true">
     <svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M15 27 L23 35 L38 18"/></svg>
   </div>
-  <h2 id="ctTitulo">Seu projeto está pronto!</h2>
-  <p id="ctSubtitulo">O PDF do pedido já foi baixado. Agora é só falar com a gente para receber a sua cotação.</p>
+  <h2 id="ctTitulo">Seu orçamento está pronto para enviar!</h2>
+  <p id="ctSubtitulo">O PDF já foi baixado. Envie para a gente: um atendente confere tudo e passa os preços e o prazo para você.</p>
 </div>
 <div class="ctBody">
   <div class="ctStats">
@@ -55,15 +55,15 @@ const HTML = `
   </div>
   <div class="ctFiles" id="waFiles"></div>
   <form class="ctEnvio" id="ctEnvio" hidden novalidate>
-    <p class="ctEnvioTit">🚀 Enviar o pedido direto para a Art Rock</p>
-    <p class="ctEnvioSub">Chega na hora para a nossa equipe, com o PDF e as artes. A gente te chama no WhatsApp com a cotação.</p>
+    <p class="ctEnvioTit">🚀 Enviar o pedido de orçamento para a Art Rock</p>
+    <p class="ctEnvioSub">Chega na hora para a nossa equipe, com o PDF e as artes. Um atendente chama você no WhatsApp para passar os preços e combinar os detalhes. Nada é cobrado agora.</p>
     <input id="ctNome" type="text" placeholder="Seu nome" autocomplete="name" maxlength="80" required>
     <input id="ctFone" type="tel" placeholder="Seu WhatsApp com DDD" autocomplete="tel" inputmode="tel" maxlength="30" required>
     <textarea id="ctObs" rows="2" placeholder="Observação (opcional): prazo, dúvidas…" maxlength="1000"></textarea>
     <label class="ctDireitos"><input type="checkbox" id="ctDireitos">
       <span>Confirmo que as artes são <b>minhas</b> ou que <b>tenho autorização</b> para usá-las (estampas com direitos autorais de terceiros não são aceitas). <button type="button" class="ctInline" data-act="direitos">Saiba mais</button></span></label>
     <p class="ctErro" id="ctErro" hidden></p>
-    <button type="submit" class="ctEnviar" id="ctEnviar" disabled>Enviar pedido</button>
+    <button type="submit" class="ctEnviar" id="ctEnviar" disabled>Pedir orçamento</button>
     <p class="ctOu"><span>ou, se preferir, pelo WhatsApp</span></p>
   </form>
   <div class="ctOk" id="ctOk" hidden></div>
@@ -235,7 +235,7 @@ function linkWhatsApp(msg) {
 
 export const ContactModule = {
   /**
-   * Abre a janela "Seu projeto está pronto!".
+   * Abre a janela "Seu orçamento está pronto para enviar!".
    * @param {Blob} pdfBlob - PDF do pedido recém-gerado.
    */
   async open(pdfBlob) {
@@ -259,8 +259,8 @@ export const ContactModule = {
     $('ctEnviar').textContent = 'Preparando os arquivos…';
     // Volta ao estado inicial (mensagem + botão do WhatsApp visíveis)
     dlg.classList.remove('ctEnviado');
-    $('ctTitulo').textContent = 'Seu projeto está pronto!';
-    $('ctSubtitulo').textContent = 'O PDF do pedido já foi baixado. Agora é só falar com a gente para receber a sua cotação.';
+    $('ctTitulo').textContent = 'Seu orçamento está pronto para enviar!';
+    $('ctSubtitulo').textContent = 'O PDF já foi baixado. Envie para a gente: um atendente confere tudo e passa os preços e o prazo para você.';
     $('waFiles').innerHTML = '<span class="ctChip ctChipWait">Preparando os arquivos…</span>';
     // Resumo do pedido
     $('ctItens').textContent = AppState.orderItems.length;
@@ -293,7 +293,7 @@ export const ContactModule = {
       (n ? `<span class="ctChip"><i>${st.zip ? 'ZIP' : 'IMG'}</i>${st.zip ? ZIP_NAME : n + ' arte(s)'}</span>` : '');
     btnWa.disabled = false;
     $('ctEnviar').disabled = false;
-    $('ctEnviar').textContent = 'Enviar pedido';
+    $('ctEnviar').textContent = 'Pedir orçamento';
 
     // "Enviar arquivos direto" só no celular: no computador o menu de
     // compartilhar do sistema quase nunca oferece o WhatsApp
@@ -342,12 +342,12 @@ export const ContactModule = {
   _mostrarEnviado(codigo) {
     st.dlg.classList.add('ctEnviadoLoja');
     $('ctEnvio').hidden = true;
-    $('ctTitulo').textContent = 'Pedido enviado! 🎉';
-    $('ctSubtitulo').textContent = 'Recebemos o seu pedido com o PDF e as artes. Em breve a Art Rock chama você no WhatsApp com a cotação.';
+    $('ctTitulo').textContent = 'Orçamento solicitado! 🎉';
+    $('ctSubtitulo').textContent = 'Recebemos o seu pedido de orçamento com o PDF e as artes. Em breve um atendente da Art Rock chama você no WhatsApp para passar os preços e combinar prazo e pagamento.';
     const ok = $('ctOk');
-    ok.innerHTML = `<span>Número do pedido</span><b>${codigo}</b><small>Guarde este número: é só falar ele para a gente.</small>`;
+    ok.innerHTML = `<span>Número do orçamento</span><b>${codigo}</b><small>Guarde este número: é só falar ele para a gente.</small>`;
     ok.hidden = false;
-    $('waMsg').value = `Olá! Acabei de enviar o pedido ${codigo} pelo site da Art Rock.`;
+    $('waMsg').value = `Olá! Acabei de enviar o pedido de orçamento ${codigo} pelo site da Art Rock.`;
     st.dlg.querySelector('[data-act="wa"] span').textContent = 'Avisar no WhatsApp (opcional)';
     st.dlg.scrollTop = 0;
   },
@@ -364,7 +364,7 @@ export const ContactModule = {
     // a mensagem e o botão do WhatsApp somem (classe ctEnviado, ver CSS)
     st.dlg.classList.add('ctEnviado');
     $('ctTitulo').textContent = 'Quase lá! 🙌';
-    $('ctSubtitulo').textContent = 'Siga os passos abaixo para enviar seu pedido ao nosso atendimento.';
+    $('ctSubtitulo').textContent = 'Siga os passos abaixo para enviar o seu pedido de orçamento ao nosso atendente.';
 
     const anexos = st.artes.length ? `<b>${PDF_NAME}</b> e <b>${st.zip ? ZIP_NAME : 'as artes'}</b>` : `<b>${PDF_NAME}</b>`;
     const steps = $('waSteps');
@@ -372,7 +372,7 @@ export const ContactModule = {
       <li class="ok"><span>Conversa aberta com a sua mensagem.
         <button type="button" class="ctInline" data-act="wa-de-novo">Não abriu? Abrir de novo</button></span></li>
       <li><span>Toque no clipe 📎 e anexe ${anexos} (estão nos seus downloads)</span></li>
-      <li><span>Envie e aguarde nosso retorno com a cotação 🚀</span></li>`;
+      <li><span>Envie e aguarde o atendente com os preços e o prazo 🚀</span></li>`;
     steps.hidden = false;
     st.dlg.scrollTop = 0;
     Logger.info('UI', 'Conversa do WhatsApp aberta para o atendimento.');
