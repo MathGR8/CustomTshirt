@@ -308,6 +308,11 @@ button, label, select { touch-action: manipulation; }
   .app .tableSizes .stepper button.stepBtn { min-width: 30px; width: 30px; min-height: 36px; padding: 0; font-size: 16px; flex: none; }
   .app .tableSizes .stepper input[type="number"] { flex: 1 1 auto; width: auto; min-width: 30px; padding: 0 2px; font-size: 16px; }
 }
+/* Tela bem baixa (ex.: iPhone SE): espaços menores para a etapa caber sem rolar */
+@media (max-height: 600px) {
+  .painel { padding-top: 8px; }
+  .etapa, #setor1 { gap: 7px; }
+}
 @media (max-height: 600px) and (max-width: 640px) {
   .app .tableSizes tr { padding: 3px 4px 3px 10px; }
   .app .stepper button.stepBtn { min-height: 34px; }
