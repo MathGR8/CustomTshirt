@@ -155,7 +155,7 @@
      No estilo da página de personalizados da Art Rock: fundo grafite, vermelho
      #EC3236, Montserrat nos títulos e Nunito no texto, cartões escuros que
      "enchem" de vermelho ao passar o mouse e botão vermelho com brilho. */
-  .arp-secao { --sx-vermelho: #EC3236; --sx-grafite: #1a1a1a; width: 100%; font-family: "Nunito", "Segoe UI", system-ui, Arial, sans-serif; color: #fff; }
+  .arp-secao { --sx-vermelho: #EC3236; --sx-grafite: #1a1a1a; width: 100%; container-type: inline-size; font-family: "Nunito", "Segoe UI", system-ui, Arial, sans-serif; color: #fff; }
   .arp-secao .arp-sx { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); align-items: center; gap: 40px;
     max-width: 1100px; margin: 0 auto; padding: 56px 48px; border-radius: 26px;
     background: radial-gradient(circle at 82% 45%, rgba(236, 50, 54, .38), transparent 46%), radial-gradient(circle at 0% 100%, rgba(236, 50, 54, .16), transparent 40%), var(--sx-grafite);
@@ -214,6 +214,32 @@
     .arp-secao a.arp-sx-cta { width: 100%; justify-content: center; padding: 17px 14px; font-size: 15px; letter-spacing: .3px; white-space: nowrap; }
     .arp-secao .arp-sx-tag { font-size: 11.5px; padding: 7px 10px; }
     .arp-secao .arp-sx-tag.t2 { right: -4%; }
+  }
+  /* Mesmo layout de celular quando a CAIXA da secao e estreita (bloco estreito
+     no construtor, coluna lateral, previa mobile do editor), nao so a tela. */
+  @container (max-width: 860px) {
+    .arp-secao h2.arp-sx-titulo { font-size: clamp(26px, 8.5cqi, 34px) !important; }
+    .arp-secao .arp-sx { grid-template-columns: 1fr; gap: 8px; padding: 32px 20px 36px; border-radius: 20px; text-align: center; }
+    .arp-secao a.arp-sx-visual { order: -1; max-width: 270px; }
+    .arp-secao .arp-sx-selo { margin-bottom: 12px; }
+    .arp-secao p.arp-sx-sub { margin-left: auto !important; margin-right: auto !important; font-size: 15px !important; }
+    .arp-secao .arp-sx-passos { grid-template-columns: 1fr; gap: 8px; text-align: left; }
+    .arp-secao .arp-sx-passos li { display: flex; align-items: center; gap: 12px; padding: 12px; }
+    .arp-secao .arp-sx-passos b { margin: 0; flex: none; }
+    .arp-secao .arp-sx-acoes { flex-direction: column; }
+    .arp-secao a.arp-sx-cta { width: 100%; justify-content: center; padding: 17px 14px; font-size: 15px; letter-spacing: .3px; white-space: nowrap; }
+    .arp-secao .arp-sx-tag { font-size: 11.5px; padding: 7px 10px; }
+    .arp-secao .arp-sx-tag.t2 { right: -4%; }
+  }
+  /* Celulares bem estreitos (320 a 380px) */
+  @media (max-width: 380px) {
+    .arp-secao .arp-sx { padding: 26px 14px 30px; }
+    .arp-secao a.arp-sx-visual { max-width: 240px; }
+    .arp-secao h2.arp-sx-titulo { font-size: 26px !important; }
+    .arp-secao .arp-sx-tag { font-size: 10.5px; padding: 6px 8px; }
+    .arp-secao .arp-sx-tag.t2 { right: -2%; }
+    .arp-secao a.arp-sx-cta { font-size: 14px; padding: 16px 10px; }
+    .arp-secao .arp-sx-passos span { font-size: 13px; }
   }
 
   /* Aparelho com "reduzir animações" ligado (Windows sem efeitos de animação,
