@@ -60,6 +60,8 @@ const HTML = `
     <input id="ctNome" type="text" placeholder="Seu nome" autocomplete="name" maxlength="80" required>
     <input id="ctFone" type="tel" placeholder="Seu WhatsApp com DDD" autocomplete="tel" inputmode="tel" maxlength="30" required>
     <textarea id="ctObs" rows="2" placeholder="Observação (opcional): prazo, dúvidas…" maxlength="1000"></textarea>
+    <label class="ctDireitos"><input type="checkbox" id="ctDireitos">
+      <span>Confirmo que as artes são <b>minhas</b> ou que <b>tenho autorização</b> para usá-las (estampas com direitos autorais de terceiros não são aceitas). <button type="button" class="ctInline" data-act="direitos">Saiba mais</button></span></label>
     <p class="ctErro" id="ctErro" hidden></p>
     <button type="submit" class="ctEnviar" id="ctEnviar" disabled>Enviar pedido</button>
     <p class="ctOu"><span>ou, se preferir, pelo WhatsApp</span></p>
@@ -185,6 +187,7 @@ function montar() {
     else if (act === 'wa-de-novo') ContactModule._abrirConversa();
     else if (act === 'share')  ContactModule._compartilhar();
     else if (act === 'baixar') ContactModule._baixarTudo();
+    else if (act === 'direitos') window._modules?.DireitosModule?.mostrar();
   });
   dlg.querySelector('#ctEnvio').addEventListener('submit', e => { e.preventDefault(); ContactModule._enviarParaLoja(); });
   return dlg;
@@ -251,6 +254,7 @@ export const ContactModule = {
     $('ctNome').value = lembrado('artrock_cliente_nome');
     $('ctFone').value = lembrado('artrock_cliente_fone');
     $('ctObs').value = '';
+    $('ctDireitos').checked = false;
     $('ctEnviar').disabled = true;
     $('ctEnviar').textContent = 'Preparando os arquivos…';
     // Volta ao estado inicial (mensagem + botão do WhatsApp visíveis)
@@ -309,6 +313,7 @@ export const ContactModule = {
     const erro = msg => { $('ctErro').textContent = msg; $('ctErro').hidden = false; };
     $('ctErro').hidden = true;
     if (!nome) { erro('Escreva o seu nome.'); $('ctNome').focus(); return; }
+    if (!$('ctDireitos').checked) { erro('Confirme que as artes são suas ou que você tem autorização para usá-las.'); $('ctDireitos').focus(); return; }
     if (fone.replace(/\D/g, '').length < 10) { erro('Escreva o seu WhatsApp com DDD (ex.: 12 99999-9999).'); $('ctFone').focus(); return; }
     lembrar('artrock_cliente_nome', nome); lembrar('artrock_cliente_fone', fone);
 
