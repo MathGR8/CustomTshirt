@@ -267,7 +267,8 @@ function pintarLista() {
     if (p.tipo === 'contato') return `<button type="button" class="cartaoPedido contatoCartao st-${esc(p.status)}${novo}" data-id="${esc(p.id)}">
       <span class="cpImg">${icone('whatsapp', 48)}</span>
       <span class="cpInfo">
-        <span class="cpTopo"><strong>Contato</strong>${etiqueta(p)}${novo ? '<span class="seloNovo">CHEGOU AGORA</span>' : ''}<span class="chipSituacao st-${esc(p.status)}">${p.status === 'entregue' ? 'Atendido' : 'Chamar'}</span></span>
+        <span class="cpTopo"><strong>Contato</strong><span class="chipSituacao st-${esc(p.status)}">${p.status === 'entregue' ? 'Atendido' : 'Chamar'}</span></span>
+        <span class="cpSelos">${etiqueta(p)}${novo ? '<span class="seloNovo">CHEGOU AGORA</span>' : ''}</span>
         <span class="cpNome">${esc(p.nome || 'Sem nome')}</span>
         <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${p.telefone ? ' · ' + esc(p.telefone) : ''}</small>
         <small>Quer fazer camiseta com a própria arte</small>
@@ -276,7 +277,8 @@ function pintarLista() {
     return `<button type="button" class="cartaoPedido st-${esc(p.status)}${novo}${p.origem === 'artrock' ? ' cartaoArtrock' : ''}" data-id="${esc(p.id)}">
       <span class="cpImg">${p.miniatura ? `<img src="${esc(p.miniatura)}" alt="">` : icone('camisa', 48)}</span>
       <span class="cpInfo">
-        <span class="cpTopo"><strong>Nº ${codigo(p)}</strong>${etiqueta(p)}${novo ? '<span class="seloNovo">CHEGOU AGORA</span>' : ''}<span class="chipSituacao st-${esc(p.status)}">${nomeSituacao(p.status)}</span></span>
+        <span class="cpTopo"><strong>Nº ${codigo(p)}</strong><span class="chipSituacao st-${esc(p.status)}">${nomeSituacao(p.status)}</span></span>
+        <span class="cpSelos">${etiqueta(p)}${novo ? '<span class="seloNovo">CHEGOU AGORA</span>' : ''}</span>
         <span class="cpNome">${esc(p.nome || 'Sem nome')}</span>
         <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${p.telefone ? ' · ' + esc(p.telefone) : ''}</small>
         ${p.limpo ? '<small class="seloLimpo">arquivos apagados</small>' : ''}
