@@ -75,11 +75,16 @@ function telaEntrar(msg = '') {
         <label class="checkLinha"><input type="checkbox" id="lembrar" ${matchMedia('(pointer: coarse)').matches ? '' : 'checked'}> Lembrar neste aparelho</label>
         ${msg ? `<p class="alertaPedido">${esc(msg)}</p>` : ''}
         <button type="submit" class="btn btnEscuro btnGrande btnLargo">${icone('check')} Entrar</button>
+        <button type="button" class="btnTexto" id="esqueci">${icone('cadeado', 18)} Esqueci a senha</button>
         <button type="button" class="btnTexto" id="voltarLoja">${icone('voltar', 18)} Voltar para o app da loja</button>
       </form>
     </main>`;
   $('#chave').focus();
   $('#voltarLoja').onclick = voltarLoja;
+  $('#esqueci').onclick = async () => {
+    const nova = await (await import('./recuperar.js')).janelaRecuperar('confeccao');
+    if (nova) { $('#chave').value = nova; aviso('Senha trocada. Lembre de atualizar no tablet (Administrador → Configurações).', 'ok'); }
+  };
   $('#mostrar').onchange = e => { $('#chave').type = e.target.checked ? 'text' : 'password'; };
   $('#formEntrar').onsubmit = async e => {
     e.preventDefault();

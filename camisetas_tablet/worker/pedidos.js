@@ -45,6 +45,14 @@
  *   POST   /api/pedidos/:id/cancelar           {desfazer?} cancela (ou reabre) um pedido ainda não pago
  *   PATCH  /api/pedidos/:id                    (senha da loja) só {status: 'entregue' | 'pronto'} de pedido pago
  *
+ * Recuperar senha por e-mail (sem senha, com limite de 3 pedidos por hora):
+ *   POST   /api/pedidos/recuperar              {tipo: 'confeccao' | 'loja' | 'admin'} manda um código de 6 números
+ *                                              para o e-mail de recuperação (vale 30 minutos)
+ *   POST   /api/pedidos/recuperar/conferir     {tipo, codigo, nova?} confere o código e troca a senha
+ *                                              (admin: a senha fica no tablet, que grava a nova)
+ *   E-mail: RECUPERACAO_EMAIL (variável do Worker) ou o padrão abaixo. Envio pelo
+ *   Resend (resend.com, grátis): segredo RESEND_API_KEY no Worker; RESEND_FROM opcional.
+ *
  * Aviso de pedido: a cada pedido (ou contato) novo o servidor manda uma
  * notificação do navegador (Web Push) para cada computador/celular que ativou
  * "Receber avisos" no painel da confecção. Grátis e sem serviço de terceiros
@@ -59,6 +67,9 @@ const MAX_ARQUIVO = 40 * 1024 * 1024;
 const MAX_PEDIDO = 30 * 1024 * 1024;
 const SENHA_INICIAL = '000000';
 const SENHA_LOJA_INICIAL = '111111';
+/** E-mail que recebe os códigos de recuperação de senha (a variável RECUPERACAO_EMAIL tem prioridade). */
+const EMAIL_RECUPERACAO = 'matheus@artrock.com.br';
+const NOME_SENHA = { confeccao: 'da confecção', loja: 'da loja (balcão)', admin: 'do administrador do tablet' };
 const FORMAS = ['credito', 'debito', 'pix', 'dinheiro', 'outro'];
 /** Pedido feito no tablet que ainda não foi pago no balcão (a confecção não vê). */
 const NAO_PAGO = "(p.origem = 'loja' AND COALESCE(p.tipo, 'pedido') = 'pedido' AND p.pago IS NULL)";
@@ -224,6 +235,9 @@ export class Pedidos extends DurableObject {
         return json({ ok: true, trocada: true });
       }
 
+      // Esqueci a senha: código por e-mail
+      if (partes[0] === 'recuperar' && req.method === 'POST') return await this.recuperar(req, ip, partes[1]);
+
       // Trocar a senha da loja (com a senha atual da loja ou a da confecção)
       if (partes[0] === 'chave-loja' && req.method === 'POST') {
         const { chave, nova } = await req.json().catch(() => ({}));
@@ -277,6 +291,77 @@ export class Pedidos extends DurableObject {
     } catch (e) {
       return json({ erro: 'falha no servidor', detalhe: String(e && e.message || e) }, 500);
     }
+  }
+
+  // ---------- Recuperar senha por e-mail ----------
+
+  emailRecuperacao() { return String(this.env.RECUPERACAO_EMAIL || EMAIL_RECUPERACAO).trim(); }
+
+  async recuperar(req, ip, passo) {
+    const d = await req.json().catch(() => ({}));
+    const tipo = String(d.tipo || '');
+    if (!NOME_SENHA[tipo]) return json({ erro: 'tipo de senha inválido' }, 400);
+    const chaveCfg = `recuperar_${tipo}`;
+    const email = this.emailRecuperacao();
+    const mascara = email.replace(/^(.{2}).*(@.*)$/, '$1***$2');
+
+    if (passo === 'conferir') {
+      const r = JSON.parse(this.um('SELECT v FROM cfg WHERE k = ?', chaveCfg)?.v || 'null');
+      if (!r || r.expira < Date.now()) return json({ erro: 'Código vencido ou não pedido. Peça um código novo.' }, 400);
+      if (r.hash !== await sha256(r.sal + String(d.codigo || '').replace(/\D/g, ''))) {
+        r.erros = (r.erros || 0) + 1;
+        if (r.erros >= 5) this.sql.exec('DELETE FROM cfg WHERE k = ?', chaveCfg);
+        else this.sql.exec('INSERT OR REPLACE INTO cfg (k, v) VALUES (?, ?)', chaveCfg, JSON.stringify(r));
+        this.errou(ip);
+        return json({ erro: r.erros >= 5 ? 'Código errado 5 vezes. Peça um código novo.' : 'Código errado.' }, 400);
+      }
+      if (tipo !== 'admin') {
+        const nova = String(d.nova || '');
+        if (nova.length < 6) return json({ erro: 'A nova senha precisa ter pelo menos 6 caracteres.' }, 400);
+        if (tipo === 'confeccao') {
+          if (this.env.PEDIDOS_SENHA) return json({ erro: 'A senha da confecção está fixa no Worker (PEDIDOS_SENHA). Troque por lá.' }, 400);
+          if (await this.confereLoja(nova)) return json({ erro: 'A senha da confecção precisa ser diferente da senha da loja.' }, 400);
+          const sal = crypto.randomUUID();
+          this.sql.exec("INSERT OR REPLACE INTO cfg (k, v) VALUES ('sal', ?), ('chave', ?)", sal, await sha256(sal + nova));
+        } else {
+          if (this.env.LOJA_SENHA) return json({ erro: 'A senha da loja está fixa no Worker (LOJA_SENHA). Troque por lá.' }, 400);
+          if (await this.confere(nova)) return json({ erro: 'A senha da loja precisa ser diferente da senha da confecção.' }, 400);
+          const sal = crypto.randomUUID();
+          this.sql.exec("INSERT OR REPLACE INTO cfg (k, v) VALUES ('sal_loja', ?), ('chave_loja', ?)", sal, await sha256(sal + nova));
+        }
+      }
+      this.sql.exec('DELETE FROM cfg WHERE k = ?', chaveCfg);
+      this.acertou(ip);
+      return json({ ok: true });
+    }
+
+    if (passo) return json({ erro: 'rota desconhecida' }, 404);
+    if (!this.env.RESEND_API_KEY) return json({ erro: 'A recuperação por e-mail ainda não foi configurada (falta a chave RESEND_API_KEY no Worker).' }, 501);
+    // No máximo 3 códigos por hora (de qualquer lugar), para não lotar o e-mail
+    const lim = this.um("SELECT n, ate FROM externos WHERE ip = 'recuperar'");
+    const vale = lim && lim.ate > Date.now();
+    if (vale && lim.n >= 3) return json({ erro: 'Já foram pedidos 3 códigos na última hora. Espere um pouco ou use o último código recebido.' }, 429);
+    const codigo = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0');
+    const sal = crypto.randomUUID();
+    const nome = NOME_SENHA[tipo];
+    const r = await fetch(this.env.RESEND_URL || 'https://api.resend.com/emails', { // RESEND_URL: só para testes
+      method: 'POST',
+      headers: { authorization: `Bearer ${this.env.RESEND_API_KEY}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        from: this.env.RESEND_FROM || 'Estúdio de Camisetas <onboarding@resend.dev>',
+        to: [email],
+        subject: `Código para trocar a senha ${nome}: ${codigo}`,
+        text: `Alguém pediu para trocar a senha ${nome} do app de camisetas.\n\nCódigo: ${codigo}\n\nVale por 30 minutos. Se não foi você, ignore este e-mail: a senha atual continua valendo.${tipo === 'confeccao' ? '\n\nDepois de trocar, atualize a senha da confecção no tablet (Administrador → Configurações), senão os pedidos não chegam.' : ''}`,
+        html: `<div style="font-family:Arial,sans-serif;font-size:16px;color:#111"><p>Alguém pediu para trocar a <b>senha ${nome}</b> do app de camisetas.</p>
+          <p style="font-size:34px;font-weight:bold;letter-spacing:6px;margin:18px 0">${codigo}</p>
+          <p>O código vale por <b>30 minutos</b>. Se não foi você, ignore este e-mail: a senha atual continua valendo.</p>
+          ${tipo === 'confeccao' ? '<p>Depois de trocar, atualize a senha da confecção no tablet (Administrador → Configurações), senão os pedidos não chegam.</p>' : ''}</div>`
+      })
+    });
+    if (!r.ok) return json({ erro: `Não foi possível enviar o e-mail (${r.status}). ${(await r.text().catch(() => '')).slice(0, 160)}` }, 502);
+    this.sql.exec('INSERT OR REPLACE INTO cfg (k, v) VALUES (?, ?)', chaveCfg, JSON.stringify({ hash: await sha256(sal + codigo), sal, expira: Date.now() + 30 * 60000, erros: 0 }));
+    this.sql.exec("INSERT OR REPLACE INTO externos (ip, n, ate) VALUES ('recuperar', ?, ?)", vale ? lim.n + 1 : 1, vale ? lim.ate : Date.now() + 3600000);
+    return json({ ok: true, para: mascara });
   }
 
   // ---------- Pedidos do site da Art Rock ----------
