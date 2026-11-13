@@ -1475,6 +1475,7 @@ TELAS.revisar = () => {
           </div>
         </article>`).join('')}
       </div>
+      ${S.itens.some(it => it.artes.some(a => a.tipo === 'texto')) ? `<p class="avisoSemTroca avisoRevisar">${icone('alerta', 22)} <span><b>Camiseta com texto personalizado não tem troca</b>, por ser um produto feito especialmente para você. Confira o texto com atenção (letras, acentos e números).</span></p>` : ''}
       <button type="button" class="btn btnContorno btnLargo btnGrande" id="outra">${icone('mais', 24)} Adicionar outra camiseta (outro modelo, cor ou arte)</button>
     </section>`;
   $$('[data-editar]').forEach(b => (b.onclick = () => editarItem(+b.dataset.editar)));
@@ -1556,6 +1557,7 @@ function editarItem(i) {
 
 TELAS.dados = () => {
   const c = S.cliente || {};
+  const comTexto = S.itens.some(it => it.artes.some(a => a.tipo === 'texto'));
   $('#tela').innerHTML = `
     <section class="dados">
       <h2 class="tituloTela">Quase pronto! Como podemos te chamar?</h2>
@@ -1563,8 +1565,9 @@ TELAS.dados = () => {
       <label class="campo">${icone('pessoa')}<span>Seu nome</span><input id="nome" autocomplete="name" autocapitalize="words" enterkeyhint="next" value="${esc(c.nome)}" placeholder="Ex.: Maria"></label>
       <label class="campo">${icone('whatsapp')}<span>WhatsApp <small>(opcional)</small></span><input id="tel" type="tel" inputmode="tel" autocomplete="tel" enterkeyhint="next" value="${esc(c.telefone)}" placeholder="(00) 00000-0000"></label>
       <label class="campo campoTexto">${icone('editar')}<span>Alguma observação? <small>(opcional)</small></span><textarea id="obs" rows="3" placeholder="Ex.: preciso para sexta-feira">${esc(c.obs)}</textarea></label>
+      ${comTexto ? `<label class="checkLinha checkSemTroca"><input type="checkbox" id="semTroca" ${c.cienteSemTroca ? 'checked' : ''}> <span>${icone('alerta', 20)} Estou ciente de que <b>camiseta com texto personalizado não tem troca</b>, por ser um produto personalizado.</span></label>` : ''}
     </section>`;
-  const ler = () => (S.cliente = { nome: $('#nome').value.trim(), telefone: $('#tel').value.trim(), obs: $('#obs').value.trim() });
+  const ler = () => (S.cliente = { nome: $('#nome').value.trim(), telefone: $('#tel').value.trim(), obs: $('#obs').value.trim(), ...(comTexto ? { cienteSemTroca: !!$('#semTroca')?.checked } : {}) });
   $('#tel').oninput = e => { // máscara simples (00) 00000-0000
     const d = e.target.value.replace(/\D/g, '').slice(0, 11);
     e.target.value = d.length > 6 ? `(${d.slice(0, 2)}) ${d.slice(2, d.length - 4)}-${d.slice(-4)}` : d.length > 2 ? `(${d.slice(0, 2)}) ${d.slice(2)}` : d;
@@ -1574,6 +1577,7 @@ TELAS.dados = () => {
     avancar: { texto: 'Enviar pedido', acao: async () => {
       ler();
       if (!S.cliente.nome) { aviso('Digite o seu nome para continuar.', 'erro'); $('#nome').focus(); return; }
+      if (comTexto && !S.cliente.cienteSemTroca) { aviso('Marque que está ciente: camiseta com texto não tem troca.', 'erro'); $('#semTroca').closest('label').classList.add('destacar'); $('#semTroca').focus(); return; }
       const b = $('#rAvancar'); b.disabled = true; b.innerHTML = 'Salvando…';
       try {
         S.ultimoPedido = await salvarPedido(S.itens, S.cliente, S.cfg);
@@ -1600,7 +1604,7 @@ TELAS.pronto = () => {
       <h2>Pedido enviado!</h2>
       <p class="prontoNumeroRotulo">Número do pedido</p>
       <p class="prontoNumero">${numeroPedido(p.numero)}</p>
-      <p class="textoAjuda">Obrigado, <b>${esc(p.cliente.nome)}</b>! Mostre este número ao atendente para concluir.<br>${p.itens.length} camiseta${p.itens.length > 1 ? 's' : ''} diferente${p.itens.length > 1 ? 's' : ''} · ${total} peça${total === 1 ? '' : 's'}</p>
+      <p class="textoAjuda">Obrigado, <b>${esc(p.cliente.nome)}</b>! <b>Vá ao caixa e mostre este número para pagar.</b> A produção começa assim que o pedido for pago.<br>${p.itens.length} camiseta${p.itens.length > 1 ? 's' : ''} diferente${p.itens.length > 1 ? 's' : ''} · ${total} peça${total === 1 ? '' : 's'}</p>
       ${p.precos?.mostrar && p.total ? `<p class="prontoValor">Total: <b>${dinheiro(p.total)}</b><small>Valor estimado. O atendente confirma na hora.</small></p>` : ''}
       <div class="linhaBotoes centro">
         <button type="button" class="btn btnEscuro btnGrande" id="novo">${icone('camisa')} Fazer outro pedido</button>
@@ -1613,14 +1617,14 @@ TELAS.pronto = () => {
   const st = $('#envioStatus');
   if (configEnvio(S.cfg).ativo && S.envioPedido) {
     st.hidden = false;
-    st.innerHTML = `<span class="girando"></span> Enviando para a confecção…`;
+    st.innerHTML = `<span class="girando"></span> Enviando para o caixa da loja…`;
     S.envioPedido.then(async r => {
       const reg = await DB.pegar('pedidos', p.id).catch(() => null);
       if (!st.isConnected) return;
       const ok = !!reg?.enviado;
       st.classList.toggle('ok', ok); st.classList.toggle('erro', !ok);
-      st.innerHTML = ok ? `${icone('check', 18)} Enviado para a confecção`
-        : `Ainda não foi para a confecção (${esc(String(reg?.erroEnvio || r?.erro || 'tentando').replace(/\.$/, ''))}). Vai tentar de novo sozinho.`;
+      st.innerHTML = ok ? `${icone('check', 18)} Enviado para o caixa da loja`
+        : `Ainda não chegou no caixa (${esc(String(reg?.erroEnvio || r?.erro || 'tentando').replace(/\.$/, ''))}). Vai tentar de novo sozinho.`;
     });
   }
   let s = 90;
@@ -1764,10 +1768,12 @@ async function manterTelaLigada() {
   } catch { /* sem suporte ou sem permissão: a tela segue a configuração do tablet */ }
 }
 
-/** Este aparelho abre a área da confecção? (#confeccao no endereço ou senha lembrada) */
-function modoConfeccao() {
-  if (location.hash === '#confeccao') return true;
-  try { return !!(localStorage.getItem('chaveConfeccao') || sessionStorage.getItem('chaveConfeccao')); } catch { return false; }
+/** Este aparelho abre a confecção, o balcão da loja ou o app do tablet? (#confeccao / #loja no endereço ou senha lembrada) */
+function modoEquipe() {
+  if (location.hash === '#confeccao') return 'confeccao';
+  if (location.hash === '#loja') return 'loja';
+  const tem = k => { try { return !!(localStorage.getItem(k) || sessionStorage.getItem(k)); } catch { return false; } };
+  return tem('chaveConfeccao') ? 'confeccao' : tem('chaveLoja') ? 'loja' : null;
 }
 
 /**
@@ -1789,9 +1795,10 @@ function ajustarTela() {
 }
 
 async function iniciar() {
-  if (modoConfeccao()) {
+  const equipe = modoEquipe();
+  if (equipe) {
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
-    return (await import('./painel.js')).iniciar();
+    return (await import(equipe === 'loja' ? './balcao.js' : './painel.js')).iniciar();
   }
   // Sem o menu de segurar o dedo na imagem (copiar, baixar, compartilhar…) e sem arrastar imagens
   document.addEventListener('contextmenu', e => { if (!e.target.closest('input, textarea')) e.preventDefault(); });

@@ -29,7 +29,7 @@ let App = null;
 export async function abrirAdmin(app) {
   App = app;
   if (document.querySelector('.janelaAdmin')) return;
-  const senha = await pedirSenha('Acesso da equipe', 'Digite a senha do <b>administrador</b> ou a senha da <b>confecção</b>.');
+  const senha = await pedirSenha('Acesso da equipe', 'Digite a senha do <b>administrador</b>, da <b>loja (balcão)</b> ou da <b>confecção</b>.');
   if (!senha) return;
   if (senha !== String(App.S.cfg.senha)) {
     // Não é a do administrador: tenta como senha da confecção (abre os pedidos da confecção)
@@ -745,16 +745,18 @@ async function apagarArtesDoCliente(pedidos, todos) {
  * até fechar o app).
  */
 async function entrarConfeccao(chave) {
+  let papel;
   try {
-    await testarChave(chave);
+    papel = (await testarChave(chave)).papel || 'confeccao';
   } catch (e) {
     if (/muitas tentativas/i.test(e.message)) aviso(e.message, 'erro');
     else if (!/errada/i.test(e.message)) aviso('Não foi possível conferir a senha da confecção: ' + e.message, 'erro');
     return false;
   }
   const lembrar = !matchMedia('(pointer: coarse)').matches;
-  try { (lembrar ? localStorage : sessionStorage).setItem('chaveConfeccao', chave); } catch { /* sem armazenamento */ }
-  location.hash = 'confeccao';
+  // Senha da loja abre o balcão (receber os pedidos); a da confecção, os pedidos da produção
+  try { (lembrar ? localStorage : sessionStorage).setItem(papel === 'loja' ? 'chaveLoja' : 'chaveConfeccao', chave); } catch { /* sem armazenamento */ }
+  location.hash = papel === 'loja' ? 'loja' : 'confeccao';
   location.reload();
   return true;
 }

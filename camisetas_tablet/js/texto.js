@@ -140,6 +140,7 @@ export function editorTexto(inicial = {}, fundo = '#191919') {
         <div class="coresTexto" data-alvo="corContorno" ${t.contorno ? '' : 'hidden'}>${CORES_TEXTO.map(([n, h]) => `<button type="button" class="corTexto" data-hex="${h}" style="--c:${h}" aria-pressed="${h === t.corContorno}" aria-label="Contorno ${n}" title="${n}"></button>`).join('')}</div>
         ${editando ? '' : `<div class="rotuloLinha"><b>Tamanho</b> <small>(dá para ajustar depois)</small></div>
         <div class="chipsPos">${TAMANHOS_TEXTO.map(([k, n, cm]) => `<button type="button" class="chipPos" data-tam="${cm}" aria-pressed="${cm === 15}">${n}<small> ${cm} cm</small></button>`).join('')}</div>`}
+        <p class="avisoSemTroca">${icone('alerta', 20)} <span><b>Atenção:</b> camiseta com texto personalizado <b>não tem troca</b>, por ser um produto feito especialmente para você.</span></p>
         <button type="button" class="btn btnEscuro btnGrande btnLargo" id="okTexto">${icone('check')} ${editando ? 'Salvar texto' : 'Colocar na camiseta'}</button>
       </div>
     </div>` });
