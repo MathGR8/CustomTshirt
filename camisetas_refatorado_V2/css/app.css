@@ -504,7 +504,7 @@ body.modoDev #shirtBoxOverlay .devCanto {
 /* Tela baixa com arte na lista: o aviso já apareceu no 1º envio e volta na confirmação do pedido */
 @media (max-height: 700px) { .temArte .avisoDireitos { display: none; } }
 
-.direitosDlg { max-width: min(460px, calc(100vw - 32px)); border: 0; border-radius: 18px; padding: 22px 22px 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); font-family: var(--font-base); color: #1b1b1f; }
+.direitosDlg { max-width: min(460px, calc(100vw - 32px)); border: 0; border-radius: 18px; padding: 22px 22px 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); font-family: var(--font-base); color: #1b1b1f; margin: auto; }
 .direitosDlg::backdrop { background: rgba(0, 0, 0, .55); }
 .direitosDlg h2 { margin: 0 0 10px; font-size: 19px; }
 .direitosDlg .dirTexto p { margin: 0 0 10px; font-size: 14.5px; line-height: 1.45; }
