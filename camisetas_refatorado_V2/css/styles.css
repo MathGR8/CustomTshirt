@@ -716,7 +716,7 @@ body.contornoArte .artOverlay.active {
    (reabrir para edição, renomear, duplicar, remover)
    ============================================= */
 #orderPanel {
-  width: 200px;
+  width: auto;
   flex-shrink: 0;
   padding: 14px 10px;
   border-right: 1px solid var(--color-border);
