@@ -15,7 +15,7 @@ const LOGO = 'https://cdn.awsli.com.br/400x300/1274/1274265/logo/logo-art-rock-2
 
 /** Passos: elemento destacado, título e texto. */
 const PASSOS = [
-  { alvo: '#etapas', titulo: 'São 4 etapas', texto: '<b>Produto</b>, <b>Arte</b>, <b>Tamanhos</b> e <b>Pedido</b>. A camiseta fica sempre à vista e você avança pelo botão embaixo.' },
+  { alvo: '#etapas', titulo: 'São 4 etapas', texto: '<b>Produto</b>, <b>Arte</b>, <b>Tamanhos</b> e <b>Orçamento</b>. A camiseta fica sempre à vista e você avança pelo botão embaixo.' },
   { alvo: '#setor1', titulo: 'Escolha o modelo', texto: 'Masculina, Feminina ou Infantil, e o tipo de malha.' },
   { alvo: '#seletorCor', titulo: 'Escolha a cor', texto: 'Toque na cor da camiseta. Ela muda na hora.' },
   { alvo: '#btnAvancar', titulo: 'Depois, envie a sua arte', texto: 'Na etapa <b>Arte</b> você manda a imagem do celular (foto, PNG, JPG, SVG ou PDF) ou escreve um texto, e arrasta para posicionar.' },
@@ -130,8 +130,9 @@ function boasVindas() {
         <li><span>1</span><div><b>Produto</b><small>Modelo, malha e cor</small></div></li>
         <li><span>2</span><div><b>Arte</b><small>Envie a sua imagem ou escreva um texto</small></div></li>
         <li><span>3</span><div><b>Tamanhos</b><small>Quantas peças de cada tamanho</small></div></li>
-        <li><span>4</span><div><b>Pedido</b><small>Envie para o atendimento pelo WhatsApp</small></div></li>
+        <li><span>4</span><div><b>Orçamento</b><small>Envie para o atendente, que passa os preços e o prazo</small></div></li>
       </ol>
+      <p class="bvNota">É um <b>pedido de orçamento</b>: nada é cobrado aqui. Preços, prazo e pagamento são combinados depois, direto com o atendente.</p>
       <button type="button" class="btn-dark bvProsseguir" data-bv="ir">Começar ›</button>
       <button type="button" class="bvPular" data-bv="pular">Já conheço, pular as dicas</button>
     </div>`;

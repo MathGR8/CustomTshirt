@@ -34,6 +34,17 @@
  *       ARTROCK_ORIGENS (variável do Worker, opcional): endereços do site
  *       permitidos, separados por vírgula (ex.: https://artrock-personalize.x.workers.dev).
  *
+ * Loja / Balcão (senha própria, a inicial é 111111; variável LOJA_SENHA no Worker tem prioridade):
+ *   O pedido feito no tablet fica "aguardando pagamento" e só aparece para a
+ *   confecção depois que o caixa registra o pagamento (cobrado na maquininha).
+ *   POST   /api/pedidos/chave                  também aceita a senha da loja → {ok, papel: 'loja'}
+ *   POST   /api/pedidos/chave-loja             {chave (da loja ou da confecção), nova} troca a senha da loja
+ *   GET    /api/pedidos                        (senha da loja) pedidos do tablet, pagos ou não
+ *   POST   /api/pedidos/:id/pagamento          {forma, valor, parcelas?, recebido?, atendente?, obs?}
+ *                                              registra o pagamento → o pedido vai para a confecção
+ *   POST   /api/pedidos/:id/cancelar           {desfazer?} cancela (ou reabre) um pedido ainda não pago
+ *   PATCH  /api/pedidos/:id                    (senha da loja) só {status: 'entregue' | 'pronto'} de pedido pago
+ *
  * Aviso de pedido: a cada pedido (ou contato) novo o servidor manda uma
  * notificação do navegador (Web Push) para cada computador/celular que ativou
  * "Receber avisos" no painel da confecção. Grátis e sem serviço de terceiros
@@ -47,6 +58,10 @@ const PEDACO = 1024 * 1024;            // o SQLite do Durable Object guarda até
 const MAX_ARQUIVO = 40 * 1024 * 1024;
 const MAX_PEDIDO = 30 * 1024 * 1024;
 const SENHA_INICIAL = '000000';
+const SENHA_LOJA_INICIAL = '111111';
+const FORMAS = ['credito', 'debito', 'pix', 'dinheiro', 'outro'];
+/** Pedido feito no tablet que ainda não foi pago no balcão (a confecção não vê). */
+const NAO_PAGO = "(p.origem = 'loja' AND COALESCE(p.tipo, 'pedido') = 'pedido' AND p.pago IS NULL)";
 // Espaço do plano grátis da Cloudflare: 1 GB por Durable Object (o número mais conservador da documentação).
 // Variável ESPACO_LIMITE_MB no Worker muda o limite (ex.: no plano pago, 10240).
 const LIMITE_PADRAO_MB = 1024;
@@ -77,10 +92,13 @@ export function avisoDoPedido(p, origem = '') {
     return `${it.modelo || ''} ${it.cor || ''} — ${tam}`.replace(/\s+/g, ' ').trim();
   });
   if (itens.length > 3) linhas.push(`… e mais ${itens.length - 3} camiseta(s)`);
-  return { titulo: `🧾 Novo pedido nº ${String(p.numero || 0).padStart(4, '0')}`, tag: `p-${p.id}`, url,
+  if (p.paraLoja) return { titulo: `🛒 Pedido nº ${String(p.numero || 0).padStart(4, '0')} aguardando pagamento`, tag: `p-${p.id}`, url: `${origem}/?pedido=${encodeURIComponent(p.id)}#loja`,
+    texto: [`${c.nome || 'Sem nome'} · ${pecas} peça${pecas === 1 ? '' : 's'}${p.total ? ' · ' + reais(p.total) : ''}`, 'Cobrar no balcão e registrar o pagamento.'].join('\n') };
+  const pago = p.pagamento ? ` · pago (${{ credito: 'crédito', debito: 'débito', pix: 'Pix', dinheiro: 'dinheiro', outro: 'outro' }[p.pagamento.forma] || p.pagamento.forma})` : '';
+  return { titulo: `🧾 Novo pedido nº ${String(p.numero || 0).padStart(4, '0')}${pago}`, tag: `p-${p.id}`, url,
     texto: [`${c.nome || 'Sem nome'} · ${pecas} peça${pecas === 1 ? '' : 's'}${p.total ? ' · ' + reais(p.total) : ''}`, ...linhas, c.obs ? `Obs.: ${c.obs}` : ''].filter(Boolean).join('\n') };
 }
-const STATUS = ['novo', 'producao', 'pronto', 'entregue'];
+const STATUS = ['novo', 'producao', 'pronto', 'entregue', 'cancelado'];
 
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
   status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }
@@ -120,6 +138,17 @@ export class Pedidos extends DurableObject {
     try { this.sql.exec('ALTER TABLE pedidos ADD COLUMN limpo INTEGER'); } catch { /* já existe */ }
     // De onde veio o pedido: 'loja' (tablet) ou 'artrock' (site da Art Rock)
     try { this.sql.exec("ALTER TABLE pedidos ADD COLUMN origem TEXT DEFAULT 'loja'"); } catch { /* já existe */ }
+    // Pagamento no balcão: quando foi pago (null = aguardando) e como; pedido com texto (sem troca)
+    try { this.sql.exec('ALTER TABLE pedidos ADD COLUMN pago INTEGER'); } catch { /* já existe */ }
+    try { this.sql.exec('ALTER TABLE pedidos ADD COLUMN pagamento TEXT'); } catch { /* já existe */ }
+    try { this.sql.exec('ALTER TABLE pedidos ADD COLUMN texto INTEGER'); } catch { /* já existe */ }
+    // Quem recebe cada aviso: 'confeccao' ou 'loja' (balcão)
+    try { this.sql.exec("ALTER TABLE aparelhos ADD COLUMN papel TEXT DEFAULT 'confeccao'"); } catch { /* já existe */ }
+    // Uma vez só: os pedidos de antes do balcão já estavam na confecção (contam como pagos)
+    if (!this.um("SELECT v FROM cfg WHERE k = 'pagamento_v1'")) {
+      this.sql.exec('UPDATE pedidos SET pago = recebido WHERE pago IS NULL');
+      this.sql.exec("INSERT OR REPLACE INTO cfg (k, v) VALUES ('pagamento_v1', '1')");
+    }
     // Limite de pedidos do site por endereço de rede (contra abuso)
     this.sql.exec('CREATE TABLE IF NOT EXISTS externos (ip TEXT PRIMARY KEY, n INTEGER, ate INTEGER)');
     // Uma vez só: apaga a senha gravada pelas versões antigas (a 1ª senha usada
@@ -153,6 +182,20 @@ export class Pedidos extends DurableObject {
     const sal = this.um("SELECT v FROM cfg WHERE k = 'sal'");
     return !!salvo && salvo.v === await sha256(sal.v + chave);
   }
+  async confereLoja(chave) {
+    if (!chave) return false;
+    if (this.env.LOJA_SENHA) return chave === this.env.LOJA_SENHA;
+    const salvo = this.um("SELECT v FROM cfg WHERE k = 'chave_loja'");
+    if (!salvo) return chave === SENHA_LOJA_INICIAL;
+    const sal = this.um("SELECT v FROM cfg WHERE k = 'sal_loja'");
+    return salvo.v === await sha256(sal.v + chave);
+  }
+  /** 'confeccao' (acesso completo), 'loja' (balcão) ou null. */
+  async papel(chave) {
+    if (await this.confere(chave)) return 'confeccao';
+    if (await this.confereLoja(chave)) return 'loja';
+    return null;
+  }
 
   async fetch(req) {
     const url = new URL(req.url);
@@ -166,12 +209,14 @@ export class Pedidos extends DurableObject {
       // Testar (e trocar) a senha
       if (partes[0] === 'chave' && req.method === 'POST') {
         const { chave, nova } = await req.json().catch(() => ({}));
-        if (!(await this.confere(String(chave || '')))) {
+        const papel = await this.papel(String(chave || ''));
+        if (!papel) {
           this.errou(ip);
           return json({ erro: 'Senha da confecção errada.' }, 401);
         }
         this.acertou(ip);
-        if (nova == null || String(nova) === String(chave)) return json({ ok: true });
+        if (papel === 'loja') return nova == null ? json({ ok: true, papel }) : json({ erro: 'Esta é a senha da loja. Para trocar a senha da confecção, use a senha da confecção.' }, 400);
+        if (nova == null || String(nova) === String(chave)) return json({ ok: true, papel });
         if (this.env.PEDIDOS_SENHA) return json({ erro: 'A senha está fixa no Worker (PEDIDOS_SENHA). Troque por lá.' }, 400);
         if (String(nova).length < 6) return json({ erro: 'A nova senha precisa ter pelo menos 6 caracteres.' }, 400);
         const sal = crypto.randomUUID();
@@ -179,14 +224,30 @@ export class Pedidos extends DurableObject {
         return json({ ok: true, trocada: true });
       }
 
-      if (!(await this.confere(req.headers.get('x-chave') || ''))) {
+      // Trocar a senha da loja (com a senha atual da loja ou a da confecção)
+      if (partes[0] === 'chave-loja' && req.method === 'POST') {
+        const { chave, nova } = await req.json().catch(() => ({}));
+        if (!(await this.papel(String(chave || '')))) { this.errou(ip); return json({ erro: 'Senha atual errada.' }, 401); }
+        this.acertou(ip);
+        if (this.env.LOJA_SENHA) return json({ erro: 'A senha da loja está fixa no Worker (LOJA_SENHA). Troque por lá.' }, 400);
+        if (String(nova || '').length < 6) return json({ erro: 'A nova senha precisa ter pelo menos 6 caracteres.' }, 400);
+        if (await this.confere(String(nova))) return json({ erro: 'A senha da loja precisa ser diferente da senha da confecção.' }, 400);
+        const sal = crypto.randomUUID();
+        this.sql.exec("INSERT OR REPLACE INTO cfg (k, v) VALUES ('sal_loja', ?), ('chave_loja', ?)", sal, await sha256(sal + nova));
+        return json({ ok: true, trocada: true });
+      }
+
+      const papel = await this.papel(req.headers.get('x-chave') || '');
+      if (!papel) {
         this.errou(ip);
         return json({ erro: 'Senha da confecção errada.' }, 401);
       }
       this.acertou(ip);
 
-      // Avisos de pedido no navegador (computador/celular do gestor)
-      if (partes[0] === 'notificacoes') return await this.notificacoes(req, partes[1], url.origin);
+      // Avisos de pedido no navegador (computador/celular do gestor ou do balcão)
+      if (partes[0] === 'notificacoes') return await this.notificacoes(req, partes[1], url.origin, papel);
+
+      if (papel === 'loja') return await this.rotaLoja(req, url, partes);
 
       // Espaço usado e limpeza dos arquivos de pedidos antigos
       if (partes[0] === 'espaco') {
@@ -200,6 +261,8 @@ export class Pedidos extends DurableObject {
 
       const [id, sub, nome] = partes;
       if (!id && req.method === 'GET') return this.lista(url);
+      if (id && sub === 'pagamento' && req.method === 'POST') return await this.pagar(id, req, url.origin);
+      if (id && sub === 'cancelar' && req.method === 'POST') return await this.cancelar(id, req);
       if (id && !sub) {
         if (req.method === 'PUT') return this.gravar(id, req, url.origin);
         if (req.method === 'GET') return this.ler(id);
@@ -323,14 +386,85 @@ export class Pedidos extends DurableObject {
 
   // ---------- Pedidos ----------
 
-  lista(url) {
+  /**
+   * Lista (resumo). Confecção: tudo menos os pedidos do tablet ainda não pagos (e os cancelados).
+   * Loja: só os pedidos do tablet (pagos, aguardando e cancelados), com o pagamento.
+   */
+  lista(url, papel = 'confeccao') {
     const status = url.searchParams.get('status');
+    const cond = [papel === 'loja' ? "p.origem = 'loja' AND COALESCE(p.tipo, 'pedido') = 'pedido'" : `NOT ${NAO_PAGO} AND p.status != 'cancelado'`];
+    const args = [];
+    if (status && STATUS.includes(status)) { cond.push('p.status = ?'); args.push(status); }
     const rows = this.sql.exec(
       `SELECT p.id, p.numero, p.data, p.nome, p.telefone, p.total, p.pecas, p.camisetas, p.status, p.miniatura, p.recebido, p.alerta, p.tipo, p.limpo, p.origem,
-              (SELECT COUNT(*) FROM arquivos a WHERE a.pedido = p.id) AS arquivos
-         FROM pedidos p ${status && STATUS.includes(status) ? 'WHERE p.status = ?' : ''}
-        ORDER BY p.recebido DESC LIMIT 500`, ...(status && STATUS.includes(status) ? [status] : [])).toArray();
+              p.pago, p.pagamento, p.texto, (SELECT COUNT(*) FROM arquivos a WHERE a.pedido = p.id) AS arquivos
+         FROM pedidos p WHERE ${cond.join(' AND ')}
+        ORDER BY p.recebido DESC LIMIT ${papel === 'loja' ? 2000 : 500}`, ...args).toArray();
+    for (const r of rows) r.pagamento = r.pagamento ? JSON.parse(r.pagamento) : null;
     return json({ pedidos: rows });
+  }
+
+  // ---------- Loja / Balcão ----------
+
+  /** O que a senha da loja pode fazer: ver os pedidos do tablet, receber, cancelar e entregar. */
+  async rotaLoja(req, url, partes) {
+    const [id, sub, nome] = partes;
+    if (!id && req.method === 'GET') return this.lista(url, 'loja');
+    if (!id) return json({ erro: 'rota desconhecida' }, 404);
+    const cab = this.um("SELECT origem, COALESCE(tipo, 'pedido') AS tipo, pago FROM pedidos WHERE id = ?", id);
+    if (!cab || cab.origem !== 'loja' || cab.tipo !== 'pedido') return json({ erro: 'pedido não encontrado' }, 404);
+    if (!sub && req.method === 'GET') return this.ler(id);
+    if (sub === 'arquivos' && nome && req.method === 'GET') return this.lerArquivo(id, nome);
+    if (sub === 'pagamento' && req.method === 'POST') return await this.pagar(id, req, url.origin);
+    if (sub === 'cancelar' && req.method === 'POST') return await this.cancelar(id, req);
+    if (!sub && req.method === 'PATCH') {
+      const { status } = await req.json().catch(() => ({}));
+      if (!cab.pago) return json({ erro: 'O pedido ainda não foi pago.' }, 400);
+      if (!['entregue', 'pronto'].includes(status)) return json({ erro: 'No balcão só dá para marcar como entregue.' }, 403);
+      this.sql.exec('UPDATE pedidos SET status = ? WHERE id = ?', status, id);
+      return json({ ok: true });
+    }
+    return json({ erro: 'Sem permissão com a senha da loja.' }, 403);
+  }
+
+  /** Registra o pagamento (cobrado por fora, na maquininha). Na 1ª vez o pedido vai para a confecção. */
+  async pagar(id, req, origem) {
+    const d = await req.json().catch(() => ({}));
+    const cab = this.um("SELECT origem, COALESCE(tipo, 'pedido') AS tipo, pago, status FROM pedidos WHERE id = ?", id);
+    if (!cab || cab.tipo !== 'pedido') return json({ erro: 'pedido não encontrado' }, 404);
+    if (cab.status === 'cancelado') return json({ erro: 'Este pedido está cancelado. Reabra antes de receber.' }, 400);
+    const forma = String(d.forma || '');
+    if (!FORMAS.includes(forma)) return json({ erro: 'Escolha a forma de pagamento.' }, 400);
+    const valor = Math.round((+d.valor || 0) * 100) / 100;
+    if (!(valor > 0) || valor > 1e6) return json({ erro: 'Informe o valor cobrado.' }, 400);
+    const txt = (v, max) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
+    const pagamento = {
+      forma, valor,
+      parcelas: forma === 'credito' ? Math.max(1, Math.min(24, parseInt(d.parcelas, 10) || 1)) : null,
+      recebido: forma === 'dinheiro' && +d.recebido > 0 ? Math.round(+d.recebido * 100) / 100 : null,
+      atendente: txt(d.atendente, 60), obs: txt(d.obs, 300),
+      em: cab.pago ? (JSON.parse(this.um('SELECT pagamento FROM pedidos WHERE id = ?', id)?.pagamento || '{}').em || cab.pago) : Date.now()
+    };
+    if (pagamento.recebido != null && pagamento.recebido < valor) return json({ erro: 'O valor recebido em dinheiro é menor que o valor cobrado.' }, 400);
+    if (cab.pago) pagamento.corrigido = Date.now();
+    this.sql.exec('UPDATE pedidos SET pago = COALESCE(pago, ?), pagamento = ? WHERE id = ?', pagamento.em, JSON.stringify(pagamento), id);
+    // Primeiro pagamento: agora a confecção recebe (avisa os aparelhos dela)
+    if (!cab.pago) {
+      const p = JSON.parse(this.sql.exec('SELECT dados FROM pedido_partes WHERE id = ? ORDER BY idx', id).toArray().map(r => r.dados).join('') || '{}');
+      p.id = id; p.pagamento = pagamento;
+      this.ctx.waitUntil(this.avisarTodos(avisoDoPedido(p, origem), origem, 'confeccao').catch(() => {}));
+    }
+    return json({ ok: true, pagamento });
+  }
+
+  /** Cancela um pedido que ainda não foi pago (ou reabre, com {desfazer: true}). */
+  async cancelar(id, req) {
+    const { desfazer } = await req.json().catch(() => ({}));
+    const cab = this.um('SELECT pago, status FROM pedidos WHERE id = ?', id);
+    if (!cab) return json({ erro: 'pedido não encontrado' }, 404);
+    if (cab.pago) return json({ erro: 'Pedido já pago não pode ser cancelado aqui. Fale com a confecção.' }, 400);
+    this.sql.exec('UPDATE pedidos SET status = ? WHERE id = ?', desfazer ? 'novo' : 'cancelado', id);
+    return json({ ok: true });
   }
 
   // ---------- Espaço ----------
@@ -338,7 +472,7 @@ export class Pedidos extends DurableObject {
   /** Pedidos entregues há mais de N meses que ainda têm arquivos. */
   antigos(meses) {
     return this.sql.exec(`SELECT p.id, (SELECT COALESCE(SUM(a.tamanho), 0) FROM arquivos a WHERE a.pedido = p.id) AS bytes
-      FROM pedidos p WHERE p.status = 'entregue' AND p.recebido < ? AND EXISTS (SELECT 1 FROM arquivos a WHERE a.pedido = p.id)`,
+      FROM pedidos p WHERE p.status IN ('entregue', 'cancelado') AND p.recebido < ? AND EXISTS (SELECT 1 FROM arquivos a WHERE a.pedido = p.id)`,
     Date.now() - meses * MES).toArray();
   }
 
@@ -380,8 +514,8 @@ export class Pedidos extends DurableObject {
     return c;
   }
 
-  async notificacoes(req, sub, origem) {
-    const lista = () => this.sql.exec('SELECT id, nome, criado, ultimo, erro FROM aparelhos ORDER BY criado').toArray();
+  async notificacoes(req, sub, origem, papel = 'confeccao') {
+    const lista = () => this.sql.exec("SELECT id, nome, criado, ultimo, erro FROM aparelhos WHERE COALESCE(papel, 'confeccao') = ? ORDER BY criado", papel).toArray();
     if (req.method === 'GET' && !sub) return json({ chave: (await this.chavesPush(origem)).publica, aparelhos: lista() });
     if (req.method === 'POST' && !sub) {
       const d = await req.json().catch(() => ({}));
@@ -390,24 +524,26 @@ export class Pedidos extends DurableObject {
       if (endpoint.length > 2000 || p256dh.length < 80 || p256dh.length > 120 || auth.length < 16 || auth.length > 40) return json({ erro: 'dados da notificação inválidos' }, 400);
       const id = (await sha256(endpoint)).slice(0, 16);
       const antigo = this.um('SELECT criado FROM aparelhos WHERE id = ?', id);
-      this.sql.exec('INSERT OR REPLACE INTO aparelhos (id, endpoint, p256dh, auth, nome, criado, ultimo, erro) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)',
-        id, endpoint, p256dh, auth, String(d.nome || 'Aparelho').slice(0, 60), antigo?.criado || Date.now());
+      this.sql.exec('INSERT OR REPLACE INTO aparelhos (id, endpoint, p256dh, auth, nome, criado, ultimo, erro, papel) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?)',
+        id, endpoint, p256dh, auth, String(d.nome || 'Aparelho').slice(0, 60), antigo?.criado || Date.now(), papel);
       return json({ ok: true, id, aparelhos: lista() });
     }
     if (req.method === 'DELETE' && sub) {
-      this.sql.exec('DELETE FROM aparelhos WHERE id = ?', sub);
+      this.sql.exec("DELETE FROM aparelhos WHERE id = ? AND COALESCE(papel, 'confeccao') = ?", sub, papel);
       return json({ ok: true, aparelhos: lista() });
     }
     if (req.method === 'POST' && sub === 'teste') {
-      const r = await this.avisarTodos({ titulo: '🔔 Teste: avisos de pedido ligados', texto: 'Quando chegar um pedido novo da loja, o aviso aparece assim.', url: `${origem}/#confeccao`, tag: 'teste' }, origem);
+      const r = await this.avisarTodos(papel === 'loja'
+        ? { titulo: '🔔 Teste: avisos do balcão ligados', texto: 'Quando um cliente fechar um pedido no tablet, o aviso aparece assim.', url: `${origem}/#loja`, tag: 'teste' }
+        : { titulo: '🔔 Teste: avisos de pedido ligados', texto: 'Quando chegar um pedido novo da loja, o aviso aparece assim.', url: `${origem}/#confeccao`, tag: 'teste' }, origem, papel);
       return json({ ...r, aparelhos: lista() }, r.enviados ? 200 : (r.total ? 502 : 400));
     }
     return json({ erro: 'rota desconhecida' }, 404);
   }
 
   /** Manda o aviso para todos os aparelhos cadastrados. */
-  async avisarTodos(dados, origem) {
-    const aparelhos = this.sql.exec('SELECT * FROM aparelhos').toArray();
+  async avisarTodos(dados, origem, papel = 'confeccao') {
+    const aparelhos = this.sql.exec("SELECT * FROM aparelhos WHERE COALESCE(papel, 'confeccao') = ?", papel).toArray();
     if (!aparelhos.length) return { total: 0, enviados: 0, erro: 'nenhum aparelho cadastrado para receber avisos' };
     const chaves = await this.chavesPush(origem);
     let enviados = 0;
@@ -426,7 +562,9 @@ export class Pedidos extends DurableObject {
     const txt = await req.text();
     if (txt.length > MAX_PEDIDO) return json({ erro: 'pedido grande demais' }, 413);
     const p = JSON.parse(txt);
-    const antigo = this.um('SELECT status, recebido FROM pedidos WHERE id = ?', id);
+    const antigo = this.um('SELECT status, recebido, pago, pagamento, limpo FROM pedidos WHERE id = ?', id);
+    const texto = (p.itens || []).some(it => (it.artes || []).some(a => a.tipo === 'texto')) ? 1 : 0;
+    const contato = p.tipo === 'contato';
     const pecas = (p.itens || []).reduce((s, it) => s + Object.values(it.quantidades || {}).reduce((a, n) => a + (n || 0), 0), 0);
     const alerta = (p.itens || []).some(it => (it.artes || []).some(a => /Baixa/i.test(a.qualidade || ''))) ? 1 : 0;
     const miniatura = String(p.miniatura || '').slice(0, 200000);
@@ -436,30 +574,36 @@ export class Pedidos extends DurableObject {
     this.ctx.storage.transactionSync(() => {
       this.sql.exec('DELETE FROM pedido_partes WHERE id = ?', id);
       for (let i = 0; i < n; i++) this.sql.exec('INSERT INTO pedido_partes (id, idx, dados) VALUES (?, ?, ?)', id, i, dados.slice(i * PEDACO, (i + 1) * PEDACO));
-      this.sql.exec(`INSERT OR REPLACE INTO pedidos (id, numero, data, nome, telefone, total, pecas, camisetas, status, miniatura, recebido, partes, alerta, tipo)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      this.sql.exec(`INSERT OR REPLACE INTO pedidos (id, numero, data, nome, telefone, total, pecas, camisetas, status, miniatura, recebido, partes, alerta, tipo,
+                       origem, pago, pagamento, limpo, texto)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'loja', ?, ?, ?, ?)`,
         id, p.numero || 0, p.data || new Date().toISOString(), p.cliente?.nome || '', p.cliente?.telefone || '',
         +p.total || 0, pecas, (p.itens || []).length, antigo?.status || 'novo', miniatura, antigo?.recebido || Date.now(), n, alerta,
-        p.tipo === 'contato' ? 'contato' : 'pedido');
+        contato ? 'contato' : 'pedido', antigo?.pago ?? null, antigo?.pagamento ?? null, antigo?.limpo ?? null, texto);
     });
-    // Pedido (ou contato) novo: avisa os aparelhos do gestor, sem segurar a resposta ao tablet
-    if (!antigo) { p.id = id; this.ctx.waitUntil(this.avisarTodos(avisoDoPedido(p, origem), origem).catch(() => {})); }
+    // Novo: contato vai direto para a confecção; pedido vai primeiro para o balcão (aguardando pagamento)
+    if (!antigo) {
+      p.id = id;
+      if (contato) this.ctx.waitUntil(this.avisarTodos(avisoDoPedido(p, origem), origem, 'confeccao').catch(() => {}));
+      else this.ctx.waitUntil(this.avisarTodos(avisoDoPedido({ ...p, paraLoja: true }, origem), origem, 'loja').catch(() => {}));
+    }
     return json({ ok: true });
   }
 
   ler(id) {
-    const cab = this.um('SELECT status, recebido, limpo FROM pedidos WHERE id = ?', id);
+    const cab = this.um('SELECT status, recebido, limpo, pago, pagamento FROM pedidos WHERE id = ?', id);
     if (!cab) return json({ erro: 'pedido não encontrado' }, 404);
     const dados = this.sql.exec('SELECT dados FROM pedido_partes WHERE id = ? ORDER BY idx', id).toArray().map(r => r.dados).join('');
     const p = JSON.parse(dados);
     p.status = cab.status; p.recebido = cab.recebido; if (cab.limpo) p.limpo = cab.limpo;
+    p.pago = cab.pago || null; p.pagamento = cab.pagamento ? JSON.parse(cab.pagamento) : null;
     p.arquivos = this.sql.exec('SELECT nome, tipo, tamanho FROM arquivos WHERE pedido = ? ORDER BY nome', id).toArray();
     return json(p);
   }
 
   async mudar(id, req) {
     const { status } = await req.json().catch(() => ({}));
-    if (!STATUS.includes(status)) return json({ erro: 'status inválido' }, 400);
+    if (!STATUS.includes(status) || status === 'cancelado') return json({ erro: 'status inválido' }, 400);
     this.sql.exec('UPDATE pedidos SET status = ? WHERE id = ?', status, id);
     return json({ ok: true });
   }

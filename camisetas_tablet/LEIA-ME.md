@@ -172,6 +172,37 @@ No Mac/Linux, o comando equivalente é
 - **Código pelo nome do arquivo**: `ROCK-151 - Metallica – Logo.png` vira o código
   **ROCK-151** e o nome **Metallica – Logo**.
 
+## Loja / Balcão (receber o pagamento)
+
+O pedido feito no tablet **não vai direto para a confecção**: primeiro aparece no
+**balcão da loja**, esperando o pagamento. Só depois que o caixa registra o
+pagamento o pedido chega para a confecção (com o aviso de pedido novo).
+
+1. Abra o endereço do app + **#loja** no computador/celular do caixa (ou toque em
+   **Acesso da equipe** no tablet) e entre com a **senha da loja**. A inicial é
+   **111111**; troque no botão **Senha** (mínimo 6 caracteres, diferente da senha
+   da confecção). A variável `LOJA_SENHA` no Worker, se existir, tem prioridade.
+2. **A receber**: os pedidos fechados no tablet, com nome, número, camisetas, total
+   e o selo **"Com texto · sem troca"**. Chega com som e a aba piscando; em
+   **🔔 Avisos** dá para receber o alerta mesmo com a página fechada.
+3. Toque no pedido, **cobre o cliente na maquininha** (ou Pix/dinheiro), escolha a
+   forma de pagamento (Crédito com parcelas, Débito, Pix, Dinheiro com troco ou
+   Outro), confira o valor e toque em **Pagamento recebido · enviar para a
+   confecção**. Se o cliente desistiu: **cancelar pedido** (dá para reabrir).
+4. **Pagos**: histórico com a forma de pagamento, o atendente e a situação da
+   produção (filtro Hoje / 7 / 30 dias / Tudo e **Planilha (CSV)** para o Excel).
+   No alto, o **caixa do dia** soma o que entrou hoje por forma de pagamento.
+5. **Para retirar**: pedidos que a confecção marcou como **Pronto**. Quando o
+   cliente busca, toque em **Cliente retirou · marcar como entregue**.
+
+Com a senha da loja não dá para apagar pedidos nem ver os pedidos do site da
+Art Rock (só a confecção). Os pedidos de antes desta versão continuam na
+confecção normalmente.
+
+**Texto não tem troca**: ao colocar um texto, o tablet avisa que camiseta com texto
+personalizado não tem troca; o aviso aparece de novo em Revisar e, em "Seus dados",
+o cliente precisa marcar que está ciente para enviar o pedido.
+
 ## Aviso de pedido no computador do gestor
 
 A cada pedido novo (e a cada cliente que deixar o contato) aparece um **alerta com som** no

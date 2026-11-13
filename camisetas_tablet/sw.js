@@ -4,12 +4,12 @@
  * As artes ficam no IndexedDB do tablet (não passam por aqui).
  * Ao publicar uma versão nova, troque VERSAO para os tablets baixarem os arquivos novos.
  */
-const VERSAO = 'camisetas-tablet-v30';
+const VERSAO = 'camisetas-tablet-v31';
 const APP = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/admin.js', 'js/catalog.js', 'js/config.js', 'js/db.js',
   'js/icons.js', 'js/order.js', 'js/shirt.js', 'js/ui.js', 'js/fontes.js',
-  'js/medidas.js', 'js/texto.js', 'js/precos.js', 'js/sync.js', 'js/textoVetor.js', 'js/painel.js', 'js/codigoArtes.js', 'js/avisos.js',
+  'js/medidas.js', 'js/texto.js', 'js/precos.js', 'js/sync.js', 'js/textoVetor.js', 'js/painel.js', 'js/balcao.js', 'js/codigoArtes.js', 'js/avisos.js',
   'vendor/opentype.min.js',
   ...['montserrat', 'bebas-neue', 'anton', 'oswald', 'bangers', 'permanent-marker', 'pacifico', 'lobster',
     'dancing-script', 'righteous', 'black-ops-one', 'rye', 'unifrakturmaguntia'].map(f => `fontes/${f}.woff`),
@@ -84,10 +84,10 @@ self.addEventListener('notificationclick', e => {
   const url = new URL(e.notification.data?.url || './#confeccao', self.registration.scope).href;
   e.waitUntil((async () => {
     const abertas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    const painel = abertas.find(c => ehPainel(c.url));
+    const painel = abertas.find(c => ehPainel(c.url, url));
     if (painel) { await painel.focus().catch(() => {}); painel.postMessage({ tipo: 'abrir', url }); return; }
     await self.clients.openWindow(url);
   })());
 });
-// Aba que já está no painel da confecção (endereço com #confeccao ou ?pedido=)
-const ehPainel = u => /#confeccao|[?&]pedido=/.test(u);
+// Aba que já está no painel certo: confecção (#confeccao) ou balcão (#loja)
+const ehPainel = (u, alvo = '') => (/#loja/.test(alvo) ? /#loja/.test(u) : /#confeccao/.test(u)) || (/[?&]pedido=/.test(u) && /#loja/.test(u) === /#loja/.test(alvo));

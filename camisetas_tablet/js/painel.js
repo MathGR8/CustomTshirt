@@ -4,7 +4,8 @@
  * Abre no próprio app: "Acesso da equipe" (ou 5 toques no nome da loja) com a
  * senha da confecção. O endereço antigo pedidos.html leva para cá.
  *
- * Mostra os pedidos que o tablet da loja enviou: lista com filtro por situação,
+ * Mostra os pedidos que o tablet da loja enviou (só depois de pagos no balcão,
+ * ver balcao.js) e os do site da Art Rock: lista com filtro por situação,
  * busca, e o pedido em tela cheia (camisetas, tamanhos, cada arte e texto),
  * com PDF, arquivos das artes e a situação (novo → em produção → pronto → entregue).
  * Entra com a senha da confecção (a mesma configurada no tablet).
@@ -84,10 +85,12 @@ function telaEntrar(msg = '') {
     e.preventDefault();
     E.chave = $('#chave').value.trim();
     try {
-      const r = await fetch(`${API}`, { headers: { 'x-chave': E.chave } });
+      const r = await fetch(`${API}/chave`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chave: E.chave }) });
       if (r.status === 401) return telaEntrar('Senha errada. Confira a senha no tablet: Administrador → Configurações → "Senha da confecção".');
       if (r.status === 429) return telaEntrar('Muitas tentativas com a senha errada (deste computador ou do tablet, se estiverem na mesma internet). Espere 15 minutos e tente de novo.');
-      if (!r.ok) return telaEntrar((await r.json().catch(() => ({}))).erro || 'Servidor indisponível.');
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) return telaEntrar(d.erro || 'Servidor indisponível.');
+      if (d.papel === 'loja') return telaEntrar('Esta é a senha da loja (balcão). Para receber pedidos, abra o endereço do app com #loja.');
       ($('#lembrar').checked ? localStorage : sessionStorage).setItem('chaveConfeccao', E.chave);
       iniciarPainel();
     } catch { telaEntrar('Sem conexão com o servidor.'); }
@@ -277,6 +280,7 @@ function pintarLista() {
         <span class="cpNome">${esc(p.nome || 'Sem nome')}</span>
         <small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${p.telefone ? ' · ' + esc(p.telefone) : ''}</small>
         ${p.limpo ? '<small class="seloLimpo">arquivos apagados</small>' : ''}
+        ${p.pagamento ? `<small class="seloPago">${icone('check', 14)} Pago na loja</small>` : ''}
         <small>${p.camisetas} ${p.origem === 'artrock' ? `modelo${p.camisetas === 1 ? '' : 's'}` : `camiseta${p.camisetas === 1 ? '' : 's'}`} · ${p.pecas} peça${p.pecas === 1 ? '' : 's'}${p.total ? ` · <b>${dinheiro(p.total)}</b>` : ''}</small>
         ${p.alerta ? `<small class="alertaPedido">${icone('fechar', 14)} Arte com qualidade baixa</small>` : ''}
       </span>

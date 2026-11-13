@@ -276,7 +276,7 @@ export const CHEST_PRESET = { cm: 10, centerX: 0.74, top: 0.12 };
 // ============================================================
 export const WHATSAPP = {
   number:  '5512982780352',
-  message: 'Olá, finalizei minha personalização e gostaria de fazer uma cotação!'
+  message: 'Olá, finalizei minha personalização e gostaria de um orçamento!'
 };
 
 // ============================================================

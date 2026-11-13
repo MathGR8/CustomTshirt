@@ -1199,3 +1199,62 @@ html:has(body.paginaPainel) { font-size: 16px; }
 .arArquivos li { display: flex; align-items: center; gap: 0.625rem; border-bottom: 1px solid var(--fundo); padding: 0.25rem 0; }
 .arArquivos li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .arArquivos small { color: var(--cinza); }
+
+/* ---------- Aviso: texto personalizado não tem troca (tablet e balcão) ---------- */
+.avisoSemTroca { display: flex; align-items: flex-start; gap: 0.625rem; margin: 0.5rem 0; padding: 0.75rem 0.875rem; border-radius: 0.875rem; background: #fff4cc; border: 1px solid #f0d58a; color: #5c4400; font-size: 0.9375rem; line-height: 1.4; }
+.avisoSemTroca .ic { color: #b07d00; margin-top: 1px; }
+.avisoRevisar { font-size: 1.0625rem; margin: 0.25rem 0 0.75rem; }
+.checkSemTroca { align-items: flex-start; margin-top: 0.75rem; padding: 0.75rem 0.875rem; border-radius: 0.875rem; background: #fff4cc; border: 2px solid #f0d58a; color: #5c4400; line-height: 1.4; }
+.checkSemTroca span { display: flex; gap: 0.5rem; align-items: flex-start; }
+.checkSemTroca.destacar { border-color: var(--perigo); animation: tremer .35s; }
+@keyframes tremer { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.seloSemTroca { display: inline-flex; align-items: center; gap: 0.25rem; color: #7a5b00 !important; font-weight: 700; }
+.seloPago { display: inline-flex; align-items: center; gap: 0.25rem; color: #2f6b3a !important; font-weight: 700; }
+
+/* ---------- Loja / Balcão ---------- */
+.caixaDia { display: flex; flex-wrap: wrap; gap: 0.625rem; padding: 1rem 1.25rem 0; max-width: 100rem; width: 100%; margin: 0 auto; }
+.cxBloco { display: flex; flex-direction: column; gap: 0.125rem; background: var(--branco); border: 2px solid var(--linha); border-radius: var(--raio); padding: 0.625rem 1rem; min-width: 9rem; box-shadow: var(--sombra); }
+.cxBloco span { font-size: 0.8125rem; font-weight: 700; color: var(--cinza-escuro); text-transform: uppercase; letter-spacing: .3px; }
+.cxBloco b { font-size: 1.375rem; }
+.cxBloco small { color: var(--cinza-escuro); }
+.cxBloco:first-child { background: var(--preto); color: var(--branco); border-color: var(--preto); }
+.cxBloco:first-child span, .cxBloco:first-child small { color: #cfcfcf; }
+.cxAlerta { border-color: #c9a227; background: #fffaf0; }
+.filtroPeriodo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.625rem; padding: 1rem 1.25rem 0; max-width: 100rem; width: 100%; margin: 0 auto; }
+.filtroPeriodo[hidden] { display: none; }
+.cartaoPedido.st-receber { border-left-color: #c9a227; }
+.cartaoPedido.st-cancelado { border-left-color: var(--cinza-claro); opacity: .7; }
+.chipSituacao.st-receber { background: #c9a227; color: #fff; }
+.chipSituacao.st-cancelado { background: var(--fundo); color: var(--cinza-escuro); text-decoration: line-through; }
+.chipSituacao.st-entregue { background: var(--fundo); color: var(--cinza-escuro); }
+.cpValor { margin-top: auto; padding-top: 0.25rem; font-size: 1.125rem; }
+.cpValor small { font-size: 0.875rem; color: var(--cinza-escuro); }
+.janelaReceber { width: min(62rem, 96vw); }
+.rcCorpo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+.rcPedido, .rcForm { display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; }
+.rcCliente { display: flex; flex-direction: column; gap: 0.125rem; }
+.rcCliente b { font-size: 1.375rem; }
+.rcCliente small { color: var(--cinza-escuro); }
+.rcItens { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.rcItens li { display: flex; gap: 0.75rem; align-items: center; background: var(--fundo); border-radius: 0.875rem; padding: 0.5rem; }
+.rcItens img { width: 4.5rem; height: 4.5rem; object-fit: contain; background: var(--branco); border-radius: 0.625rem; flex-shrink: 0; }
+.rcItens span { display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; flex: 1; }
+.rcItens small { color: var(--cinza-escuro); }
+.rcItens em { font-style: normal; font-weight: 800; white-space: nowrap; }
+.rcTotal { display: flex; justify-content: space-between; align-items: baseline; border-top: 2px solid var(--linha); padding-top: 0.625rem; }
+.rcTotal b { font-size: 1.625rem; }
+.formasPag { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.5rem; }
+.formasPag button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; min-height: 5rem; border-radius: 0.875rem; border: 2px solid var(--linha); background: var(--branco); font-weight: 700; font-size: 0.9375rem; }
+.formasPag button[aria-pressed="true"] { background: var(--preto); border-color: var(--preto); color: var(--branco); }
+.rcForm .campoPeq { flex: none; }
+.rcTroco { font-size: 1.125rem; min-height: 1.5rem; }
+.faixaPagamento { display: flex; align-items: center; gap: 0.5rem; margin: 0; padding: 0.625rem 0.875rem; border-radius: 0.75rem; background: #fff4cc; color: #5c4400; font-weight: 700; }
+.faixaPagamento.pago { background: #e3f3e6; color: #2f6b3a; }
+.dadosPagamento { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; margin: 0; }
+.dadosPagamento dt { color: var(--cinza-escuro); font-weight: 700; }
+.dadosPagamento dd { margin: 0; }
+@media (max-width: 760px) {
+  .rcCorpo { grid-template-columns: 1fr; }
+  .formasPag { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.rcDesc { font-style: normal; font-weight: 500; color: var(--cinza-escuro); }
