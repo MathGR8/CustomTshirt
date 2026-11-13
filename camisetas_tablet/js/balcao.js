@@ -9,7 +9,7 @@
  * marca como entregue quando o cliente busca.
  *
  * Entra com a senha da loja (inicial 111111; troca em "Senha" aqui mesmo).
- * Abre pelo endereço do app + #loja, ou em "Acesso da equipe" no tablet.
+ * Abre pelo endereço do app + #loja, ou no tablet com 5 toques no nome da loja (senha da loja).
  */
 
 import { $, $$, esc, aviso, confirmar, ajudarTeclado, janela } from './ui.js';
