@@ -1,7 +1,7 @@
 /**
  * @module painel
  * @description Pedidos no computador da confecção.
- * Abre no próprio app: "Acesso da equipe" (ou 5 toques no nome da loja) com a
+ * Abre no próprio app: endereço + #confeccao (ou 5 toques no nome da loja) com a
  * senha da confecção. O endereço antigo pedidos.html leva para cá.
  *
  * Mostra os pedidos que o tablet da loja enviou (só depois de pagos no balcão,

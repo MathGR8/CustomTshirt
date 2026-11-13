@@ -1039,8 +1039,8 @@ ABAS.config = el => {
     <div class="adminCaixa formConfig">
       <h3>${icone('lista', 22)} Pedidos no computador da confecção</h3>
       <p class="textoAjuda">Cada pedido feito aqui é enviado pela internet. No computador, abra o mesmo endereço do app
-        <b class="linkPainel">${esc(location.origin + location.pathname.replace(/[^/]*$/, ''))}</b>,
-        clique em <b>Acesso da equipe</b> e digite a senha da confecção. Sem internet, o pedido espera e vai sozinho depois.</p>
+        com <b>#confeccao</b> no final: <b class="linkPainel">${esc(location.origin + location.pathname.replace(/[^/]*$/, ''))}#confeccao</b>,
+        e digite a senha da confecção (o caixa usa <b>#loja</b> com a senha da loja). Sem internet, o pedido espera e vai sozinho depois.</p>
       <label class="checkLinha"><input type="checkbox" id="eAtivo" ${configEnvio(c).ativo ? 'checked' : ''}> <b>Enviar pedidos para a confecção</b></label>
       <label class="campoPeq"><span>Senha da confecção (a inicial é <b>${SENHA_INICIAL}</b>)</span>
         <input id="eChave" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(configEnvio(c).chave)}" placeholder="${SENHA_INICIAL}"></label>
@@ -1172,7 +1172,7 @@ ABAS.ajuda = el => {
       <h3>${icone('check', 22)} Várias artes de uma vez</h3>
       <p>Em <b>Artes</b>, toque em <b>Selecionar várias</b> (ou segure o dedo numa arte). Marque as artes ou um tema inteiro e escolha: <b>Camiseta pronta</b> (tamanho, posição, cores e preço para todas), <b>Mover para tema</b> (com subcategoria, ex.: a banda), <b>Ocultar</b>, <b>Mostrar</b> ou <b>Apagar</b>.</p>
       <h3>${icone('lista', 22)} Pedidos no computador da confecção</h3>
-      <p>Cada pedido novo vai sozinho para a confecção. No computador, abra o mesmo endereço do app, clique em <b>Acesso da equipe</b> e digite a senha da confecção (a inicial é <b>${SENHA_INICIAL}</b>; troque em <b>Configurações</b>).</p>
+      <p>Cada pedido novo vai sozinho para a confecção. No computador, abra o endereço do app com <b>#confeccao</b> no final e digite a senha da confecção (a inicial é <b>${SENHA_INICIAL}</b>; troque em <b>Configurações</b>).</p>
       <h3>${icone('dinheiro', 22)} Preços</h3>
       <p>Na aba <b>Preços</b>, preencha o preço de cada modelo e malha, os acréscimos por tamanho e para frente + costas. Desligue <b>Mostrar preços para o cliente</b> para esconder os valores do app.</p>
       <p>Os pedidos ficam salvos neste tablet, na aba <b>Pedidos</b>, com o PDF para produção (imagens da frente/costas, tamanhos, nome do arquivo de cada arte e medidas em cm).</p>

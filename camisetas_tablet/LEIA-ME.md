@@ -178,8 +178,8 @@ O pedido feito no tablet **não vai direto para a confecção**: primeiro aparec
 **balcão da loja**, esperando o pagamento. Só depois que o caixa registra o
 pagamento o pedido chega para a confecção (com o aviso de pedido novo).
 
-1. Abra o endereço do app + **#loja** no computador/celular do caixa (ou toque em
-   **Acesso da equipe** no tablet) e entre com a **senha da loja**. A inicial é
+1. Abra o endereço do app + **#loja** no computador/celular do caixa (ou, no tablet,
+   toque 5 vezes no nome da loja) e entre com a **senha da loja**. A inicial é
    **111111**; troque no botão **Senha** (mínimo 6 caracteres, diferente da senha
    da confecção). A variável `LOJA_SENHA` no Worker, se existir, tem prioridade.
 2. **A receber**: os pedidos fechados no tablet, com nome, número, camisetas, total
@@ -232,9 +232,10 @@ Os pedidos são feitos no tablet da loja e podem ser vistos em qualquer computad
 
 1. O envio já vem **ligado**: cada pedido novo feito no tablet vai sozinho para a confecção.
    A **senha inicial da confecção é `000000`**.
-2. No computador: abra **o mesmo endereço do app** (`https://<endereço do app>/`), clique em
-   **Acesso da equipe** (canto de baixo) e digite a senha da confecção. A mesma janela serve para
-   as duas senhas: a do **administrador** abre o Administrador e a da **confecção** abre os pedidos.
+2. No computador: abra o endereço do app com **#confeccao** no final
+   (`https://<endereço do app>/#confeccao`) e digite a senha da confecção. Na página inicial
+   não há botão de acesso: a janela de senha abre com **5 toques** (ou segurando o dedo) no nome
+   da loja, e serve para as três senhas: **administrador**, **loja (balcão)** e **confecção**.
    No computador a senha fica lembrada (abre direto nos pedidos); **Sair** volta para o app da loja.
    No tablet, a janela abre com 5 toques no nome da loja, e a senha da confecção vale só até
    fechar o app. O endereço antigo `/pedidos.html` continua funcionando.
