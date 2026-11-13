@@ -1258,3 +1258,11 @@ html:has(body.paginaPainel) { font-size: 16px; }
   .formasPag { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 .rcDesc { font-style: normal; font-weight: 500; color: var(--cinza-escuro); }
+
+/* Cartão do pedido: nº e situação na 1ª linha, etiquetas (Loja / Art Rock, chegou agora) na 2ª, sem quebrar */
+.cpTopo { align-items: flex-start; }
+.cpTopo strong { white-space: nowrap; }
+.cpSelos { display: flex; flex-wrap: wrap; gap: 0.375rem; margin: 0.125rem 0 0.25rem; }
+.cpSelos:empty { display: none; }
+.etiquetaOrigem, .seloNovo { white-space: nowrap; }
+.etiquetaOrigem { padding: 0.125rem 0.625rem; }
