@@ -127,8 +127,10 @@ export function ajuda(titulo, dicas) {
     <button type="button" class="btn btnEscuro btnLargo" data-fechar>Entendi</button>` });
 }
 
-/** Teclado de senha numérica. @returns {Promise<string|null>} */
-export function pedirSenha(titulo = 'Acesso da equipe', ajuda = 'Digite a senha para continuar.') {
+/** Valor devolvido por pedirSenha quando tocam em "Esqueci a senha". */
+export const ESQUECI = '\u0000esqueci';
+/** Teclado de senha numérica. @returns {Promise<string|null>} (ESQUECI com { esqueci: true }) */
+export function pedirSenha(titulo = 'Acesso da equipe', ajuda = 'Digite a senha para continuar.', { esqueci = false } = {}) {
   const j = janela({ titulo: `${icone('cadeado')} ${titulo}`, classe: 'janelaSenha', html: `
     <p class="textoAjuda">${ajuda}</p>
     <div class="pontosSenha" aria-live="polite"></div>
@@ -137,7 +139,8 @@ export function pedirSenha(titulo = 'Acesso da equipe', ajuda = 'Digite a senha 
       <button type="button" data-n="ok" class="ok" aria-label="Confirmar">${icone('check')}</button></div>
     <form class="senhaLetras" hidden><input type="password" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" placeholder="Senha" aria-label="Senha">
       <button type="submit" class="btn btnEscuro">${icone('check', 20)} Entrar</button></form>
-    <button type="button" class="btnTexto senhaAbc">Senha com letras? Toque aqui</button>` });
+    <button type="button" class="btnTexto senhaAbc">Senha com letras? Toque aqui</button>
+    ${esqueci ? '<button type="button" class="btnTexto senhaEsqueci">Esqueci a senha</button>' : ''}` });
   let valor = '';
   const pintar = () => {
     $('.pontosSenha', j.el).innerHTML = Array.from({ length: Math.max(6, Math.min(valor.length, 16)) }, (_, i) => `<i class="${i < valor.length ? 'cheio' : ''}"></i>`).join('');
@@ -146,6 +149,7 @@ export function pedirSenha(titulo = 'Acesso da equipe', ajuda = 'Digite a senha 
   const fechar = v => { document.removeEventListener('keydown', teclas, true); j.fechar(v); };
   j.aoFechar.then(() => document.removeEventListener('keydown', teclas, true));
   j.el.addEventListener('click', e => {
+    if (e.target.closest('.senhaEsqueci')) return fechar(ESQUECI);
     if (e.target.closest('.senhaAbc')) {
       const f = $('.senhaLetras', j.el); f.hidden = false;
       $('.tecladoSenha', j.el).hidden = $('.pontosSenha', j.el).hidden = e.target.closest('.senhaAbc').hidden = true;

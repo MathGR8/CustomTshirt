@@ -203,6 +203,27 @@ confecção normalmente.
 personalizado não tem troca; o aviso aparece de novo em Revisar e, em "Seus dados",
 o cliente precisa marcar que está ciente para enviar o pedido.
 
+## Esqueci a senha (recuperação por e-mail)
+
+As três senhas (administrador do tablet, loja/balcão e confecção) podem ser trocadas
+com um **código de 6 números** enviado para o e-mail de recuperação
+(**matheus@artrock.com.br**; para mudar, crie a variável `RECUPERACAO_EMAIL` no Worker).
+
+- No tablet: 5 toques no nome da loja → **Esqueci a senha** → escolha qual senha.
+- No balcão (`#loja`) e na confecção (`#confeccao`): **Esqueci a senha** na tela de entrada.
+- O código vale 30 minutos; no máximo 3 códigos por hora. Trocando a senha da confecção
+  pelo tablet, ele já passa a usar a nova para enviar os pedidos (trocando no computador,
+  atualize no tablet em Administrador → Configurações).
+
+**Para funcionar (uma vez só):**
+1. Crie uma conta grátis em **resend.com** usando o e-mail **matheus@artrock.com.br**
+   (sem domínio próprio, o Resend só envia para o e-mail dono da conta, que é o que precisamos).
+2. Em **API Keys → Create API Key** (permissão "Sending access"), copie a chave (começa com `re_`).
+3. No Cloudflare: Workers → **camisetas-tablet** → Configurações → **Variáveis e segredos** →
+   Adicionar → tipo **Segredo**, nome `RESEND_API_KEY`, valor = a chave. Salvar e implantar.
+
+Sem essa chave, o "Esqueci a senha" mostra que a recuperação ainda não foi configurada.
+
 ## Aviso de pedido no computador do gestor
 
 A cada pedido novo (e a cada cliente que deixar o contato) aparece um **alerta com som** no

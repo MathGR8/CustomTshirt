@@ -14,7 +14,7 @@
 import { PADRAO, CORES, POSICOES, MODELOS, MALHAS, ordenarTemas, ordenarGrupos, compararArtes } from './config.js';
 import { DB } from './db.js';
 import { icone } from './icons.js';
-import { $, $$, esc, num, aviso, janela, confirmar, pedirSenha, progressoJanela, aoDeslizar, setasDoTeclado } from './ui.js';
+import { $, $$, esc, num, aviso, janela, confirmar, pedirSenha, progressoJanela, aoDeslizar, setasDoTeclado, ESQUECI } from './ui.js';
 import { importar, urlDa, urlMiniatura, limparUrls, exportarCatalogo, importarCatalogo, lib } from './catalog.js';
 import { credito } from './fontes.js';
 import { pdfPedido, baixar, numeroPedido, totalPecas, textoResumo, imagemLado } from './order.js';
@@ -29,7 +29,8 @@ let App = null;
 export async function abrirAdmin(app) {
   App = app;
   if (document.querySelector('.janelaAdmin')) return;
-  const senha = await pedirSenha('Acesso da equipe', 'Digite a senha do <b>administrador</b>, da <b>loja (balcão)</b> ou da <b>confecção</b>.');
+  const senha = await pedirSenha('Acesso da equipe', 'Digite a senha do <b>administrador</b>, da <b>loja (balcão)</b> ou da <b>confecção</b>.', { esqueci: true });
+  if (senha === ESQUECI) return esqueciSenha();
   if (!senha) return;
   if (senha !== String(App.S.cfg.senha)) {
     // Não é a do administrador: tenta como senha da confecção (abre os pedidos da confecção)
@@ -734,6 +735,31 @@ async function apagarArtesDoCliente(pedidos, todos) {
   const ids = new Set(pedidos.flatMap(p => p.itens.flatMap(it => it.artes)).filter(a => a.origem && a.origem !== 'catalogo' && a.artId).map(a => a.artId));
   const outros = new Set(todos.filter(p => !pedidos.includes(p)).flatMap(p => p.itens.flatMap(it => it.artes.map(a => a.artId))));
   for (const id of ids) if (!outros.has(id)) await DB.apagar('artes', id).catch(() => {});
+}
+
+// ---------- Esqueci a senha (código por e-mail) ----------
+
+async function esqueciSenha() {
+  const j = janela({ titulo: `${icone('cadeado')} Esqueci a senha`, classe: 'janelaPequena', html: `
+    <p class="textoAjuda">Qual senha você esqueceu? Um código vai para o e-mail de recuperação.</p>
+    <div class="menuEdicao">${[['admin', 'engrenagem', 'Administrador', 'Artes, preços e configurações deste tablet'],
+      ['loja', 'dinheiro', 'Loja (balcão)', 'Receber os pagamentos'], ['confeccao', 'lista', 'Confecção', 'Pedidos da produção']]
+      .map(([t, ic, n, s]) => `<button type="button" class="opcaoMenu" data-tipo="${t}">${icone(ic, 26)}<span><b>${n}</b><small>${s}</small></span>${icone('avancar', 20)}</button>`).join('')}</div>` });
+  const tipo = await new Promise(ok => { j.el.querySelectorAll('[data-tipo]').forEach(b => (b.onclick = () => { ok(b.dataset.tipo); j.fechar(); })); j.aoFechar.then(() => ok(null)); });
+  if (!tipo) return;
+  const nova = await (await import('./recuperar.js')).janelaRecuperar(tipo);
+  if (!nova) return;
+  if (tipo === 'admin') {
+    const cfg = { ...App.S.cfg, senha: nova };
+    await DB.salvarConfig(cfg); App.aplicarConfig(cfg);
+    aviso('Senha do administrador trocada. Use a nova senha para entrar.', 'ok');
+  } else if (tipo === 'confeccao') {
+    // O tablet usa a senha da confecção para enviar os pedidos: já atualiza aqui
+    const cfg = { ...App.S.cfg, envio: { ...configEnvio(App.S.cfg), chave: nova, versao: VERSAO_ENVIO } };
+    await DB.salvarConfig(cfg); App.aplicarConfig(cfg);
+    enviarPendentes(cfg).catch(() => {});
+    aviso('Senha da confecção trocada (e já atualizada neste tablet).', 'ok');
+  } else aviso('Senha da loja trocada.', 'ok');
 }
 
 // ---------- Ver pedido (tela cheia) ----------
